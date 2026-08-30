@@ -3,113 +3,249 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Penyimpanan Pribadi (Firestore + B2)</title>
+  <title>CyberStorage // Private Cloud</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 30px; background-color: #f4f7f6; }
-    .container { max-width: 800px; margin: auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-    h1, h2 { color: #333; }
-    .header-flex { display: flex; justify-content: space-between; align-items: center; }
-    
-    #loginScreen, #setupScreen, #appScreen { display: none; }
-    
-    .form-group { margin-bottom: 15px; }
-    .form-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
-    .form-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-    
-    button { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-    .btn-primary { background-color: #007bff; color: white; }
-    .btn-success { background-color: #28a745; color: white; }
-    .btn-danger { background-color: #dc3545; color: white; }
-    .btn-warning { background-color: #ffc107; color: black; font-size: 12px; }
-    
-    .upload-section { margin-bottom: 20px; padding: 15px; border: 2px dashed #ccc; border-radius: 6px; text-align: center; }
-    input[type="file"] { display: none; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-    th { background-color: #f8f9fa; }
-    .status { margin-top: 10px; font-weight: bold; color: #555; }
+    :root {
+      --bg-color: #0b0f19;
+      --card-bg: #111827;
+      --accent: #00ffcc;
+      --accent-hover: #00b386;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --border: #1f2937;
+      --danger: #ef4444;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 40px auto;
+      background: var(--card-bg);
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 255, 204, 0.05);
+      border: 1px solid var(--border);
+    }
+
+    h1, h2 {
+      color: var(--text-main);
+      letter-spacing: 1px;
+    }
+
+    .header-flex {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 15px;
+      margin-bottom: 25px;
+    }
+
+    .header-flex h1 {
+      font-size: 1.5rem;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-flex h1::before {
+      content: '';
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      background-color: var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--accent);
+    }
+
+    #loginScreen, #appScreen {
+      display: none;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px;
+      background: #0b0f19;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-main);
+      font-size: 1rem;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color 0.3s;
+    }
+
+    .form-group input:focus {
+      border-color: var(--accent);
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s;
+    }
+
+    .btn-primary {
+      background-color: var(--accent);
+      color: #000;
+    }
+    .btn-primary:hover {
+      background-color: var(--accent-hover);
+      box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);
+    }
+
+    .btn-danger {
+      background-color: transparent;
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+    .btn-danger:hover {
+      background-color: var(--danger);
+      color: #fff;
+    }
+
+    .upload-section {
+      background: #0b0f19;
+      margin-bottom: 30px;
+      padding: 30px;
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      text-align: center;
+      transition: border-color 0.3s;
+    }
+    .upload-section:hover {
+      border-color: var(--accent);
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    #selectedFileName {
+      color: var(--text-muted);
+      margin: 15px 0;
+      font-style: italic;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    th {
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    td a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    td a:hover {
+      text-decoration: underline;
+    }
+
+    .status {
+      margin-top: 15px;
+      font-size: 0.9rem;
+      color: var(--accent);
+      font-family: monospace;
+    }
   </style>
 </head>
 <body>
 
 <div class="container">
   
-  <!-- 1. LAYAR LOGIN -->
+  <!-- LAYAR LOGIN -->
   <div id="loginScreen">
-    <h2>Login Drive Pribadi</h2>
+    <h2>System Access // Login</h2>
+    <p style="color: var(--text-muted); margin-bottom: 25px;">Autentikasi Firebase diperlukan untuk masuk.</p>
     <div class="form-group">
-      <input type="email" id="loginEmail" placeholder="Email Firebase Anda">
+      <label>Email Address</label>
+      <input type="email" id="loginEmail" placeholder="user@domain.com">
     </div>
     <div class="form-group">
-      <input type="password" id="loginPass" placeholder="Password Firebase Anda">
+      <label>Password</label>
+      <input type="password" id="loginPass" placeholder="••••••••">
     </div>
-    <button class="btn-primary" onclick="login()">Masuk</button>
+    <button class="btn-primary" onclick="login()">Inisialisasi Masuk</button>
     <div id="loginStatus" class="status"></div>
   </div>
 
-  <!-- 2. LAYAR SETUP (Jika Kunci B2 Belum Ada) -->
-  <div id="setupScreen">
-    <h2>Pengaturan API Backblaze</h2>
-    <p>Masukkan API Key Backblaze. Ini akan disimpan permanen secara aman di dalam Firestore Anda.</p>
-    <div class="form-group">
-      <label>Endpoint</label>
-      <input type="text" id="b2Endpoint" placeholder="https://s3.us-west-004.backblazeb2.com">
-    </div>
-    <div class="form-group">
-      <label>Nama Bucket</label>
-      <input type="text" id="b2Bucket" placeholder="pribadi-storage-123">
-    </div>
-    <div class="form-group">
-      <label>Key ID (Access)</label>
-      <input type="text" id="b2KeyId">
-    </div>
-    <div class="form-group">
-      <label>Application Key (Secret)</label>
-      <input type="password" id="b2AppKey">
-    </div>
-    <button class="btn-success" onclick="saveB2Keys()">Simpan ke Firestore</button>
-  </div>
-
-  <!-- 3. LAYAR APLIKASI UTAMA -->
+  <!-- LAYAR UTAMA DASHBOARD -->
   <div id="appScreen">
     <div class="header-flex">
-      <h1>Drive Pribadi</h1>
-      <div>
-        <button class="btn-warning" onclick="resetB2Keys()">Ubah API B2</button>
-        <button class="btn-danger" onclick="logout()">Keluar</button>
-      </div>
+      <h1>CyberStorage <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">[Firebase + GitHub]</span></h1>
+      <button class="btn-danger" onclick="logout()">Putuskan Sesi</button>
     </div>
     
     <div class="upload-section">
-      <button class="btn-primary" onclick="document.getElementById('fileInput').click()">Pilih File</button>
+      <button class="btn-primary" onclick="document.getElementById('fileInput').click()">Pilih Berkas / Foto</button>
       <input type="file" id="fileInput" onchange="showFileName()">
-      <p id="selectedFileName">Belum ada file dipilih</p>
-      <button id="uploadBtn" class="btn-success" style="display: none;">Mulai Upload</button>
+      <p id="selectedFileName">Tidak ada berkas yang dipilih</p>
+      <button id="uploadBtn" class="btn-primary" style="display: none;" onclick="uploadToGitHubAndFirebase()">Unggah ke Cloud</button>
       <div id="status" class="status"></div>
     </div>
 
-    <h2>Daftar File</h2>
+    <h2>Direktori Berkas</h2>
     <table>
       <thead>
-        <tr><th>Nama File</th><th>Ukuran</th><th>Aksi</th></tr>
+        <tr>
+          <th>Nama Berkas</th>
+          <th>Ukuran</th>
+          <th>Aksi</th>
+        </tr>
       </thead>
-      <tbody id="fileTableBody"></tbody>
+      <tbody id="fileTableBody">
+        <tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Memuat data dari database...</td></tr>
+      </tbody>
     </table>
   </div>
 
 </div>
 
-<!-- Script Modul dengan Firebase v9+ dan AWS SDK -->
+<!-- Script Utama Firebase & GitHub API -->
 <script type="module">
-  // Import Firebase Modular SDK
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-  
-  // Import AWS S3 SDK (untuk Backblaze)
-  import { S3Client, PutObjectCommand } from "https://esm.sh/@aws-sdk/client-s3@3.500.0";
+  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-  // Konfigurasi Asli Anda
+  // 1. Konfigurasi Firebase Anda
   const firebaseConfig = {
     apiKey: "AIzaSyBYyVRU9cweEaniUkM3ZF2YeHhdxo3WrUA",
     authDomain: "privatedatasaya.firebaseapp.com",
@@ -119,20 +255,24 @@
     appId: "1:842911791149:web:4d1fec084ed8caa9d1a0a4"
   };
   
-  // Inisialisasi Firebase
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
 
-  let s3Client, b2ConfigData;
+  // 2. Konfigurasi GitHub Anda (Untuk simpan file fisik)
+  const GITHUB_USERNAME = "appvena"; // Sesuai akun Anda
+  const GITHUB_REPO = "private";     // Sesuai repo Anda
+  const GITHUB_TOKEN = "MASUKKAN_TOKEN_GITHUB_CLASSIC_ANDA_DISINI"; 
 
-  // --- ALUR AUTENTIKASI ---
-  onAuthStateChanged(auth, async (user) => {
+  // Cek Status Auth
+  onAuthStateChanged(auth, (user) => {
     if (user) {
       document.getElementById('loginScreen').style.display = 'none';
-      checkB2Keys(); 
+      document.getElementById('appScreen').style.display = 'block';
+      loadFiles();
     } else {
-      showScreen('loginScreen');
+      document.getElementById('loginScreen').style.display = 'block';
+      document.getElementById('appScreen').style.display = 'none';
     }
   });
 
@@ -140,61 +280,14 @@
     const email = document.getElementById('loginEmail').value;
     const pass = document.getElementById('loginPass').value;
     const stat = document.getElementById('loginStatus');
-    stat.textContent = "Mencoba masuk...";
-    
+    stat.textContent = "> Menghubungkan ke server...";
+
     signInWithEmailAndPassword(auth, email, pass).catch(err => {
-      stat.textContent = "Gagal: " + err.message;
+      stat.textContent = "> Akses ditolak: " + err.message;
     });
   };
 
   window.logout = () => signOut(auth);
-
-  // --- MANAJEMEN KUNCI BACKBLAZE (FIRESTORE) ---
-  async function checkB2Keys() {
-    try {
-      const docRef = doc(db, 'settings', 'b2_api');
-      const docSnap = await getDoc(docRef);
-      
-      if (docSnap.exists()) {
-        b2ConfigData = docSnap.data();
-        initS3(b2ConfigData);
-        showScreen('appScreen');
-        loadFiles();
-      } else {
-        showScreen('setupScreen'); 
-      }
-    } catch (err) {
-      alert("Gagal membaca Firestore. Pastikan Firestore Security Rules sudah diatur.");
-    }
-  }
-
-  window.saveB2Keys = async function() {
-    const keys = {
-      endpoint: document.getElementById('b2Endpoint').value.trim(),
-      bucket: document.getElementById('b2Bucket').value.trim(),
-      keyId: document.getElementById('b2KeyId').value.trim(),
-      appKey: document.getElementById('b2AppKey').value.trim()
-    };
-    if (Object.values(keys).includes("")) return alert("Isi semua kolom!");
-    
-    await setDoc(doc(db, 'settings', 'b2_api'), keys);
-    checkB2Keys();
-  };
-
-  window.resetB2Keys = async function() {
-    await deleteDoc(doc(db, 'settings', 'b2_api'));
-    checkB2Keys();
-  };
-
-  // --- INIT S3 & APLIKASI ---
-  function initS3(config) {
-    const region = config.endpoint.split('.')[1] || "us-east-1";
-    s3Client = new S3Client({
-      endpoint: config.endpoint,
-      region: region,
-      credentials: { accessKeyId: config.keyId, secretAccessKey: config.appKey }
-    });
-  }
 
   window.showFileName = function() {
     const input = document.getElementById('fileInput');
@@ -204,59 +297,80 @@
     }
   };
 
-  document.getElementById('uploadBtn').addEventListener('click', async () => {
-    const file = document.getElementById('fileInput').files[0];
+  window.uploadToGitHubAndFirebase = async function() {
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
     const stat = document.getElementById('status');
     if (!file) return;
 
-    stat.textContent = "Upload ke Backblaze...";
-    try {
+    stat.textContent = "> Mengonversi stream data...";
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = async function() {
+      const base64Content = reader.result.split(',')[1];
       const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
-      
-      await s3Client.send(new PutObjectCommand({
-        Bucket: b2ConfigData.bucket,
-        Key: fileName,
-        Body: file,
-        ContentType: file.type || "application/octet-stream"
-      }));
+      const githubPath = `uploads/${fileName}`;
 
-      const publicUrl = `${b2ConfigData.endpoint}/${b2ConfigData.bucket}/${fileName}`;
-      stat.textContent = "Mencatat ke Firestore...";
+      stat.textContent = "> Mengirim paket ke GitHub repository...";
 
-      await addDoc(collection(db, 'user_files'), {
-        fileName: file.name,
-        fileUrl: publicUrl,
-        fileSize: (file.size / (1024 * 1024)).toFixed(2) + " MB",
-        createdAt: serverTimestamp()
-      });
+      try {
+        const response = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${GITHUB_REPO}/contents/${githubPath}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `token ${GITHUB_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: `Upload file: ${file.name}`,
+            content: base64Content
+          })
+        });
 
-      stat.textContent = "Selesai!";
-      document.getElementById('fileInput').value = "";
-      document.getElementById('selectedFileName').textContent = "Belum ada file dipilih";
-      document.getElementById('uploadBtn').style.display = 'none';
-    } catch (err) {
-      stat.textContent = "Error: " + err.message;
-    }
-  });
+        if (!response.ok) throw new Error("Gagal mengirim payload ke GitHub API");
+
+        const fileUrl = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${GITHUB_REPO}/main/${githubPath}`;
+
+        stat.textContent = "> Menyinkronkan metadata ke Firestore...";
+
+        await addDoc(collection(db, 'user_files'), {
+          fileName: file.name,
+          fileUrl: fileUrl,
+          fileSize: (file.size / (1024 * 1024)).toFixed(2) + " MB",
+          createdAt: serverTimestamp()
+        });
+
+        stat.textContent = "> Transaksi unggah sukses!";
+        fileInput.value = "";
+        document.getElementById('selectedFileName').textContent = "Tidak ada berkas yang dipilih";
+        document.getElementById('uploadBtn').style.display = 'none';
+
+      } catch (err) {
+        console.error(err);
+        stat.textContent = "> Error sistem: " + err.message;
+      }
+    };
+  };
 
   function loadFiles() {
     const q = query(collection(db, 'user_files'), orderBy('createdAt', 'desc'));
     onSnapshot(q, (snap) => {
       const tbody = document.getElementById('fileTableBody');
       tbody.innerHTML = '';
+      
+      if(snap.empty) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Direktori kosong.</td></tr>`;
+        return;
+      }
+
       snap.forEach(document => {
         const d = document.data();
         tbody.innerHTML += `<tr>
-          <td>${d.fileName}</td><td>${d.fileSize}</td>
-          <td><a href="${d.fileUrl}" target="_blank">Unduh</a></td>
+          <td>${d.fileName}</td>
+          <td>${d.fileSize}</td>
+          <td><a href="${d.fileUrl}" target="_blank" download>Unduh</a></td>
         </tr>`;
       });
-    });
-  }
-
-  function showScreen(id) {
-    ['loginScreen', 'setupScreen', 'appScreen'].forEach(s => {
-      document.getElementById(s).style.display = (s === id) ? 'block' : 'none';
     });
   }
 </script>
