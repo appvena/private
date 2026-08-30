@@ -3,631 +3,338 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CyberStorage // Deep Space Node</title>
+  <title>Deep Space Node // Multi-System</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SheetJS & html2pdf.js -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     :root {
       --bg-color: #030712;
-      --card-bg: rgba(17, 24, 39, 0.75);
+      --card-bg: rgba(17, 24, 39, 0.85);
       --accent: #3ecf8e;
-      --accent-hover: #34b27b;
-      --text-main: #f3f4f6;
-      --text-muted: #9ca3af;
       --border: rgba(75, 85, 99, 0.4);
-      --danger: #ef4444;
-      --warning: #ffc107;
     }
-
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: var(--bg-color);
-      color: var(--text-main);
-      margin: 0;
-      padding: 20px;
+      color: #f3f4f6;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       min-height: 100vh;
       overflow-x: hidden;
-      position: relative;
     }
-
-    /* Animasi Latar Belakang Luar Angkasa */
     #spaceCanvas {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      top: 0; left: 0; width: 100%; height: 100%;
       z-index: -1;
       background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
     }
-
-    .container {
-      max-width: 950px;
-      margin: 30px auto;
+    .glass-card {
       background: var(--card-bg);
       backdrop-filter: blur(12px);
-      padding: 30px;
-      border-radius: 16px;
-      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
-      border: 1px solid var(--border);
-      position: relative;
-      z-index: 1;
-    }
-
-    h1, h2 {
-      color: var(--text-main);
-      letter-spacing: 1.5px;
-    }
-
-    .header-flex {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 15px;
-      margin-bottom: 25px;
-      flex-wrap: wrap;
-      gap: 15px;
-    }
-
-    .header-flex h1 {
-      font-size: 1.5rem;
-      margin: 0;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      text-shadow: 0 0 10px rgba(62, 207, 142, 0.5);
-    }
-    .header-flex h1::before {
-      content: '';
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      background-color: var(--accent);
-      border-radius: 50%;
-      box-shadow: 0 0 12px var(--accent);
-    }
-
-    #loginScreen, #setupScreen, #passwordScreen, #appScreen {
-      display: none;
-    }
-
-    .form-group {
-      margin-bottom: 20px;
-    }
-
-    .form-group label {
-      display: block;
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--text-muted);
-      margin-bottom: 8px;
-    }
-
-    .form-group input {
-      width: 100%;
-      padding: 12px;
-      background: rgba(3, 7, 18, 0.8);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text-main);
-      font-size: 1rem;
-      box-sizing: border-box;
-      outline: none;
-      transition: all 0.3s;
-    }
-
-    .form-group input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 8px rgba(62, 207, 142, 0.3);
-    }
-
-    button {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: all 0.3s;
-    }
-
-    .btn-primary {
-      background-color: var(--accent);
-      color: #000;
-      box-shadow: 0 0 10px rgba(62, 207, 142, 0.2);
-    }
-    .btn-primary:hover {
-      background-color: var(--accent-hover);
-      box-shadow: 0 0 20px rgba(62, 207, 142, 0.5);
-    }
-
-    .btn-warning {
-      background-color: var(--warning);
-      color: #000;
-    }
-
-    .btn-danger {
-      background-color: transparent;
-      color: var(--danger);
-      border: 1px solid var(--danger);
-    }
-    .btn-danger:hover {
-      background-color: var(--danger);
-      color: #fff;
-    }
-
-    .btn-secondary {
-      background-color: rgba(31, 41, 55, 0.8);
-      color: var(--text-main);
       border: 1px solid var(--border);
     }
-    .btn-secondary:hover {
-      background-color: #374151;
-    }
-
-    .upload-section {
-      background: rgba(3, 7, 18, 0.6);
-      margin-bottom: 30px;
-      padding: 30px;
-      border: 2px dashed var(--border);
-      border-radius: 10px;
-      text-align: center;
-    }
-
-    input[type="file"] {
-      display: none;
-    }
-
-    #previewContainer {
-      margin: 15px auto;
-      max-width: 200px;
-      max-height: 150px;
-      display: none;
-      border-radius: 6px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-    }
-    #previewContainer img {
-      width: 100%;
-      height: auto;
-      object-fit: cover;
-    }
-
-    #selectedFileName {
-      color: var(--text-muted);
-      margin: 10px 0;
-      font-style: italic;
-    }
-
-    #progressWrapper {
-      width: 100%;
-      background-color: var(--border);
-      border-radius: 4px;
-      margin-top: 15px;
-      display: none;
-      overflow: hidden;
-    }
-    #progressBar {
-      width: 0%;
-      height: 10px;
-      background-color: var(--accent);
-      transition: width 0.2s ease-in-out;
-    }
-    #progressText {
-      font-size: 0.85rem;
-      color: var(--accent);
-      margin-top: 5px;
-      display: none;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-
-    th, td {
-      padding: 12px 15px;
-      text-align: left;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.9rem;
-    }
-
-    th {
-      color: var(--text-muted);
-      text-transform: uppercase;
-      font-size: 0.75rem;
-      letter-spacing: 1px;
-      background: rgba(255, 255, 255, 0.02);
-    }
-
-    td a, td span.action-link {
-      color: var(--accent);
-      text-decoration: none;
-      cursor: pointer;
-      margin-right: 12px;
-    }
-    td a:hover, td span.action-link:hover {
-      text-decoration: underline;
-    }
-
-    .note-text {
-      color: var(--text-muted);
-      font-size: 0.82rem;
-      display: block;
-      margin-top: 4px;
-      font-style: italic;
-    }
-
-    .status {
-      margin-top: 15px;
-      font-size: 0.9rem;
-      color: var(--accent);
-      font-family: monospace;
-    }
-
-    /* Modal Styling */
-    #previewModal, #noteModal {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.85);
-      z-index: 1000;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-    }
-    .modal-box {
-      max-width: 85%;
-      width: 400px;
-      background: #111827;
-      padding: 20px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      text-align: center;
-      position: relative;
-    }
-    .modal-box textarea {
-      width: 100%;
-      height: 100px;
-      background: #030712;
-      border: 1px solid var(--border);
-      color: var(--text-main);
-      padding: 10px;
-      border-radius: 6px;
-      margin-bottom: 15px;
-      resize: none;
-      outline: none;
-      box-sizing: border-box;
-    }
-    #previewModal img, #previewModal iframe {
-      max-width: 100%;
-      max-height: 70vh;
-      border-radius: 4px;
+    .print-only { display: none; }
+    @media print {
+      .no-print { display: none !important; }
+      .print-only { display: block; }
+      body { background: white; color: black; }
+      .glass-card { background: transparent; border: none; box-shadow: none; filter: none; }
     }
   </style>
 </head>
-<body>
+<body class="p-4 sm:p-6">
 
-<!-- Latar Belakang Digital Luar Angkasa (Canvas) -->
 <canvas id="spaceCanvas"></canvas>
 
-<div class="container">
-  
-  <!-- 1. LAYAR LOGIN (TEMA LUAR ANGKASA) -->
-  <div id="loginScreen">
-    <h2>Deep Space Access // Login</h2>
-    <p style="color: var(--text-muted); margin-bottom: 25px;">Masukkan kredensial orbital Anda untuk memulai.</p>
-    <div class="form-group">
-      <label>Email Address</label>
-      <input type="email" id="loginEmail" placeholder="commander@space.org">
-    </div>
-    <div class="form-group">
-      <label>Password</label>
-      <input type="password" id="loginPass" placeholder="••••••••">
-    </div>
-    <button class="btn-primary" onclick="login()">Inisialisasi Akses</button>
-    <div id="loginStatus" class="status"></div>
-  </div>
+<div class="max-w-5xl mx-auto space-y-6">
 
-  <!-- 2. LAYAR SETUP SUPABASE API -->
-  <div id="setupScreen">
-    <h2>Pengaturan Supabase Storage</h2>
-    <p style="color: var(--text-muted); margin-bottom: 25px;">Masukkan kredensial Supabase Anda untuk penyimpanan data besar.</p>
-    <div class="form-group">
-      <label>Supabase Project URL</label>
-      <input type="text" id="supaUrl" placeholder="https://xxxx.supabase.co">
-    </div>
-    <div class="form-group">
-      <label>Supabase Anon/Public Key</label>
-      <input type="password" id="supaKey" placeholder="sb_publishable_...">
-    </div>
-    <div class="form-group">
-      <label>Nama Bucket Storage</label>
-      <input type="text" id="supaBucket" placeholder="uploads">
-    </div>
-    <button class="btn-primary" onclick="saveSupabaseKeys()">Simpan Pengaturan</button>
-    <button class="btn-danger" onclick="logout()" style="margin-left: 10px;">Keluar</button>
-    <div id="setupStatus" class="status"></div>
-  </div>
-
-  <!-- 3. LAYAR GANTI PASSWORD -->
-  <div id="passwordScreen">
-    <h2>Keamanan Orbital // Ganti Password</h2>
-    <p style="color: var(--text-muted); margin-bottom: 25px;">Perbarui sandi akses Anda.</p>
-    <div class="form-group">
-      <label>Password Saat Ini</label>
-      <input type="password" id="currentPassword" placeholder="••••••••">
-    </div>
-    <div class="form-group">
-      <label>Password Baru</label>
-      <input type="password" id="newPassword" placeholder="••••••••">
-    </div>
-    <button class="btn-primary" onclick="updatePasswordAccount()">Simpan Sandi Baru</button>
-    <button class="btn-secondary" onclick="showScreen('appScreen')" style="margin-left: 10px;">Kembali</button>
-    <div id="passwordStatus" class="status"></div>
-  </div>
-
-  <!-- 4. LAYAR UTAMA DASHBOARD -->
-  <div id="appScreen">
-    <div class="header-flex">
-      <h1>CyberStorage <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">[Space Node Active]</span></h1>
+  <!-- LAYAR LOGIN -->
+  <div id="loginScreen" class="glass-card p-8 rounded-2xl max-w-md mx-auto mt-20 shadow-2xl">
+    <h2 class="text-2xl font-bold tracking-wider mb-2 text-emerald-400">Deep Space Access</h2>
+    <p class="text-gray-400 text-sm mb-6">Login untuk mengelola Storage & Kalkulator Outlet.</p>
+    <div class="space-y-4">
       <div>
-        <button class="btn-secondary" onclick="showScreen('passwordScreen')">Ganti Password</button>
-        <button class="btn-warning" onclick="resetSupabaseKeys()">Ubah Konfigurasi</button>
-        <button class="btn-danger" onclick="logout()">Keluar</button>
+        <label class="block text-xs uppercase tracking-wider text-gray-400 mb-2">Email Address</label>
+        <input type="email" id="loginEmail" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-emerald-400 outline-none" placeholder="admin@space.org">
       </div>
+      <div>
+        <label class="block text-xs uppercase tracking-wider text-gray-400 mb-2">Password</label>
+        <input type="password" id="loginPass" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-emerald-400 outline-none" placeholder="••••••••">
+      </div>
+      <button onclick="login()" class="w-full py-3 bg-emerald-500 text-gray-950 font-bold rounded-lg hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/20">Inisialisasi Akses</button>
+      <div id="loginStatus" class="text-sm text-emerald-400 font-mono text-center"></div>
     </div>
-    
-    <div class="upload-section">
-      <button class="btn-primary" onclick="document.getElementById('fileInput').click()">Pilih Berkas / Foto Orbital</button>
-      <input type="file" id="fileInput" onchange="handleFileSelected()">
-      
-      <div id="previewContainer">
-        <img id="filePreview" src="" alt="Pratinjau File">
-      </div>
-
-      <p id="selectedFileName">Tidak ada berkas yang dipilih</p>
-      
-      <div id="progressWrapper">
-        <div id="progressBar"></div>
-      </div>
-      <div id="progressText">0%</div>
-
-      <button id="uploadBtn" class="btn-primary" style="display: none; margin-top: 15px;" onclick="uploadToSupabaseStorage()">Unggah ke Orbit</button>
-      <div id="status" class="status"></div>
-    </div>
-
-    <h2>Direktori Berkas Orbital</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Nama Berkas & Catatan</th>
-          <th>Ukuran</th>
-          <th>Aksi</th>
-        </tr>
-      </thead>
-      <tbody id="fileTableBody">
-        <tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Memindai sektor...</td></tr>
-      </tbody>
-    </table>
   </div>
 
+  <!-- LAYAR SETUP SUPABASE -->
+  <div id="setupScreen" class="glass-card p-8 rounded-2xl max-w-md mx-auto mt-20 shadow-2xl hidden">
+    <h2 class="text-2xl font-bold tracking-wider mb-2 text-emerald-400">Setup Supabase Storage</h2>
+    <div class="space-y-4">
+      <input type="text" id="supaUrl" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white" placeholder="Project URL">
+      <input type="password" id="supaKey" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white" placeholder="Anon Key">
+      <input type="text" id="supaBucket" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white" value="uploads">
+      <div class="flex gap-2">
+        <button onclick="saveSupabaseKeys()" class="flex-1 py-3 bg-emerald-500 text-gray-950 font-bold rounded-lg">Simpan</button>
+        <button onclick="logout()" class="px-4 py-3 bg-red-500/20 text-red-400 border border-red-500/50 rounded-lg">Keluar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD UTAMA -->
+  <div id="appScreen" class="glass-card p-6 sm:p-8 rounded-2xl shadow-2xl hidden space-y-6">
+    
+    <!-- HEADER & LOGOUT -->
+    <div class="flex flex-wrap justify-between items-center no-print">
+      <div class="flex items-center gap-3">
+        <span class="w-3 h-3 bg-emerald-400 rounded-full shadow-[0_0_12px_#3ecf8e]"></span>
+        <h1 class="text-xl font-bold tracking-wide text-white">Deep Space Node</h1>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="resetSupabaseKeys()" class="px-3 py-2 bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs rounded-lg hover:bg-amber-500 hover:text-black transition">Konfigurasi Storage</button>
+        <button onclick="logout()" class="px-3 py-2 bg-red-500/20 text-red-400 border border-red-500/40 text-xs rounded-lg hover:bg-red-500 hover:text-white transition">Keluar</button>
+      </div>
+    </div>
+
+    <!-- TAB NAVIGASI -->
+    <div class="flex border-b border-gray-800 gap-6 no-print pt-2">
+      <button id="btnTabStorage" onclick="switchTab('storage')" class="pb-3 border-b-2 border-emerald-400 text-emerald-400 font-bold transition">📁 CyberStorage</button>
+      <button id="btnTabCalc" onclick="switchTab('calc')" class="pb-3 text-gray-400 hover:text-gray-200 transition border-b-2 border-transparent hover:border-gray-500">💰 Kalkulator Outlet</button>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 1: CYBERSTORAGE (TAMPIL DEFAULT)           -->
+    <!-- ============================================== -->
+    <div id="tab-storage" class="space-y-6 no-print">
+      
+      <!-- Upload Area -->
+      <div class="bg-gray-950/60 border-2 border-dashed border-gray-800 p-6 rounded-xl text-center space-y-4">
+        <input type="file" id="fileInput" class="hidden" onchange="handleFileSelected()">
+        <button onclick="document.getElementById('fileInput').click()" class="px-6 py-3 bg-emerald-500 text-gray-950 font-bold rounded-lg hover:bg-emerald-400 transition shadow-[0_0_15px_rgba(62,207,142,0.2)]">Pilih Berkas / Foto Orbital</button>
+        <div id="previewContainer" class="mx-auto max-w-[200px] hidden rounded-lg overflow-hidden border border-gray-700"><img id="filePreview" src=""></div>
+        <p id="selectedFileName" class="text-sm text-gray-400 italic">Tidak ada berkas</p>
+        
+        <div id="progressWrapper" class="w-full bg-gray-800 rounded-full h-2.5 hidden overflow-hidden">
+          <div id="progressBar" class="bg-emerald-400 h-2.5 w-0 transition-all duration-200"></div>
+        </div>
+        <div id="progressText" class="text-xs text-emerald-400 font-mono hidden">0%</div>
+
+        <button id="uploadBtn" class="px-6 py-2 bg-emerald-500 text-gray-950 font-bold text-sm rounded-lg hidden mx-auto" onclick="uploadToSupabaseStorage()">Unggah ke Orbit</button>
+        <div id="status" class="text-xs text-emerald-400 font-mono"></div>
+      </div>
+      
+      <!-- Tabel Direktori -->
+      <div>
+        <h2 class="text-lg font-semibold mb-3 text-gray-200">Direktori Berkas Orbital</h2>
+        <div class="overflow-x-auto bg-gray-950/40 rounded-xl border border-gray-800">
+          <table class="w-full text-left text-sm border-collapse">
+            <thead><tr class="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider bg-white/[0.02]">
+              <th class="p-4">Nama Berkas & Catatan</th><th class="p-4">Ukuran</th><th class="p-4 text-right">Aksi</th>
+            </tr></thead>
+            <tbody id="fileTableBody">
+              <tr><td colspan="3" class="p-4 text-center text-gray-500">Memindai sektor...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+
+    <!-- ============================================== -->
+    <!-- TAB 2: KALKULATOR OUTLET (SEMBUNYI DEFAULT)    -->
+    <!-- ============================================== -->
+    <div id="tab-calc" class="space-y-6 hidden">
+      <div id="pdfExportArea" class="bg-gray-950/40 p-6 rounded-xl border border-gray-800 relative">
+        
+        <!-- Header Laporan -->
+        <div class="flex flex-wrap justify-between items-start gap-4 border-b border-gray-800 pb-4">
+          <div>
+            <h2 class="text-2xl font-bold text-emerald-400">Laporan Outlet Harian</h2>
+            <p id="displayDate" class="text-sm text-gray-300 font-semibold mt-1">Memuat tanggal...</p>
+          </div>
+          <div class="text-right">
+            <div class="bg-gray-900 border border-gray-700 px-4 py-2 rounded-lg text-xs font-mono text-emerald-300 inline-block mb-2 shadow-inner">
+              Kurs USD/IDR: <span id="kursRateText" class="font-bold">Memuat...</span>
+            </div>
+            <div class="flex gap-2 no-print justify-end">
+              <button onclick="exportToExcel()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition shadow">Ekspor Excel</button>
+              <button onclick="exportToPDF()" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg transition shadow">Ekspor PDF</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Area Libur / Form Input -->
+        <div id="holidayBanner" class="hidden mt-4 bg-red-500/10 border border-red-500/50 text-red-400 p-4 rounded-lg text-center font-bold">
+          Layanan input ditutup. Hari ini adalah hari libur (Sabtu/Minggu).
+        </div>
+
+        <div id="outletInputForm" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5 no-print">
+          <div class="sm:col-span-1">
+            <input type="text" id="outletName" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:border-emerald-400 outline-none" placeholder="Nama Outlet (Misal: Outlet A)">
+          </div>
+          <div class="sm:col-span-1">
+            <input type="number" id="inputUSDC" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:border-emerald-400 outline-none" placeholder="Total Netto (USDC)">
+          </div>
+          <div class="sm:col-span-1">
+            <button onclick="saveOutletData()" class="w-full h-full py-2 bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-sm rounded-lg transition shadow-[0_0_15px_rgba(62,207,142,0.2)]">Tambah Data Hari Ini</button>
+          </div>
+        </div>
+
+        <!-- Daftar Outlet Hari Ini -->
+        <div id="todayOutletList" class="space-y-3 mt-6">
+          <div class="text-gray-500 text-center text-sm italic py-4" id="emptyOutletMsg">Belum ada outlet yang diinput hari ini.</div>
+        </div>
+
+        <!-- Total Kalkulasi -->
+        <div class="mt-6 pt-5 border-t border-gray-700 flex flex-col items-end gap-2">
+          <div class="text-lg font-bold text-gray-200">
+            Total USDC: <span id="totalUsdcDisplay" class="text-emerald-400 ml-2">0 USDC</span>
+          </div>
+          <div class="text-2xl font-bold text-white bg-gradient-to-r from-gray-900 to-gray-800 px-6 py-4 rounded-xl border border-gray-700 shadow-lg mt-2">
+            Total IDR: <span id="totalIdrDisplay" class="text-emerald-400 ml-2 drop-shadow-md">Rp 0</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <!-- MODAL PRATINJAU FILE -->
-<div id="previewModal">
-  <div class="modal-box" style="width: auto; max-width: 85%;">
-    <div id="modalBody"></div>
-    <button class="btn-danger" onclick="closePreviewModal()" style="margin-top: 15px;">Tutup Pratinjau</button>
+<div id="previewModal" class="fixed inset-0 bg-black/85 z-50 hidden justify-center items-center p-4">
+  <div class="glass-card p-5 rounded-xl max-w-2xl w-full text-center relative space-y-4">
+    <div id="modalBody" class="flex justify-center items-center overflow-auto max-h-[70vh]"></div>
+    <button onclick="closePreviewModal()" class="px-5 py-2 bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500 hover:text-white font-bold text-sm rounded-lg transition">Tutup Pratinjau</button>
   </div>
 </div>
 
-<!-- MODAL TAMBAH/EDIT CATATAN -->
-<div id="noteModal">
-  <div class="modal-box">
-    <h3>Catatan Berkas</h3>
-    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">Tambahkan atau ubah catatan untuk file ini.</p>
-    <textarea id="noteInputText" placeholder="Tulis catatan di sini..."></textarea>
-    <div>
-      <button class="btn-primary" onclick="saveFileNote()">Simpan Catatan</button>
-      <button class="btn-secondary" onclick="closeNoteModal()" style="margin-left: 8px;">Batal</button>
+<!-- MODAL CATATAN BERKAS -->
+<div id="noteModal" class="fixed inset-0 bg-black/85 z-50 hidden justify-center items-center p-4">
+  <div class="glass-card p-6 rounded-xl max-w-sm w-full space-y-4 text-center border border-gray-700 shadow-2xl">
+    <h3 class="text-lg font-bold text-emerald-400">Catatan Berkas</h3>
+    <textarea id="noteInputText" class="w-full h-28 bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm text-white outline-none focus:border-emerald-400 resize-none shadow-inner" placeholder="Tulis catatan penting..."></textarea>
+    <div class="flex justify-end gap-2 mt-2">
+      <button onclick="closeNoteModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-xs font-bold rounded-lg border border-gray-600 transition">Batal</button>
+      <button onclick="saveFileNote()" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-xs rounded-lg shadow transition">Simpan Catatan</button>
     </div>
   </div>
 </div>
 
+<!-- SCRIPTS -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc, deleteDoc, updateDoc, collection, addDoc, deleteDoc as deleteFirestoreDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc, deleteDoc, updateDoc, collection, addDoc, onSnapshot, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
   import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-  // --- ANIMASI BINTANG LUAR ANGKASA ---
+  // --- LOGIKA TAB MENU ---
+  window.switchTab = function(tabName) {
+    const tabStorage = document.getElementById('tab-storage');
+    const tabCalc = document.getElementById('tab-calc');
+    const btnStorage = document.getElementById('btnTabStorage');
+    const btnCalc = document.getElementById('btnTabCalc');
+
+    if (tabName === 'storage') {
+      tabStorage.classList.remove('hidden');
+      tabCalc.classList.add('hidden');
+      btnStorage.className = "pb-3 border-b-2 border-emerald-400 text-emerald-400 font-bold transition";
+      btnCalc.className = "pb-3 text-gray-400 hover:text-gray-200 transition border-b-2 border-transparent hover:border-gray-500";
+    } else {
+      tabStorage.classList.add('hidden');
+      tabCalc.classList.remove('hidden');
+      btnCalc.className = "pb-3 border-b-2 border-emerald-400 text-emerald-400 font-bold transition";
+      btnStorage.className = "pb-3 text-gray-400 hover:text-gray-200 transition border-b-2 border-transparent hover:border-gray-500";
+    }
+  };
+
+  // --- ANIMASI SPACE ---
   const canvas = document.getElementById('spaceCanvas');
   const ctx = canvas.getContext('2d');
-  let stars = [];
-  const numStars = 120;
-
-  function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-  }
-  window.addEventListener('resize', resizeCanvas);
-  resizeCanvas();
-
-  for (let i = 0; i < numStars; i++) {
-    stars.push({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      radius: Math.random() * 1.5,
-      alpha: Math.random(),
-      speed: Math.random() * 0.02 + 0.005
-    });
-  }
-
+  let stars = Array.from({length: 100}, () => ({ x: Math.random() * window.innerWidth, y: Math.random() * window.innerHeight, radius: Math.random() * 1.5, alpha: Math.random(), speed: Math.random() * 0.02 + 0.005 }));
+  window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
   function animateSpace() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#ffffff";
-    stars.forEach(star => {
-      ctx.globalAlpha = star.alpha;
-      ctx.beginPath();
-      ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
-      ctx.fill();
-      star.alpha += star.speed;
-      if (star.alpha > 1 || star.alpha < 0.2) star.speed = -star.speed;
-    });
+    ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = "#ffffff";
+    stars.forEach(s => { ctx.globalAlpha = s.alpha; ctx.beginPath(); ctx.arc(s.x, s.y, s.radius, 0, Math.PI*2); ctx.fill(); s.alpha += s.speed; if(s.alpha>1||s.alpha<0.2) s.speed = -s.speed; });
     requestAnimationFrame(animateSpace);
   }
   animateSpace();
 
-  // --- INISIALISASI FIREBASE & SUPABASE ---
-  const firebaseConfig = {
+  // --- FIREBASE SETUP ---
+  const app = initializeApp({
     apiKey: "AIzaSyBYyVRU9cweEaniUkM3ZF2YeHhdxo3WrUA",
     authDomain: "privatedatasaya.firebaseapp.com",
     projectId: "privatedatasaya",
-    storageBucket: "privatedatasaya.firebasestorage.app",
-    messagingSenderId: "842911791149",
-    appId: "1:842911791149:web:4d1fec084ed8caa9d1a0a4"
-  };
-  
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-
-  let supaClient = null;
-  let supaBucketName = "";
-  let activeFileDocId = null;
-
-  onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      await checkSupabaseSettings(user.uid);
-    } else {
-      showScreen('loginScreen');
-    }
+    storageBucket: "privatedatasaya.firebasestorage.app"
   });
+  const auth = getAuth(app); const db = getFirestore(app);
+  let supaClient = null, supaBucketName = "", activeFileDocId = null;
+  let currentKursUSD = 16000;
+  
+  // Tanggal & Deteksi Libur
+  const todayDateObj = new Date();
+  const dayOfWeek = todayDateObj.getDay(); 
+  const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+  const todayStrDb = todayDateObj.toISOString().split('T')[0];
+  const optionsId = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  document.getElementById('displayDate').textContent = todayDateObj.toLocaleDateString('id-ID', optionsId);
 
-  window.login = function() {
-    const email = document.getElementById('loginEmail').value;
-    const pass = document.getElementById('loginPass').value;
-    const stat = document.getElementById('loginStatus');
-    stat.textContent = "> Menghubungkan ke orbit...";
+  // Fetch Kurs Real-Time
+  fetch('https://open.er-api.com/v6/latest/USD').then(r=>r.json()).then(d => {
+    if(d?.rates?.IDR) { 
+        currentKursUSD = d.rates.IDR; 
+        document.getElementById('kursRateText').textContent = `Rp ${currentKursUSD.toLocaleString('id-ID', {maximumFractionDigits: 0})}`; 
+    }
+  }).catch(() => document.getElementById('kursRateText').textContent = `Rp ${currentKursUSD.toLocaleString('id-ID')} (Fallback)`);
 
-    signInWithEmailAndPassword(auth, email, pass).catch(err => {
-      stat.textContent = "> Gagal: " + err.message;
-    });
-  };
-
+  onAuthStateChanged(auth, async (user) => { if(user) checkSupabaseSettings(user.uid); else showScreen('loginScreen'); });
+  window.login = () => signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, document.getElementById('loginPass').value).catch(e => document.getElementById('loginStatus').textContent = "> " + e.message);
   window.logout = () => signOut(auth);
+  window.showScreen = (id) => ['loginScreen', 'setupScreen', 'appScreen'].forEach(s => document.getElementById(s).style.display = (s === id) ? 'block' : 'none');
 
   async function checkSupabaseSettings(uid) {
     try {
-      const docRef = doc(db, 'settings', 'supabase_' + uid);
-      const docSnap = await getDoc(docRef);
-      
-      if (docSnap.exists()) {
-        const config = docSnap.data();
-        supaClient = createClient(config.url, config.key);
-        supaBucketName = config.bucket;
+      const snap = await getDoc(doc(db, 'settings', 'supabase_' + uid));
+      if (snap.exists()) {
+        supaClient = createClient(snap.data().url, snap.data().key);
+        supaBucketName = snap.data().bucket;
         showScreen('appScreen');
         loadFiles();
-      } else {
-        showScreen('setupScreen');
-      }
-    } catch (err) {
-      console.error(err);
-      showScreen('setupScreen');
-    }
+        initDailyDashboard();
+      } else showScreen('setupScreen');
+    } catch(e) { showScreen('setupScreen'); }
   }
 
   window.saveSupabaseKeys = async function() {
     const user = auth.currentUser;
-    if (!user) return;
-
-    const config = {
-      url: document.getElementById('supaUrl').value.trim(),
-      key: document.getElementById('supaKey').value.trim(),
-      bucket: document.getElementById('supaBucket').value.trim()
-    };
-
-    if (!config.url || !config.key || !config.bucket) {
-      document.getElementById('setupStatus').textContent = "> Harap isi semua kolom!";
-      return;
-    }
-
-    document.getElementById('setupStatus').textContent = "> Menyimpan konfigurasi...";
-    
-    try {
-      await setDoc(doc(db, 'settings', 'supabase_' + user.uid), config);
-      await checkSupabaseSettings(user.uid);
-    } catch (err) {
-      document.getElementById('setupStatus').textContent = "> Gagal menyimpan: " + err.message;
-    }
+    if(!user) return;
+    const config = { url: document.getElementById('supaUrl').value.trim(), key: document.getElementById('supaKey').value.trim(), bucket: document.getElementById('supaBucket').value.trim() };
+    await setDoc(doc(db, 'settings', 'supabase_' + user.uid), config);
+    await checkSupabaseSettings(user.uid);
   };
-
   window.resetSupabaseKeys = async function() {
-    const user = auth.currentUser;
-    if (user && confirm("Ingin mengubah konfigurasi Supabase?")) {
-      await deleteDoc(doc(db, 'settings', 'supabase_' + user.uid));
-      checkSupabaseSettings(user.uid);
+    if (auth.currentUser && confirm("Ubah konfigurasi Supabase?")) {
+      await deleteDoc(doc(db, 'settings', 'supabase_' + auth.currentUser.uid));
+      checkSupabaseSettings(auth.currentUser.uid);
     }
   };
 
-  window.updatePasswordAccount = async function() {
-    const user = auth.currentUser;
-    const currentPass = document.getElementById('currentPassword').value;
-    const newPass = document.getElementById('newPassword').value;
-    const stat = document.getElementById('passwordStatus');
-
-    if (!currentPass || !newPass) {
-      stat.textContent = "> Harap isi semua kolom sandi!";
-      return;
-    }
-
-    stat.textContent = "> Memverifikasi sandi...";
-
-    try {
-      const credential = EmailAuthProvider.credential(user.email, currentPass);
-      await reauthenticateWithCredential(user, credential);
-
-      stat.textContent = "> Memperbarui sandi...";
-      await updatePassword(user, newPass);
-
-      stat.textContent = "> Sandi berhasil diubah!";
-      document.getElementById('currentPassword').value = '';
-      document.getElementById('newPassword').value = '';
-      setTimeout(() => showScreen('appScreen'), 1500);
-    } catch (err) {
-      stat.textContent = "> Gagal: " + err.message;
-    }
-  };
-
-  window.showScreen = function(id) {
-    ['loginScreen', 'setupScreen', 'passwordScreen', 'appScreen'].forEach(s => {
-      document.getElementById(s).style.display = (s === id) ? 'block' : 'none';
-    });
-  }
-
+  // --- CYBERSTORAGE LOGIC ---
   window.handleFileSelected = function() {
     const input = document.getElementById('fileInput');
     const previewContainer = document.getElementById('previewContainer');
     const filePreview = document.getElementById('filePreview');
-    const fileNameText = document.getElementById('selectedFileName');
-    const uploadBtn = document.getElementById('uploadBtn');
-
     if (input.files.length > 0) {
       const file = input.files[0];
-      fileNameText.textContent = file.name;
-      uploadBtn.style.display = 'inline-block';
-
+      document.getElementById('selectedFileName').textContent = file.name;
+      document.getElementById('uploadBtn').style.display = 'block';
       if (file.type.startsWith('image/')) {
         const reader = new FileReader();
-        reader.onload = function(e) {
-          filePreview.src = e.target.result;
-          previewContainer.style.display = 'block';
-        }
+        reader.onload = e => { filePreview.src = e.target.result; previewContainer.style.display = 'block'; }
         reader.readAsDataURL(file);
-      } else {
-        previewContainer.style.display = 'none';
-      }
+      } else { previewContainer.style.display = 'none'; }
     }
   };
 
@@ -635,184 +342,148 @@
     const fileInput = document.getElementById('fileInput');
     const file = fileInput.files[0];
     const stat = document.getElementById('status');
-    const progressWrapper = document.getElementById('progressWrapper');
-    const progressBar = document.getElementById('progressBar');
-    const progressText = document.getElementById('progressText');
-    const uploadBtn = document.getElementById('uploadBtn');
-
+    const pw = document.getElementById('progressWrapper'), pb = document.getElementById('progressBar'), pt = document.getElementById('progressText');
     if (!file || !supaClient) return;
 
-    uploadBtn.style.display = 'none';
-    progressWrapper.style.display = 'block';
-    progressText.style.display = 'block';
-    stat.textContent = "> Mengunggah ke orbit...";
-
-    let progress = 0;
-    progressBar.style.width = "0%";
-    progressText.textContent = "0%";
-
-    const interval = setInterval(() => {
-      if (progress < 90) {
-        progress += 10;
-        progressBar.style.width = progress + "%";
-        progressText.textContent = progress + "%";
-      }
-    }, 200);
+    document.getElementById('uploadBtn').style.display = 'none';
+    pw.style.display = 'block'; pt.style.display = 'block';
+    let progress = 0; const interval = setInterval(() => { if (progress < 90) { progress += 10; pb.style.width = progress + '%'; pt.textContent = progress + '%'; } }, 200);
 
     const storagePath = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
-
     try {
-      const { data, error } = await supaClient.storage
-        .from(supaBucketName)
-        .upload(storagePath, file);
-
+      const { error } = await supaClient.storage.from(supaBucketName).upload(storagePath, file);
       if (error) throw error;
-
-      clearInterval(interval);
-      progressBar.style.width = "100%";
-      progressText.textContent = "100%";
-
-      const { data: { publicUrl } } = supaClient.storage
-        .from(supaBucketName)
-        .getPublicUrl(storagePath);
-
-      stat.textContent = "> Menyinkronkan metadata...";
+      clearInterval(interval); pb.style.width = '100%'; pt.textContent = '100%';
+      const { data: { publicUrl } } = supaClient.storage.from(supaBucketName).getPublicUrl(storagePath);
 
       await addDoc(collection(db, 'user_files'), {
-        fileName: file.name,
-        filePath: storagePath,
-        fileUrl: publicUrl,
-        fileSize: (file.size / (1024 * 1024)).toFixed(2) + " MB",
-        note: "",
-        createdAt: serverTimestamp()
+        fileName: file.name, filePath: storagePath, fileUrl: publicUrl, fileSize: (file.size / (1024 * 1024)).toFixed(2) + " MB", note: "", createdAt: serverTimestamp()
       });
-
-      stat.textContent = "> Berhasil diunggah ke orbit!";
-      
-      setTimeout(() => {
-        fileInput.value = "";
-        document.getElementById('selectedFileName').textContent = "Tidak ada berkas yang dipilih";
-        document.getElementById('previewContainer').style.display = 'none';
-        progressWrapper.style.display = 'none';
-        progressText.style.display = 'none';
-        stat.textContent = "";
-      }, 2000);
-
+      stat.textContent = "> Berhasil diunggah!";
+      setTimeout(() => { fileInput.value = ""; document.getElementById('selectedFileName').textContent = "Tidak ada berkas"; document.getElementById('previewContainer').style.display = 'none'; pw.style.display = 'none'; pt.style.display = 'none'; stat.textContent = ""; }, 2000);
     } catch (err) {
-      clearInterval(interval);
-      console.error(err);
-      stat.textContent = "> Error: " + err.message;
-      uploadBtn.style.display = 'inline-block';
-      progressWrapper.style.display = 'none';
-      progressText.style.display = 'none';
-    }
-  };
-
-  // --- MANAJEMEN CATATAN BERKAS ---
-  window.openNoteModal = function(docId, currentNote) {
-    activeFileDocId = docId;
-    document.getElementById('noteInputText').value = currentNote || '';
-    document.getElementById('noteModal').style.display = 'flex';
-  };
-
-  window.closeNoteModal = function() {
-    document.getElementById('noteModal').style.display = 'none';
-    activeFileDocId = null;
-  };
-
-  window.saveFileNote = async function() {
-    if (!activeFileDocId) return;
-    const newNote = document.getElementById('noteInputText').value.trim();
-
-    try {
-      await updateDoc(doc(db, 'user_files', activeFileDocId), {
-        note: newNote
-      });
-      closeNoteModal();
-    } catch (err) {
-      alert("Gagal menyimpan catatan: " + err.message);
-    }
-  };
-
-  // --- PRATINJAU FILE ---
-  window.openPreview = function(fileUrl, fileName) {
-    const modal = document.getElementById('previewModal');
-    const modalBody = document.getElementById('modalBody');
-    const ext = fileName.split('.').pop().toLowerCase();
-
-    modalBody.innerHTML = '';
-
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-      modalBody.innerHTML = `<img src="${fileUrl}" alt="Pratinjau Gambar">`;
-    } else if (ext === 'pdf') {
-      modalBody.innerHTML = `<iframe src="${fileUrl}" width="100%" height="450px" style="border:none;"></iframe>`;
-    } else {
-      modalBody.innerHTML = `<p style="color: var(--text-muted); padding: 20px;">Pratinjau tidak tersedia untuk jenis file ini (.${ext}).</p>`;
-    }
-
-    modal.style.display = 'flex';
-  };
-
-  window.closePreviewModal = function() {
-    document.getElementById('previewModal').style.display = 'none';
-    document.getElementById('modalBody').innerHTML = '';
-  };
-
-  window.deleteFile = async function(docId, filePath) {
-    const user = auth.currentUser;
-    const password = prompt("Keamanan Orbital: Masukkan sandi akun Anda untuk menghapus berkas ini:");
-    
-    if (!password) return;
-
-    try {
-      const credential = EmailAuthProvider.credential(user.email, password);
-      await reauthenticateWithCredential(user, credential);
-
-      if(confirm("Apakah Anda yakin ingin menghapus berkas ini dari orbit secara permanen?")) {
-        if (filePath) {
-          await supaClient.storage.from(supaBucketName).remove([filePath]);
-        }
-        await deleteFirestoreDoc(doc(db, 'user_files', docId));
-        alert("Berkas berhasil dihapus!");
-      }
-    } catch (err) {
-      alert("Penghapusan dibatalkan. Sandi salah atau terjadi kesalahan: " + err.message);
+      clearInterval(interval); stat.textContent = "> Error: " + err.message; document.getElementById('uploadBtn').style.display = 'block'; pw.style.display = 'none'; pt.style.display = 'none';
     }
   };
 
   function loadFiles() {
-    const q = query(collection(db, 'user_files'), orderBy('createdAt', 'desc'));
-    onSnapshot(q, (snap) => {
-      const tbody = document.getElementById('fileTableBody');
-      tbody.innerHTML = '';
-      
-      if(snap.empty) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Sektor kosong. Belum ada berkas diorbit.</td></tr>`;
-        return;
-      }
-
-      snap.forEach(documentSnapshot => {
-        const d = documentSnapshot.data();
-        const docId = documentSnapshot.id;
-        const noteDisplay = d.note ? `<span class="note-text">Catatan: ${d.note}</span>` : `<span class="note-text" style="opacity: 0.5;">Belum ada catatan</span>`;
-
-        tbody.innerHTML += `<tr>
-          <td>
-            <strong>${d.fileName}</strong>
-            ${noteDisplay}
-          </td>
-          <td>${d.fileSize}</td>
-          <td>
-            <span class="action-link" onclick="openPreview('${d.fileUrl}', '${d.fileName}')">Pratinjau</span>
-            <a href="${d.fileUrl}" target="_blank" download>Unduh</a>
-            <span class="action-link" onclick="openNoteModal('${docId}', '${d.note || ''}')">Catatan</span>
-            <a href="#" onclick="deleteFile('${docId}', '${d.filePath || ''}')" style="color: var(--danger);">Hapus</a>
-          </td>
-        </tr>`;
+    onSnapshot(query(collection(db, 'user_files'), orderBy('createdAt', 'desc')), (snap) => {
+      const tbody = document.getElementById('fileTableBody'); tbody.innerHTML = '';
+      if (snap.empty) { tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-500">Sektor kosong. Belum ada berkas.</td></tr>`; return; }
+      snap.forEach(docSnap => {
+        const d = docSnap.data(); const docId = docSnap.id;
+        const noteText = d.note ? `<span class="block text-xs text-gray-400 italic mt-1 font-mono">📝 ${d.note}</span>` : `<span class="block text-xs text-gray-600 italic mt-1">Tanpa catatan</span>`;
+        tbody.innerHTML += `
+          <tr class="border-b border-gray-800 hover:bg-white/[0.02] transition">
+            <td class="p-4"><strong>${d.fileName}</strong>${noteText}</td>
+            <td class="p-4 text-gray-400">${d.fileSize}</td>
+            <td class="p-4 space-x-3 text-right">
+              <span class="text-emerald-400 cursor-pointer hover:text-emerald-300 font-semibold" onclick="openPreview('${d.fileUrl}', '${d.fileName}')">Pratinjau</span>
+              <a href="${d.fileUrl}" target="_blank" download class="text-emerald-400 hover:text-emerald-300 font-semibold">Unduh</a>
+              <span class="text-amber-400 cursor-pointer hover:text-amber-300 font-semibold" onclick="openNoteModal('${docId}', '${d.note || ''}')">Catatan</span>
+              <span class="text-red-400 cursor-pointer hover:text-red-300 font-semibold" onclick="deleteFile('${docId}', '${d.filePath || ''}')">Hapus</span>
+            </td>
+          </tr>`;
       });
     });
   }
-</script>
 
+  window.openPreview = (url, name) => {
+    const modalBody = document.getElementById('modalBody'); const ext = name.split('.').pop().toLowerCase();
+    modalBody.innerHTML = ['jpg','jpeg','png','gif','webp'].includes(ext) ? `<img src="${url}" class="max-h-[60vh] rounded shadow-lg border border-gray-700">` : 
+                          (ext === 'pdf' ? `<iframe src="${url}" width="100%" height="450px" class="border-0 rounded border border-gray-700"></iframe>` : `<p class="text-gray-400">Pratinjau tidak didukung untuk format ini.</p>`);
+    document.getElementById('previewModal').style.display = 'flex';
+  };
+  window.closePreviewModal = () => document.getElementById('previewModal').style.display = 'none';
+
+  window.openNoteModal = (id, note) => { activeFileDocId = id; document.getElementById('noteInputText').value = note; document.getElementById('noteModal').style.display = 'flex'; };
+  window.closeNoteModal = () => { document.getElementById('noteModal').style.display = 'none'; activeFileDocId = null; };
+  window.saveFileNote = async () => { if(activeFileDocId) { await updateDoc(doc(db, 'user_files', activeFileDocId), { note: document.getElementById('noteInputText').value.trim() }); closeNoteModal(); } };
+
+  window.deleteFile = async (docId, path) => {
+    const password = prompt("Keamanan Orbital: Masukkan sandi akun Anda untuk menghapus berkas ini:");
+    if (!password) return;
+    try {
+      await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(auth.currentUser.email, password));
+      if (confirm("Hapus permanen berkas ini?")) {
+        if (path) await supaClient.storage.from(supaBucketName).remove([path]);
+        await deleteDoc(doc(db, 'user_files', docId)); alert("Berhasil dihapus!");
+      }
+    } catch (e) { alert("Gagal menghapus: " + e.message); }
+  };
+
+
+  // --- OUTLET CALCULATOR LOGIC ---
+  function initDailyDashboard() {
+    if (isWeekend) {
+      document.getElementById('outletInputForm').style.display = 'none';
+      document.getElementById('holidayBanner').style.display = 'block';
+    }
+    
+    onSnapshot(query(collection(db, 'outlet_profits'), where('dateStr', '==', todayStrDb), orderBy('createdAt', 'asc')), (snap) => {
+      const container = document.getElementById('todayOutletList'); container.innerHTML = '';
+      if (snap.empty) {
+        document.getElementById('emptyOutletMsg').style.display = 'block';
+        document.getElementById('totalUsdcDisplay').textContent = "0 USDC";
+        document.getElementById('totalIdrDisplay').textContent = "Rp 0";
+        return;
+      }
+      
+      document.getElementById('emptyOutletMsg').style.display = 'none';
+      let sumUSDC = 0;
+
+      snap.forEach(docSnap => {
+        const d = docSnap.data(); sumUSDC += d.usdc;
+        container.innerHTML += `
+          <div class="flex justify-between items-center p-4 bg-gray-900 border border-gray-700 rounded-lg shadow-md hover:border-emerald-500/50 transition group">
+            <div>
+              <span class="font-bold text-gray-200 text-lg group-hover:text-emerald-400 transition">${d.outlet}</span>
+            </div>
+            <div class="text-right">
+              <span class="text-emerald-400 font-bold text-lg block tracking-wide">Netto: ${d.usdc.toLocaleString(undefined, {minimumFractionDigits: 2})} USDC</span>
+              <button onclick="deleteOutletRecord('${docSnap.id}')" class="text-red-400 text-xs hover:text-red-300 font-semibold mt-1 no-print">Hapus Data</button>
+            </div>
+          </div>
+        `;
+      });
+
+      document.getElementById('totalUsdcDisplay').textContent = `${sumUSDC.toLocaleString(undefined, {minimumFractionDigits: 2})} USDC`;
+      document.getElementById('totalIdrDisplay').textContent = `Rp ${(sumUSDC * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
+    });
+  }
+
+  window.saveOutletData = async () => {
+    const outlet = document.getElementById('outletName').value.trim(), usdc = parseFloat(document.getElementById('inputUSDC').value);
+    if (!outlet || isNaN(usdc)) return alert("Isi nama outlet dan nominal USDC!");
+    await addDoc(collection(db, 'outlet_profits'), { dateStr: todayStrDb, outlet: outlet, usdc: usdc, createdAt: serverTimestamp() });
+    document.getElementById('outletName').value = ''; document.getElementById('inputUSDC').value = '';
+  };
+  window.deleteOutletRecord = async (id) => { if(confirm("Hapus data outlet ini?")) await deleteDoc(doc(db, 'outlet_profits', id)); };
+
+  // --- EKSPOR LOGIC ---
+  window.exportToPDF = () => {
+    html2pdf().from(document.getElementById('pdfExportArea')).set({
+      margin: 10, filename: `Laporan_Outlet_${todayStrDb}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).save();
+  };
+
+  window.exportToExcel = () => {
+    const container = document.getElementById('todayOutletList');
+    if (container.children.length === 0 || document.getElementById('emptyOutletMsg').style.display !== 'none') return alert("Tidak ada data hari ini.");
+    
+    let excelData = [ ["Tanggal", "Nama Outlet", "Netto (USDC)"] ];
+    container.querySelectorAll('.flex.justify-between').forEach(row => {
+      excelData.push([todayStrDb, row.querySelector('.font-bold').innerText, parseFloat(row.querySelector('.text-emerald-400').innerText.replace('Netto: ', '').replace(' USDC', '').replace(/,/g, ''))]);
+    });
+    
+    excelData.push([]);
+    excelData.push(["TOTAL KESELURUHAN", document.getElementById('totalUsdcDisplay').innerText, document.getElementById('totalIdrDisplay').innerText]);
+    excelData.push(["Kurs Saat Ini", document.getElementById('kursRateText').innerText, ""]);
+
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelData), "Rekap Harian");
+    XLSX.writeFile(wb, `Laporan_Outlet_${todayStrDb}.xlsx`);
+  };
+
+</script>
 </body>
 </html>
