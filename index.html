@@ -3,220 +3,204 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Deep Space Node // Multi-System</title>
+  <title>Sistem Administrasi & Kalkulator Outlet</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- SheetJS & html2pdf.js -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
-    :root {
-      --bg-color: #030712;
-      --card-bg: rgba(17, 24, 39, 0.85);
-      --accent: #3ecf8e;
-      --border: rgba(75, 85, 99, 0.4);
-    }
     body {
-      background-color: var(--bg-color);
-      color: #f3f4f6;
+      background-color: #f1f5f9;
+      color: #1e293b;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       min-height: 100vh;
-      overflow-x: hidden;
     }
-    #spaceCanvas {
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      z-index: -1;
-      background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
-    }
-    .glass-card {
-      background: var(--card-bg);
-      backdrop-filter: blur(12px);
-      border: 1px solid var(--border);
+    .corporate-card {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     }
     .print-only { display: none; }
     @media print {
       .no-print { display: none !important; }
       .print-only { display: block; }
       body { background: white; color: black; }
-      .glass-card { background: transparent; border: none; box-shadow: none; filter: none; }
+      .corporate-card { background: transparent; border: none; box-shadow: none; }
     }
   </style>
 </head>
 <body class="p-4 sm:p-6">
 
-<canvas id="spaceCanvas"></canvas>
-
 <div class="max-w-5xl mx-auto space-y-6">
 
-  <!-- LAYAR LOGIN -->
-  <div id="loginScreen" class="glass-card p-8 rounded-2xl max-w-md mx-auto mt-20 shadow-2xl">
-    <h2 class="text-2xl font-bold tracking-wider mb-2 text-emerald-400">Deep Space Access</h2>
-    <p class="text-gray-400 text-sm mb-6">Login untuk mengelola Storage & Kalkulator Outlet.</p>
+  <!-- LAYAR LOGIN (Disembunyikan default agar tidak flicker saat cek sesi) -->
+  <div id="loginScreen" class="corporate-card p-8 rounded-lg max-w-md mx-auto mt-20 shadow-lg hidden">
+    <h2 class="text-2xl font-bold tracking-wide mb-1 text-slate-800 border-b pb-2">Login Administrasi</h2>
+    <p class="text-slate-500 text-xs mb-6">Masukkan kredensial akun Anda untuk mengakses sistem.</p>
     <div class="space-y-4">
       <div>
-        <label class="block text-xs uppercase tracking-wider text-gray-400 mb-2">Email Address</label>
-        <input type="email" id="loginEmail" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-emerald-400 outline-none" placeholder="admin@space.org">
+        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Email Address</label>
+        <input type="email" id="loginEmail" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm focus:border-blue-600 outline-none" placeholder="admin@domain.com">
       </div>
       <div>
-        <label class="block text-xs uppercase tracking-wider text-gray-400 mb-2">Password</label>
-        <input type="password" id="loginPass" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-emerald-400 outline-none" placeholder="••••••••">
+        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Password</label>
+        <input type="password" id="loginPass" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm focus:border-blue-600 outline-none" placeholder="••••••••">
       </div>
-      <button onclick="login()" class="w-full py-3 bg-emerald-500 text-gray-950 font-bold rounded-lg hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/20">Inisialisasi Akses</button>
-      <div id="loginStatus" class="text-sm text-emerald-400 font-mono text-center"></div>
+      <button onclick="login()" class="w-full py-2.5 bg-blue-900 text-white font-semibold rounded hover:bg-blue-800 transition text-sm shadow">Masuk Sistem</button>
+      <div id="loginStatus" class="text-xs text-red-600 font-mono text-center"></div>
     </div>
   </div>
 
   <!-- LAYAR SETUP SUPABASE -->
-  <div id="setupScreen" class="glass-card p-8 rounded-2xl max-w-md mx-auto mt-20 shadow-2xl hidden">
-    <h2 class="text-2xl font-bold tracking-wider mb-2 text-emerald-400">Setup Supabase Storage</h2>
+  <div id="setupScreen" class="corporate-card p-8 rounded-lg max-w-md mx-auto mt-20 shadow-lg hidden">
+    <h2 class="text-2xl font-bold tracking-wide mb-2 text-slate-800 border-b pb-2">Setup Koneksi Storage</h2>
     <div class="space-y-4">
-      <input type="text" id="supaUrl" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white" placeholder="Project URL">
-      <input type="password" id="supaKey" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white" placeholder="Anon Key">
-      <input type="text" id="supaBucket" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white" value="uploads">
+      <input type="text" id="supaUrl" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm" placeholder="Project URL">
+      <input type="password" id="supaKey" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm" placeholder="Anon Key">
+      <input type="text" id="supaBucket" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm" value="uploads">
       <div class="flex gap-2">
-        <button onclick="saveSupabaseKeys()" class="flex-1 py-3 bg-emerald-500 text-gray-950 font-bold rounded-lg">Simpan</button>
-        <button onclick="logout()" class="px-4 py-3 bg-red-500/20 text-red-400 border border-red-500/50 rounded-lg">Keluar</button>
+        <button onclick="saveSupabaseKeys()" class="flex-1 py-2.5 bg-blue-900 text-white font-semibold rounded text-sm">Simpan</button>
+        <button onclick="logout()" class="px-4 py-2.5 bg-slate-200 text-slate-700 border border-slate-300 rounded text-sm">Keluar</button>
       </div>
     </div>
   </div>
 
   <!-- DASHBOARD UTAMA -->
-  <div id="appScreen" class="glass-card p-6 sm:p-8 rounded-2xl shadow-2xl hidden space-y-6">
+  <div id="appScreen" class="corporate-card p-6 sm:p-8 rounded-lg shadow-md hidden space-y-6">
     
     <!-- HEADER & LOGOUT -->
-    <div class="flex flex-wrap justify-between items-center no-print">
+    <div class="flex flex-wrap justify-between items-center border-b border-slate-200 pb-4 no-print">
       <div class="flex items-center gap-3">
-        <span class="w-3 h-3 bg-emerald-400 rounded-full shadow-[0_0_12px_#3ecf8e]"></span>
-        <h1 class="text-xl font-bold tracking-wide text-white">Deep Space Node</h1>
+        <div class="bg-blue-900 text-white font-bold px-3 py-1.5 rounded text-xs tracking-wider">OFFICE SYSTEM</div>
+        <h1 class="text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
       </div>
-      <div class="flex gap-2">
-        <button onclick="resetSupabaseKeys()" class="px-3 py-2 bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs rounded-lg hover:bg-amber-500 hover:text-black transition">Konfigurasi Storage</button>
-        <button onclick="logout()" class="px-3 py-2 bg-red-500/20 text-red-400 border border-red-500/40 text-xs rounded-lg hover:bg-red-500 hover:text-white transition">Keluar</button>
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 5m)</span>
+        <button onclick="resetSupabaseKeys()" class="px-3 py-1.5 bg-slate-100 text-slate-700 border border-slate-300 text-xs rounded hover:bg-slate-200 transition">Konfigurasi</button>
+        <button onclick="logout()" class="px-3 py-1.5 bg-red-700 text-white text-xs rounded hover:bg-red-800 transition">Keluar</button>
       </div>
     </div>
 
     <!-- TAB NAVIGASI -->
-    <div class="flex border-b border-gray-800 gap-6 no-print pt-2">
-      <button id="btnTabStorage" onclick="switchTab('storage')" class="pb-3 border-b-2 border-emerald-400 text-emerald-400 font-bold transition">📁 CyberStorage</button>
-      <button id="btnTabCalc" onclick="switchTab('calc')" class="pb-3 text-gray-400 hover:text-gray-200 transition border-b-2 border-transparent hover:border-gray-500">💰 Kalkulator Outlet</button>
+    <div class="flex border-b border-slate-300 gap-6 no-print">
+      <button id="btnTabCalc" onclick="switchTab('calc')" class="pb-2.5 border-b-2 border-blue-900 text-blue-900 font-bold text-sm transition">💰 Kalkulator Outlet</button>
+      <button id="btnTabStorage" onclick="switchTab('storage')" class="pb-2.5 text-slate-500 hover:text-slate-800 transition border-b-2 border-transparent text-sm">📁 Arsip Berkas</button>
     </div>
 
     <!-- ============================================== -->
-    <!-- TAB 1: CYBERSTORAGE                            -->
+    <!-- TAB 1: KALKULATOR OUTLET (TAMPIL DEFAULT)      -->
     <!-- ============================================== -->
-    <div id="tab-storage" class="space-y-6 no-print">
-      <!-- Upload Area -->
-      <div class="bg-gray-950/60 border-2 border-dashed border-gray-800 p-6 rounded-xl text-center space-y-4">
-        <input type="file" id="fileInput" class="hidden" onchange="handleFileSelected()">
-        <button onclick="document.getElementById('fileInput').click()" class="px-6 py-3 bg-emerald-500 text-gray-950 font-bold rounded-lg hover:bg-emerald-400 transition shadow-[0_0_15px_rgba(62,207,142,0.2)]">Pilih Berkas / Foto Orbital</button>
-        <div id="previewContainer" class="mx-auto max-w-[200px] hidden rounded-lg overflow-hidden border border-gray-700"><img id="filePreview" src=""></div>
-        <p id="selectedFileName" class="text-sm text-gray-400 italic">Tidak ada berkas</p>
+    <div id="tab-calc" class="space-y-6">
+      <div id="pdfExportArea" class="bg-white p-6 rounded border border-slate-200 relative space-y-4">
         
-        <div id="progressWrapper" class="w-full bg-gray-800 rounded-full h-2.5 hidden overflow-hidden">
-          <div id="progressBar" class="bg-emerald-400 h-2.5 w-0 transition-all duration-200"></div>
-        </div>
-        <div id="progressText" class="text-xs text-emerald-400 font-mono hidden">0%</div>
-
-        <button id="uploadBtn" class="px-6 py-2 bg-emerald-500 text-gray-950 font-bold text-sm rounded-lg hidden mx-auto" onclick="uploadToSupabaseStorage()">Unggah ke Orbit</button>
-        <div id="status" class="text-xs text-emerald-400 font-mono"></div>
-      </div>
-      
-      <!-- Tabel Direktori -->
-      <div>
-        <h2 class="text-lg font-semibold mb-3 text-gray-200">Direktori Berkas Orbital</h2>
-        <div class="overflow-x-auto bg-gray-950/40 rounded-xl border border-gray-800">
-          <table class="w-full text-left text-sm border-collapse">
-            <thead><tr class="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider bg-white/[0.02]">
-              <th class="p-4">Nama Berkas & Catatan</th><th class="p-4">Ukuran</th><th class="p-4 text-right">Aksi</th>
-            </tr></thead>
-            <tbody id="fileTableBody">
-              <tr><td colspan="3" class="p-4 text-center text-gray-500">Memindai sektor...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- ============================================== -->
-    <!-- TAB 2: KALKULATOR OUTLET                       -->
-    <!-- ============================================== -->
-    <div id="tab-calc" class="space-y-6 hidden">
-      <div id="pdfExportArea" class="bg-gray-950/40 p-6 rounded-xl border border-gray-800 relative">
-        
-        <!-- LIVE CLOCK BANNER -->
-        <div class="mb-4 bg-gray-900/80 border border-emerald-500/30 p-3 rounded-xl flex justify-between items-center text-xs font-mono text-emerald-400 shadow-inner">
-          <div>Status Sistem: <span class="text-white font-bold">ONLINE (Live)</span></div>
-          <div id="liveClockDisplay" class="text-sm font-bold tracking-wider">Memuat Waktu...</div>
+        <!-- LIVE CLOCK & STATUS BANNER -->
+        <div class="bg-slate-50 border border-slate-300 p-2.5 rounded flex justify-between items-center text-xs font-mono text-slate-700">
+          <div>Status: <span class="text-emerald-700 font-bold">TERHUBUNG (LIVE)</span></div>
+          <div id="liveClockDisplay" class="font-bold">Memuat Waktu...</div>
         </div>
 
         <!-- Header & Filter Tanggal -->
-        <div class="flex flex-wrap justify-between items-start gap-4 border-b border-gray-800 pb-4">
+        <div class="flex flex-wrap justify-between items-start gap-4 border-b border-slate-200 pb-4">
           <div>
-            <h2 class="text-2xl font-bold text-emerald-400">Laporan Outlet Harian</h2>
+            <h2 class="text-xl font-bold text-slate-800">Laporan Outlet Harian</h2>
             <div class="flex gap-4 mt-3 no-print items-end">
               <div>
-                <label class="block text-xs text-gray-400 mb-1">Dari Tanggal:</label>
-                <input type="date" id="filterStart" onchange="applyDateFilter()" class="p-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:border-emerald-400 outline-none">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Dari Tanggal:</label>
+                <input type="date" id="filterStart" onchange="applyDateFilter()" class="p-2 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm focus:border-blue-600 outline-none">
               </div>
               <div>
-                <label class="block text-xs text-gray-400 mb-1">Sampai Tanggal:</label>
-                <input type="date" id="filterEnd" onchange="applyDateFilter()" class="p-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:border-emerald-400 outline-none">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Sampai Tanggal:</label>
+                <input type="date" id="filterEnd" onchange="applyDateFilter()" class="p-2 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm focus:border-blue-600 outline-none">
               </div>
             </div>
             <!-- Teks Tanggal Untuk Cetak PDF -->
-            <p id="printDateText" class="text-sm text-gray-300 font-semibold mt-3 print-only">Periode: Memuat...</p>
+            <p id="printDateText" class="text-sm text-slate-600 font-semibold mt-3 print-only">Periode: Memuat...</p>
           </div>
           
           <div class="text-right">
-            <div class="bg-gray-900 border border-gray-700 px-4 py-2 rounded-lg text-xs font-mono text-emerald-300 inline-block mb-2 shadow-inner">
+            <div class="bg-slate-100 border border-slate-300 px-3 py-1.5 rounded text-xs font-mono text-slate-700 inline-block mb-2">
               Kurs USD/IDR: <span id="kursRateText" class="font-bold">Memuat...</span>
             </div>
             <div class="flex gap-2 no-print justify-end">
-              <button onclick="exportToExcel()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition shadow">Ekspor Excel</button>
-              <button onclick="exportToPDF()" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg transition shadow">Ekspor PDF</button>
+              <button onclick="exportToExcel()" class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded transition">Ekspor Excel</button>
+              <button onclick="exportToPDF()" class="px-3 py-1.5 bg-purple-800 hover:bg-purple-900 text-white text-xs font-semibold rounded transition">Ekspor PDF</button>
             </div>
           </div>
         </div>
 
         <!-- Info Mode Filter -->
-        <div id="rangeFilterBanner" class="hidden mt-4 bg-blue-500/10 border border-blue-500/50 text-blue-300 p-3 rounded-lg text-center text-sm">
+        <div id="rangeFilterBanner" class="hidden bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded text-sm">
           Menampilkan akumulasi data dari rentang waktu yang dipilih. <b>(Mode Input Dinonaktifkan)</b>
         </div>
 
         <!-- Area Libur -->
-        <div id="holidayBanner" class="hidden mt-4 bg-red-500/10 border border-red-500/50 text-red-400 p-4 rounded-lg text-center font-bold">
+        <div id="holidayBanner" class="hidden bg-red-50 border border-red-200 text-red-700 p-3 rounded text-sm font-semibold text-center">
           Layanan input ditutup. Tanggal yang dipilih adalah hari libur (Sabtu/Minggu).
         </div>
 
         <!-- Form Input -->
-        <div id="outletInputForm" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5 no-print">
-          <div class="sm:col-span-1">
-            <input type="text" id="outletName" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:border-emerald-400 outline-none" placeholder="Nama Outlet (Misal: Outlet A)">
+        <div id="outletInputForm" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 no-print">
+          <div>
+            <input type="text" id="outletName" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm focus:border-blue-600 outline-none" placeholder="Nama Outlet (Misal: Outlet A)">
           </div>
-          <div class="sm:col-span-1">
-            <input type="text" id="inputUSDC" oninput="formatInputCurrency(this)" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:border-emerald-400 outline-none" placeholder="Netto USDC (Otomatis Titik)">
+          <div>
+            <input type="text" id="inputUSDC" oninput="formatInputCurrency(this)" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm focus:border-blue-600 outline-none" placeholder="Netto USDC (Otomatis Titik)">
           </div>
-          <div class="sm:col-span-1">
-            <button onclick="saveOutletData()" class="w-full h-full py-2 bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-sm rounded-lg transition shadow-[0_0_15px_rgba(62,207,142,0.2)]">Buat / Tambah Outlet</button>
+          <div>
+            <button onclick="saveOutletData()" class="w-full h-full py-2.5 bg-blue-900 hover:bg-blue-800 text-white font-semibold text-sm rounded transition shadow">Buat / Tambah Outlet</button>
           </div>
         </div>
 
         <!-- Daftar Outlet -->
-        <div id="todayOutletList" class="space-y-3 mt-6">
-          <div class="text-gray-500 text-center text-sm italic py-4" id="emptyOutletMsg">Belum ada outlet pada tanggal ini.</div>
+        <div id="todayOutletList" class="space-y-3 mt-4">
+          <div class="text-slate-400 text-center text-sm italic py-4" id="emptyOutletMsg">Belum ada data pada tanggal ini.</div>
         </div>
 
         <!-- Total Kalkulasi -->
-        <div class="mt-6 pt-5 border-t border-gray-700 flex flex-col items-end gap-2">
-          <div class="text-lg font-bold text-gray-200">
-            Total USDC: <span id="totalUsdcDisplay" class="text-emerald-400 ml-2">0 USDC</span>
+        <div class="mt-6 pt-4 border-t border-slate-200 flex flex-col items-end gap-1">
+          <div class="text-sm font-bold text-slate-700">
+            Total USDC: <span id="totalUsdcDisplay" class="text-blue-900 ml-2 font-mono">0 USDC</span>
           </div>
-          <div class="text-2xl font-bold text-white bg-gradient-to-r from-gray-900 to-gray-800 px-6 py-4 rounded-xl border border-gray-700 shadow-lg mt-2">
-            Total IDR: <span id="totalIdrDisplay" class="text-emerald-400 ml-2 drop-shadow-md">Rp 0</span>
+          <div class="text-xl font-extrabold text-slate-900 bg-slate-100 px-5 py-3 rounded border border-slate-300 shadow-inner mt-1">
+            Total IDR: <span id="totalIdrDisplay" class="text-blue-900 ml-2 font-mono">Rp 0</span>
           </div>
         </div>
 
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 2: CYBERSTORAGE                            -->
+    <!-- ============================================== -->
+    <div id="tab-storage" class="space-y-6 hidden">
+      <div class="bg-white border border-slate-200 p-6 rounded text-center space-y-4">
+        <input type="file" id="fileInput" class="hidden" onchange="handleFileSelected()">
+        <button onclick="document.getElementById('fileInput').click()" class="px-5 py-2.5 bg-blue-900 text-white font-semibold rounded hover:bg-blue-800 transition text-sm">Pilih Berkas / Dokumen</button>
+        <div id="previewContainer" class="mx-auto max-w-[200px] hidden rounded overflow-hidden border border-slate-300"><img id="filePreview" src=""></div>
+        <p id="selectedFileName" class="text-sm text-slate-500 italic">Tidak ada berkas</p>
+        
+        <div id="progressWrapper" class="w-full bg-slate-200 rounded-full h-2 hidden overflow-hidden">
+          <div id="progressBar" class="bg-blue-600 h-2 w-0 transition-all duration-200"></div>
+        </div>
+        <div id="progressText" class="text-xs text-blue-800 font-mono hidden">0%</div>
+
+        <button id="uploadBtn" class="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-sm rounded hidden mx-auto" onclick="uploadToSupabaseStorage()">Unggah ke Server</button>
+        <div id="status" class="text-xs text-emerald-700 font-mono"></div>
+      </div>
+      
+      <div>
+        <h2 class="text-base font-bold mb-3 text-slate-800">Direktori Arsip Berkas</h2>
+        <div class="overflow-x-auto bg-white rounded border border-slate-200">
+          <table class="w-full text-left text-sm border-collapse">
+            <thead><tr class="border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wider bg-slate-50">
+              <th class="p-3">Nama Berkas & Catatan</th><th class="p-3">Ukuran</th><th class="p-3 text-right">Aksi</th>
+            </tr></thead>
+            <tbody id="fileTableBody">
+              <tr><td colspan="3" class="p-4 text-center text-slate-400">Memindai arsip...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -224,21 +208,21 @@
 </div>
 
 <!-- MODAL PRATINJAU FILE -->
-<div id="previewModal" class="fixed inset-0 bg-black/85 z-50 hidden justify-center items-center p-4">
-  <div class="glass-card p-5 rounded-xl max-w-2xl w-full text-center relative space-y-4">
+<div id="previewModal" class="fixed inset-0 bg-slate-900/70 z-50 hidden justify-center items-center p-4">
+  <div class="corporate-card p-5 rounded max-w-2xl w-full text-center relative space-y-4">
     <div id="modalBody" class="flex justify-center items-center overflow-auto max-h-[70vh]"></div>
-    <button onclick="closePreviewModal()" class="px-5 py-2 bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500 hover:text-white font-bold text-sm rounded-lg transition">Tutup Pratinjau</button>
+    <button onclick="closePreviewModal()" class="px-4 py-2 bg-red-700 text-white font-semibold text-xs rounded hover:bg-red-800 transition">Tutup Pratinjau</button>
   </div>
 </div>
 
 <!-- MODAL CATATAN BERKAS -->
-<div id="noteModal" class="fixed inset-0 bg-black/85 z-50 hidden justify-center items-center p-4">
-  <div class="glass-card p-6 rounded-xl max-w-sm w-full space-y-4 text-center border border-gray-700 shadow-2xl">
-    <h3 class="text-lg font-bold text-emerald-400">Catatan Berkas</h3>
-    <textarea id="noteInputText" class="w-full h-28 bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm text-white outline-none focus:border-emerald-400 resize-none shadow-inner" placeholder="Tulis catatan penting..."></textarea>
+<div id="noteModal" class="fixed inset-0 bg-slate-900/70 z-50 hidden justify-center items-center p-4">
+  <div class="corporate-card p-6 rounded max-w-sm w-full space-y-4 text-center shadow-lg">
+    <h3 class="text-base font-bold text-slate-800">Catatan Arsip</h3>
+    <textarea id="noteInputText" class="w-full h-28 bg-slate-50 border border-slate-300 rounded p-3 text-sm text-slate-800 outline-none focus:border-blue-600 resize-none" placeholder="Tulis catatan..."></textarea>
     <div class="flex justify-end gap-2 mt-2">
-      <button onclick="closeNoteModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-xs font-bold rounded-lg border border-gray-600 transition">Batal</button>
-      <button onclick="saveFileNote()" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-xs rounded-lg shadow transition">Simpan Catatan</button>
+      <button onclick="closeNoteModal()" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded">Batal</button>
+      <button onclick="saveFileNote()" class="px-3 py-1.5 bg-blue-900 hover:bg-blue-800 text-white text-xs font-semibold rounded">Simpan</button>
     </div>
   </div>
 </div>
@@ -247,10 +231,25 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc, deleteDoc, updateDoc, collection, addDoc, onSnapshot, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, getDoc, deleteDoc, updateDoc, collection, addDoc, onSnapshot, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
   import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-  // --- JAM & TANGGAL LIVE REAL-TIME ---
+  // --- AUTO LOGOUT 5 MENIT (INACTIVITY TIMER) ---
+  let inactivityTimer;
+  function resetInactivityTimer() {
+    clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(() => {
+      if(auth.currentUser) {
+        signOut(auth);
+        alert("Sesi Anda telah berakhir otomatis karena tidak ada aktivitas selama 5 menit.");
+      }
+    }, 5 * 60 * 1000);
+  }
+  ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(evt => {
+    window.addEventListener(evt, resetInactivityTimer);
+  });
+
+  // --- LIVE CLOCK ---
   function updateLiveClock() {
     const now = new Date();
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
@@ -259,7 +258,7 @@
   setInterval(updateLiveClock, 1000);
   updateLiveClock();
 
-  // --- LOGIKA TAB MENU ---
+  // --- LOGIKA TAB MENU (DEFAULT: CALC) ---
   window.switchTab = function(tabName) {
     const tabStorage = document.getElementById('tab-storage');
     const tabCalc = document.getElementById('tab-calc');
@@ -268,16 +267,16 @@
 
     if (tabName === 'storage') {
       tabStorage.classList.remove('hidden'); tabCalc.classList.add('hidden');
-      btnStorage.className = "pb-3 border-b-2 border-emerald-400 text-emerald-400 font-bold transition";
-      btnCalc.className = "pb-3 text-gray-400 hover:text-gray-200 transition border-b-2 border-transparent hover:border-gray-500";
+      btnStorage.className = "pb-2.5 border-b-2 border-blue-900 text-blue-900 font-bold text-sm transition";
+      btnCalc.className = "pb-2.5 text-slate-500 hover:text-slate-800 transition border-b-2 border-transparent text-sm";
     } else {
       tabStorage.classList.add('hidden'); tabCalc.classList.remove('hidden');
-      btnCalc.className = "pb-3 border-b-2 border-emerald-400 text-emerald-400 font-bold transition";
-      btnStorage.className = "pb-3 text-gray-400 hover:text-gray-200 transition border-b-2 border-transparent hover:border-gray-500";
+      btnCalc.className = "pb-2.5 border-b-2 border-blue-900 text-blue-900 font-bold text-sm transition";
+      btnStorage.className = "pb-2.5 text-slate-500 hover:text-slate-800 transition border-b-2 border-transparent text-sm";
     }
   };
 
-  // --- FORMAT PEMISAH RIBUAN REAL-TIME SAAT MENGETIK ---
+  // --- FORMAT PEMISAH RIBUAN ---
   window.formatInputCurrency = function(input) {
     let cleanVal = input.value.replace(/\D/g, ''); 
     if (!cleanVal) {
@@ -291,19 +290,6 @@
     if(!str) return 0;
     return parseFloat(str.toString().replace(/\./g, '').replace(',', '.')) || 0;
   };
-
-  // --- ANIMASI SPACE ---
-  const canvas = document.getElementById('spaceCanvas');
-  const ctx = canvas.getContext('2d');
-  let stars = Array.from({length: 100}, () => ({ x: Math.random() * window.innerWidth, y: Math.random() * window.innerHeight, radius: Math.random() * 1.5, alpha: Math.random(), speed: Math.random() * 0.02 + 0.005 }));
-  window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
-  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-  function animateSpace() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = "#ffffff";
-    stars.forEach(s => { ctx.globalAlpha = s.alpha; ctx.beginPath(); ctx.arc(s.x, s.y, s.radius, 0, Math.PI*2); ctx.fill(); s.alpha += s.speed; if(s.alpha>1||s.alpha<0.2) s.speed = -s.speed; });
-    requestAnimationFrame(animateSpace);
-  }
-  animateSpace();
 
   // --- FIREBASE SETUP ---
   const app = initializeApp({
@@ -326,7 +312,7 @@
   document.getElementById('filterStart').value = todayStrDb;
   document.getElementById('filterEnd').value = todayStrDb;
 
-  let currentOutletListener = null;
+  let allOutletData = [];
 
   fetch('https://open.er-api.com/v6/latest/USD').then(r=>r.json()).then(d => {
     if(d?.rates?.IDR) { 
@@ -335,10 +321,20 @@
     }
   }).catch(() => document.getElementById('kursRateText').textContent = `Rp ${currentKursUSD.toLocaleString('id-ID')} (Fallback)`);
 
-  onAuthStateChanged(auth, async (user) => { if(user) checkSupabaseSettings(user.uid); else showScreen('loginScreen'); });
+  onAuthStateChanged(auth, async (user) => { 
+    if(user) {
+      document.getElementById('loginScreen').style.display = 'none';
+      checkSupabaseSettings(user.uid);
+      resetInactivityTimer();
+    } else {
+      document.getElementById('appScreen').style.display = 'none';
+      document.getElementById('setupScreen').style.display = 'none';
+      document.getElementById('loginScreen').style.display = 'block';
+    }
+  });
+
   window.login = () => signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, document.getElementById('loginPass').value).catch(e => document.getElementById('loginStatus').textContent = "> " + e.message);
   window.logout = () => signOut(auth);
-  window.showScreen = (id) => ['loginScreen', 'setupScreen', 'appScreen'].forEach(s => document.getElementById(s).style.display = (s === id) ? 'block' : 'none');
 
   async function checkSupabaseSettings(uid) {
     try {
@@ -346,11 +342,19 @@
       if (snap.exists()) {
         supaClient = createClient(snap.data().url, snap.data().key);
         supaBucketName = snap.data().bucket;
-        showScreen('appScreen');
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('setupScreen').style.display = 'none';
+        document.getElementById('appScreen').style.display = 'block';
         loadFiles();
-        applyDateFilter();
-      } else showScreen('setupScreen');
-    } catch(e) { showScreen('setupScreen'); }
+        initOutletListener();
+      } else {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('appScreen').style.display = 'none';
+        document.getElementById('setupScreen').style.display = 'block';
+      }
+    } catch(e) { 
+      document.getElementById('setupScreen').style.display = 'block'; 
+    }
   }
 
   window.saveSupabaseKeys = async function() {
@@ -361,7 +365,7 @@
     await checkSupabaseSettings(user.uid);
   };
   window.resetSupabaseKeys = async function() {
-    if (auth.currentUser && confirm("Ubah konfigurasi Supabase?")) {
+    if (auth.currentUser && confirm("Ubah konfigurasi Storage?")) {
       await deleteDoc(doc(db, 'settings', 'supabase_' + auth.currentUser.uid));
       checkSupabaseSettings(auth.currentUser.uid);
     }
@@ -409,23 +413,23 @@
   function loadFiles() {
     onSnapshot(query(collection(db, 'user_files')), (snap) => {
       const tbody = document.getElementById('fileTableBody'); tbody.innerHTML = '';
-      if (snap.empty) { tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-500">Sektor kosong. Belum ada berkas.</td></tr>`; return; }
+      if (snap.empty) { tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-400">Direktori arsip kosong.</td></tr>`; return; }
       
       let items = [];
       snap.forEach(d => items.push({ id: d.id, ...d.data() }));
       items.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
 
       items.forEach(d => {
-        const noteText = d.note ? `<span class="block text-xs text-gray-400 italic mt-1 font-mono">📝 ${d.note}</span>` : `<span class="block text-xs text-gray-600 italic mt-1">Tanpa catatan</span>`;
+        const noteText = d.note ? `<span class="block text-xs text-slate-500 italic mt-1">📝 ${d.note}</span>` : `<span class="block text-xs text-slate-400 italic mt-1">Tanpa catatan</span>`;
         tbody.innerHTML += `
-          <tr class="border-b border-gray-800 hover:bg-white/[0.02] transition">
-            <td class="p-4"><strong>${d.fileName}</strong>${noteText}</td>
-            <td class="p-4 text-gray-400">${d.fileSize}</td>
-            <td class="p-4 space-x-3 text-right">
-              <span class="text-emerald-400 cursor-pointer hover:text-emerald-300 font-semibold" onclick="openPreview('${d.fileUrl}', '${d.fileName}')">Pratinjau</span>
-              <a href="${d.fileUrl}" target="_blank" download class="text-emerald-400 hover:text-emerald-300 font-semibold">Unduh</a>
-              <span class="text-amber-400 cursor-pointer hover:text-amber-300 font-semibold" onclick="openNoteModal('${d.id}', '${d.note || ''}')">Catatan</span>
-              <span class="text-red-400 cursor-pointer hover:text-red-300 font-semibold" onclick="deleteFile('${d.id}', '${d.filePath || ''}')">Hapus</span>
+          <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
+            <td class="p-3"><strong>${d.fileName}</strong>${noteText}</td>
+            <td class="p-3 text-slate-500">${d.fileSize}</td>
+            <td class="p-3 space-x-3 text-right">
+              <span class="text-blue-700 cursor-pointer hover:underline font-semibold" onclick="openPreview('${d.fileUrl}', '${d.fileName}')">Pratinjau</span>
+              <a href="${d.fileUrl}" target="_blank" download class="text-blue-700 hover:underline font-semibold">Unduh</a>
+              <span class="text-amber-700 cursor-pointer hover:underline font-semibold" onclick="openNoteModal('${d.id}', '${d.note || ''}')">Catatan</span>
+              <span class="text-red-700 cursor-pointer hover:underline font-semibold" onclick="deleteFile('${d.id}', '${d.filePath || ''}')">Hapus</span>
             </td>
           </tr>`;
       });
@@ -434,8 +438,8 @@
 
   window.openPreview = (url, name) => {
     const modalBody = document.getElementById('modalBody'); const ext = name.split('.').pop().toLowerCase();
-    modalBody.innerHTML = ['jpg','jpeg','png','gif','webp'].includes(ext) ? `<img src="${url}" class="max-h-[60vh] rounded shadow-lg border border-gray-700">` : 
-                          (ext === 'pdf' ? `<iframe src="${url}" width="100%" height="450px" class="border-0 rounded border border-gray-700"></iframe>` : `<p class="text-gray-400">Pratinjau tidak didukung.</p>`);
+    modalBody.innerHTML = ['jpg','jpeg','png','gif','webp'].includes(ext) ? `<img src="${url}" class="max-h-[60vh] rounded shadow border border-slate-300">` : 
+                          (ext === 'pdf' ? `<iframe src="${url}" width="100%" height="450px" class="border rounded border-slate-300"></iframe>` : `<p class="text-slate-500">Pratinjau tidak didukung.</p>`);
     document.getElementById('previewModal').style.display = 'flex';
   };
   window.closePreviewModal = () => document.getElementById('previewModal').style.display = 'none';
@@ -444,7 +448,7 @@
   window.saveFileNote = async () => { if(activeFileDocId) { await updateDoc(doc(db, 'user_files', activeFileDocId), { note: document.getElementById('noteInputText').value.trim() }); closeNoteModal(); } };
   
   window.deleteFile = async (docId, path) => {
-    const password = prompt("Masukkan sandi akun Anda untuk menghapus berkas ini:");
+    const password = prompt("Masukkan password akun Anda untuk konfirmasi hapus:");
     if (!password) return;
     try {
       await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(auth.currentUser.email, password));
@@ -453,16 +457,20 @@
         await deleteDoc(doc(db, 'user_files', docId)); alert("Berhasil dihapus!");
       }
     } catch (e) { 
-      if (e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password') {
-        alert("Gagal menghapus: Sandi / Password yang Anda masukkan SALAH.");
-      } else {
-        alert("Gagal menghapus: " + e.message);
-      }
+      alert("Password salah atau gagal menghapus.");
     }
   };
 
 
-  // --- OUTLET CALCULATOR LOGIC ---
+  // --- OUTLET CALCULATOR LOGIC (CLIENT-SIDE FILTERING & ROBUST DATA SYNC) ---
+  function initOutletListener() {
+    onSnapshot(collection(db, 'outlet_profits'), (snap) => {
+      allOutletData = [];
+      snap.forEach(d => allOutletData.push({ id: d.id, ...d.data() }));
+      applyDateFilter();
+    });
+  }
+
   window.applyDateFilter = function() {
     let start = document.getElementById('filterStart').value;
     let end = document.getElementById('filterEnd').value;
@@ -478,7 +486,7 @@
     const parts = start.split('-');
     const dateObjStart = new Date(parts[0], parts[1] - 1, parts[2]);
     const dayOfWeek = dateObjStart.getDay(); 
-    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6); // 0 = Minggu, 6 = Sabtu
+    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6); 
     
     const optionsId = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     
@@ -502,64 +510,53 @@
        document.getElementById('holidayBanner').style.display = 'none';
     }
 
-    if(currentOutletListener) currentOutletListener(); 
+    // Filter secara client-side agar data pasti muncul tanpa indeks kompleks
+    const filteredItems = allOutletData.filter(d => d.dateStr >= start && d.dateStr <= end);
 
-    // PERBAIKAN: Menggunakan pencarian persis (==) jika tanggal sama, dan rentang (>=, <=) jika berbeda
-    let q;
-    if (isSingleDay) {
-      q = query(collection(db, 'outlet_profits'), where('dateStr', '==', start));
-    } else {
-      q = query(collection(db, 'outlet_profits'), where('dateStr', '>=', start), where('dateStr', '<=', end));
+    const container = document.getElementById('todayOutletList'); container.innerHTML = '';
+    if (filteredItems.length === 0) {
+      document.getElementById('emptyOutletMsg').style.display = 'block';
+      document.getElementById('totalUsdcDisplay').textContent = "0 USDC";
+      document.getElementById('totalIdrDisplay').textContent = "Rp 0";
+      return;
     }
+    
+    document.getElementById('emptyOutletMsg').style.display = 'none';
+    let sumUSDC = 0;
+    
+    filteredItems.sort((a, b) => {
+      if(a.dateStr === b.dateStr) return (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0);
+      return a.dateStr > b.dateStr ? -1 : 1;
+    });
 
-    currentOutletListener = onSnapshot(q, (snap) => {
-      const container = document.getElementById('todayOutletList'); container.innerHTML = '';
-      if (snap.empty) {
-        document.getElementById('emptyOutletMsg').style.display = 'block';
-        document.getElementById('totalUsdcDisplay').textContent = "0 USDC";
-        document.getElementById('totalIdrDisplay').textContent = "Rp 0";
-        return;
-      }
+    filteredItems.forEach(d => {
+      sumUSDC += (d.usdc || 0);
+      const dateLabel = isSingleDay ? '' : `<span class="block text-xs text-slate-400 font-mono mt-0.5">${d.dateStr}</span>`;
+      const usdcFormatted = (d.usdc || 0).toLocaleString('id-ID', {maximumFractionDigits: 2});
       
-      document.getElementById('emptyOutletMsg').style.display = 'none';
-      let sumUSDC = 0;
-      let items = [];
-      snap.forEach(d => items.push({ id: d.id, ...d.data() }));
-      
-      items.sort((a, b) => {
-        if(a.dateStr === b.dateStr) return (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0);
-        return a.dateStr > b.dateStr ? -1 : 1;
-      });
+      const usdcDisplay = (d.usdc || 0) === 0 
+        ? `<span class="text-amber-600 font-bold text-sm block">Belum ada input</span>` 
+        : `<span class="text-blue-900 font-bold text-sm block font-mono">Netto: ${usdcFormatted} USDC</span>`;
 
-      items.forEach(d => {
-        sumUSDC += d.usdc;
-        const dateLabel = isSingleDay ? '' : `<span class="block text-xs text-gray-500 font-mono mt-1">${d.dateStr}</span>`;
-        const usdcFormatted = d.usdc.toLocaleString('id-ID', {maximumFractionDigits: 2});
-        
-        const usdcDisplay = d.usdc === 0 
-          ? `<span class="text-amber-400 font-bold text-lg block tracking-wide">Belum ada input</span>` 
-          : `<span class="text-emerald-400 font-bold text-lg block tracking-wide">Netto: ${usdcFormatted} USDC</span>`;
-
-        container.innerHTML += `
-          <div class="flex justify-between items-center p-4 bg-gray-900 border border-gray-700 rounded-lg shadow-md hover:border-emerald-500/50 transition group">
-            <div>
-              <span class="font-bold text-gray-200 text-lg group-hover:text-emerald-400 transition">${d.outlet}</span>
-              ${dateLabel}
-            </div>
-            <div class="text-right">
-              ${usdcDisplay}
-              <div class="mt-2 no-print flex justify-end gap-4">
-                <button onclick="updateOutletUSDC('${d.id}', ${d.usdc})" class="text-blue-400 text-xs hover:text-blue-300 font-semibold transition">Isi/Ubah Netto</button>
-                <button onclick="deleteOutletRecord('${d.id}')" class="text-red-400 text-xs hover:text-red-300 font-semibold transition">Hapus</button>
-              </div>
+      container.innerHTML += `
+        <div class="flex justify-between items-center p-3.5 bg-slate-50 border border-slate-200 rounded shadow-sm hover:bg-slate-100 transition">
+          <div>
+            <span class="font-bold text-slate-800 text-sm">${d.outlet}</span>
+            ${dateLabel}
+          </div>
+          <div class="text-right">
+            ${usdcDisplay}
+            <div class="mt-1.5 no-print flex justify-end gap-3 text-xs">
+              <button onclick="updateOutletUSDC('${d.id}', ${d.usdc || 0})" class="text-blue-700 hover:underline font-semibold">Ubah Netto</button>
+              <button onclick="deleteOutletRecord('${d.id}')" class="text-red-700 hover:underline font-semibold">Hapus</button>
             </div>
           </div>
-        `;
-      });
-
-      document.getElementById('totalUsdcDisplay').textContent = `${sumUSDC.toLocaleString('id-ID', {maximumFractionDigits: 2})} USDC`;
-      document.getElementById('totalIdrDisplay').textContent = `Rp ${(sumUSDC * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
+        </div>
+      `;
     });
+
+    document.getElementById('totalUsdcDisplay').textContent = `${sumUSDC.toLocaleString('id-ID', {maximumFractionDigits: 2})} USDC`;
+    document.getElementById('totalIdrDisplay').textContent = `Rp ${(sumUSDC * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
   };
 
   window.saveOutletData = async () => {
@@ -589,8 +586,7 @@
 
   window.updateOutletUSDC = async (id, currentVal) => {
     let formatVal = currentVal === 0 ? '' : currentVal.toLocaleString('id-ID');
-    const newVal = prompt("Masukkan keuntungan Netto baru (Otomatis titik ribuan):", formatVal);
-    
+    const newVal = prompt("Masukkan keuntungan Netto baru:", formatVal);
     if (newVal === null) return; 
     const parsed = parseCurrency(newVal);
     if (isNaN(parsed)) return alert("Format nominal tidak valid!");
@@ -618,11 +614,11 @@
     container.querySelectorAll('.flex.justify-between').forEach(row => {
       const name = row.querySelector('.font-bold').innerText;
       let dateText = document.getElementById('filterStart').value;
-      const dateSpan = row.querySelector('.text-gray-500'); 
+      const dateSpan = row.querySelector('.text-slate-400'); 
       if(dateSpan) dateText = dateSpan.innerText;
 
       let nettoVal = 0;
-      const nettoEl = row.querySelector('.text-emerald-400');
+      const nettoEl = row.querySelector('.font-mono');
       if (nettoEl) {
          nettoVal = parseCurrency(nettoEl.innerText.replace('Netto: ', '').replace(' USDC', ''));
       }
