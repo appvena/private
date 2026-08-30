@@ -103,10 +103,9 @@
     </div>
 
     <!-- ============================================== -->
-    <!-- TAB 1: CYBERSTORAGE (TAMPIL DEFAULT)           -->
+    <!-- TAB 1: CYBERSTORAGE                            -->
     <!-- ============================================== -->
     <div id="tab-storage" class="space-y-6 no-print">
-      
       <!-- Upload Area -->
       <div class="bg-gray-950/60 border-2 border-dashed border-gray-800 p-6 rounded-xl text-center space-y-4">
         <input type="file" id="fileInput" class="hidden" onchange="handleFileSelected()">
@@ -137,21 +136,32 @@
           </table>
         </div>
       </div>
-
     </div>
 
     <!-- ============================================== -->
-    <!-- TAB 2: KALKULATOR OUTLET (SEMBUNYI DEFAULT)    -->
+    <!-- TAB 2: KALKULATOR OUTLET                       -->
     <!-- ============================================== -->
     <div id="tab-calc" class="space-y-6 hidden">
       <div id="pdfExportArea" class="bg-gray-950/40 p-6 rounded-xl border border-gray-800 relative">
         
-        <!-- Header Laporan -->
+        <!-- Header & Filter Tanggal -->
         <div class="flex flex-wrap justify-between items-start gap-4 border-b border-gray-800 pb-4">
           <div>
             <h2 class="text-2xl font-bold text-emerald-400">Laporan Outlet Harian</h2>
-            <p id="displayDate" class="text-sm text-gray-300 font-semibold mt-1">Memuat tanggal...</p>
+            <div class="flex gap-4 mt-3 no-print items-end">
+              <div>
+                <label class="block text-xs text-gray-400 mb-1">Dari Tanggal:</label>
+                <input type="date" id="filterStart" onchange="applyDateFilter()" class="p-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:border-emerald-400 outline-none">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-400 mb-1">Sampai Tanggal:</label>
+                <input type="date" id="filterEnd" onchange="applyDateFilter()" class="p-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:border-emerald-400 outline-none">
+              </div>
+            </div>
+            <!-- Teks Tanggal Untuk Cetak PDF -->
+            <p id="printDateText" class="text-sm text-gray-300 font-semibold mt-3 print-only">Periode: Memuat...</p>
           </div>
+          
           <div class="text-right">
             <div class="bg-gray-900 border border-gray-700 px-4 py-2 rounded-lg text-xs font-mono text-emerald-300 inline-block mb-2 shadow-inner">
               Kurs USD/IDR: <span id="kursRateText" class="font-bold">Memuat...</span>
@@ -163,26 +173,33 @@
           </div>
         </div>
 
-        <!-- Area Libur / Form Input -->
-        <div id="holidayBanner" class="hidden mt-4 bg-red-500/10 border border-red-500/50 text-red-400 p-4 rounded-lg text-center font-bold">
-          Layanan input ditutup. Hari ini adalah hari libur (Sabtu/Minggu).
+        <!-- Info Mode Filter -->
+        <div id="rangeFilterBanner" class="hidden mt-4 bg-blue-500/10 border border-blue-500/50 text-blue-300 p-3 rounded-lg text-center text-sm">
+          Menampilkan akumulasi data dari rentang waktu yang dipilih. <b>(Mode Input Dinonaktifkan)</b>
         </div>
 
+        <!-- Area Libur -->
+        <div id="holidayBanner" class="hidden mt-4 bg-red-500/10 border border-red-500/50 text-red-400 p-4 rounded-lg text-center font-bold">
+          Layanan input ditutup. Tanggal yang dipilih adalah hari libur (Sabtu/Minggu).
+        </div>
+
+        <!-- Form Input -->
         <div id="outletInputForm" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5 no-print">
           <div class="sm:col-span-1">
             <input type="text" id="outletName" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:border-emerald-400 outline-none" placeholder="Nama Outlet (Misal: Outlet A)">
           </div>
           <div class="sm:col-span-1">
-            <input type="number" id="inputUSDC" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:border-emerald-400 outline-none" placeholder="Total Netto (USDC)">
+            <!-- PENTING: oninput otomatis memberi titik ribuan real-time -->
+            <input type="text" id="inputUSDC" oninput="formatInputCurrency(this)" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:border-emerald-400 outline-none" placeholder="Netto USDC (Otomatis Titik)">
           </div>
           <div class="sm:col-span-1">
-            <button onclick="saveOutletData()" class="w-full h-full py-2 bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-sm rounded-lg transition shadow-[0_0_15px_rgba(62,207,142,0.2)]">Tambah Data Hari Ini</button>
+            <button onclick="saveOutletData()" class="w-full h-full py-2 bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-sm rounded-lg transition shadow-[0_0_15px_rgba(62,207,142,0.2)]">Buat / Tambah Outlet</button>
           </div>
         </div>
 
-        <!-- Daftar Outlet Hari Ini -->
+        <!-- Daftar Outlet -->
         <div id="todayOutletList" class="space-y-3 mt-6">
-          <div class="text-gray-500 text-center text-sm italic py-4" id="emptyOutletMsg">Belum ada outlet yang diinput hari ini.</div>
+          <div class="text-gray-500 text-center text-sm italic py-4" id="emptyOutletMsg">Belum ada outlet pada tanggal ini.</div>
         </div>
 
         <!-- Total Kalkulasi -->
@@ -225,7 +242,6 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-  // Menghapus orderBy agar tidak memicu error Index Firestore
   import { getFirestore, doc, setDoc, getDoc, deleteDoc, updateDoc, collection, addDoc, onSnapshot, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
   import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -245,6 +261,23 @@
       btnCalc.className = "pb-3 border-b-2 border-emerald-400 text-emerald-400 font-bold transition";
       btnStorage.className = "pb-3 text-gray-400 hover:text-gray-200 transition border-b-2 border-transparent hover:border-gray-500";
     }
+  };
+
+  // --- FORMAT PEMISAH RIBUAN REAL-TIME SAAT MENGETIK ---
+  window.formatInputCurrency = function(input) {
+    let cleanVal = input.value.replace(/\D/g, ''); // Ambil angka saja
+    if (!cleanVal) {
+      input.value = '';
+      return;
+    }
+    // Format otomatis dengan titik pemisah ribuan
+    input.value = Number(cleanVal).toLocaleString('id-ID');
+  };
+  
+  const parseCurrency = (str) => {
+    if(!str) return 0;
+    // Ubah format string "10.000" menjadi angka murni 10000
+    return parseFloat(str.toString().replace(/\./g, '').replace(',', '.')) || 0;
   };
 
   // --- ANIMASI SPACE ---
@@ -271,13 +304,12 @@
   let supaClient = null, supaBucketName = "", activeFileDocId = null;
   let currentKursUSD = 16000;
   
-  // Tanggal & Deteksi Libur
-  const todayDateObj = new Date();
-  const dayOfWeek = todayDateObj.getDay(); 
-  const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
-  const todayStrDb = todayDateObj.toISOString().split('T')[0];
-  const optionsId = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-  document.getElementById('displayDate').textContent = todayDateObj.toLocaleDateString('id-ID', optionsId);
+  // Tanggal Hari Ini Setup
+  const todayStrDb = new Date().toISOString().split('T')[0];
+  document.getElementById('filterStart').value = todayStrDb;
+  document.getElementById('filterEnd').value = todayStrDb;
+
+  let currentOutletListener = null;
 
   fetch('https://open.er-api.com/v6/latest/USD').then(r=>r.json()).then(d => {
     if(d?.rates?.IDR) { 
@@ -299,7 +331,7 @@
         supaBucketName = snap.data().bucket;
         showScreen('appScreen');
         loadFiles();
-        initDailyDashboard();
+        applyDateFilter();
       } else showScreen('setupScreen');
     } catch(e) { showScreen('setupScreen'); }
   }
@@ -390,7 +422,6 @@
     document.getElementById('previewModal').style.display = 'flex';
   };
   window.closePreviewModal = () => document.getElementById('previewModal').style.display = 'none';
-
   window.openNoteModal = (id, note) => { activeFileDocId = id; document.getElementById('noteInputText').value = note; document.getElementById('noteModal').style.display = 'flex'; };
   window.closeNoteModal = () => { document.getElementById('noteModal').style.display = 'none'; activeFileDocId = null; };
   window.saveFileNote = async () => { if(activeFileDocId) { await updateDoc(doc(db, 'user_files', activeFileDocId), { note: document.getElementById('noteInputText').value.trim() }); closeNoteModal(); } };
@@ -404,20 +435,57 @@
         if (path) await supaClient.storage.from(supaBucketName).remove([path]);
         await deleteDoc(doc(db, 'user_files', docId)); alert("Berhasil dihapus!");
       }
-    } catch (e) { alert("Gagal menghapus: " + e.message); }
+    } catch (e) { 
+      if (e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password') {
+        alert("Gagal menghapus: Sandi / Password yang Anda masukkan SALAH.");
+      } else {
+        alert("Gagal menghapus: " + e.message);
+      }
+    }
   };
 
 
   // --- OUTLET CALCULATOR LOGIC ---
-  function initDailyDashboard() {
-    if (isWeekend) {
-      document.getElementById('outletInputForm').style.display = 'none';
-      document.getElementById('holidayBanner').style.display = 'block';
-    }
+  window.applyDateFilter = function() {
+    let start = document.getElementById('filterStart').value;
+    let end = document.getElementById('filterEnd').value;
     
-    // Hilangkan orderBy untuk mencegah error Firebase Index
-    const q = query(collection(db, 'outlet_profits'), where('dateStr', '==', todayStrDb));
-    onSnapshot(q, (snap) => {
+    if(!start) { start = todayStrDb; document.getElementById('filterStart').value = start; }
+    if(!end) { end = start; document.getElementById('filterEnd').value = end; }
+    if(start > end) {
+      alert("Tanggal mulai tidak boleh lebih dari tanggal akhir.");
+      end = start; document.getElementById('filterEnd').value = end;
+    }
+
+    const isSingleDay = (start === end);
+    const dateObjStart = new Date(start);
+    const dayOfWeek = dateObjStart.getDay(); 
+    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+    const optionsId = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    
+    if(isSingleDay) {
+       document.getElementById('printDateText').textContent = dateObjStart.toLocaleDateString('id-ID', optionsId);
+       document.getElementById('rangeFilterBanner').style.display = 'none';
+       
+       if (isWeekend) {
+         document.getElementById('outletInputForm').style.display = 'none';
+         document.getElementById('holidayBanner').style.display = 'block';
+       } else {
+         document.getElementById('outletInputForm').style.display = 'grid';
+         document.getElementById('holidayBanner').style.display = 'none';
+       }
+    } else {
+       const dateObjEnd = new Date(end);
+       document.getElementById('printDateText').textContent = `${dateObjStart.toLocaleDateString('id-ID', optionsId)} - ${dateObjEnd.toLocaleDateString('id-ID', optionsId)}`;
+       document.getElementById('rangeFilterBanner').style.display = 'block';
+       document.getElementById('outletInputForm').style.display = 'none';
+       document.getElementById('holidayBanner').style.display = 'none';
+    }
+
+    if(currentOutletListener) currentOutletListener(); 
+
+    const q = query(collection(db, 'outlet_profits'), where('dateStr', '>=', start), where('dateStr', '<=', end));
+    currentOutletListener = onSnapshot(q, (snap) => {
       const container = document.getElementById('todayOutletList'); container.innerHTML = '';
       if (snap.empty) {
         document.getElementById('emptyOutletMsg').style.display = 'block';
@@ -431,41 +499,55 @@
       let items = [];
       snap.forEach(d => items.push({ id: d.id, ...d.data() }));
       
-      // Sort manual menggunakan Javascript
-      items.sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
+      items.sort((a, b) => {
+        if(a.dateStr === b.dateStr) return (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0);
+        return a.dateStr > b.dateStr ? -1 : 1;
+      });
 
       items.forEach(d => {
         sumUSDC += d.usdc;
+        const dateLabel = isSingleDay ? '' : `<span class="block text-xs text-gray-500 font-mono mt-1">${d.dateStr}</span>`;
+        const usdcFormatted = d.usdc.toLocaleString('id-ID', {maximumFractionDigits: 2});
+        
+        const usdcDisplay = d.usdc === 0 
+          ? `<span class="text-amber-400 font-bold text-lg block tracking-wide">Belum ada input</span>` 
+          : `<span class="text-emerald-400 font-bold text-lg block tracking-wide">Netto: ${usdcFormatted} USDC</span>`;
+
         container.innerHTML += `
           <div class="flex justify-between items-center p-4 bg-gray-900 border border-gray-700 rounded-lg shadow-md hover:border-emerald-500/50 transition group">
             <div>
               <span class="font-bold text-gray-200 text-lg group-hover:text-emerald-400 transition">${d.outlet}</span>
+              ${dateLabel}
             </div>
             <div class="text-right">
-              <span class="text-emerald-400 font-bold text-lg block tracking-wide">Netto: ${d.usdc.toLocaleString(undefined, {minimumFractionDigits: 2})} USDC</span>
-              <button onclick="deleteOutletRecord('${d.id}')" class="text-red-400 text-xs hover:text-red-300 font-semibold mt-1 no-print">Hapus Data</button>
+              ${usdcDisplay}
+              <div class="mt-2 no-print flex justify-end gap-4">
+                <button onclick="updateOutletUSDC('${d.id}', ${d.usdc})" class="text-blue-400 text-xs hover:text-blue-300 font-semibold transition">Isi/Ubah Netto</button>
+                <button onclick="deleteOutletRecord('${d.id}')" class="text-red-400 text-xs hover:text-red-300 font-semibold transition">Hapus</button>
+              </div>
             </div>
           </div>
         `;
       });
 
-      document.getElementById('totalUsdcDisplay').textContent = `${sumUSDC.toLocaleString(undefined, {minimumFractionDigits: 2})} USDC`;
+      document.getElementById('totalUsdcDisplay').textContent = `${sumUSDC.toLocaleString('id-ID', {maximumFractionDigits: 2})} USDC`;
       document.getElementById('totalIdrDisplay').textContent = `Rp ${(sumUSDC * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
     });
-  }
+  };
 
   window.saveOutletData = async () => {
     try {
       const outlet = document.getElementById('outletName').value.trim();
-      const usdc = parseFloat(document.getElementById('inputUSDC').value);
+      const usdcInput = document.getElementById('inputUSDC').value;
+      const dateToSave = document.getElementById('filterStart').value;
       
-      if (!outlet || isNaN(usdc)) {
-        alert("Harap isi nama outlet dan nominal USDC terlebih dahulu!");
-        return;
-      }
+      if (!outlet) return alert("Harap isi Nama Outlet terlebih dahulu!");
+      
+      let usdc = parseCurrency(usdcInput);
+      if (isNaN(usdc)) usdc = 0; 
       
       await addDoc(collection(db, 'outlet_profits'), { 
-        dateStr: todayStrDb, 
+        dateStr: dateToSave, 
         outlet: outlet, 
         usdc: usdc, 
         createdAt: serverTimestamp() 
@@ -475,34 +557,57 @@
       document.getElementById('inputUSDC').value = '';
     } catch (error) {
       alert("Gagal menyimpan data: " + error.message);
-      console.error(error);
     }
+  };
+
+  window.updateOutletUSDC = async (id, currentVal) => {
+    let formatVal = currentVal === 0 ? '' : currentVal.toLocaleString('id-ID');
+    const newVal = prompt("Masukkan keuntungan Netto baru (Otomatis titik ribuan):", formatVal);
+    
+    if (newVal === null) return; 
+    const parsed = parseCurrency(newVal);
+    if (isNaN(parsed)) return alert("Format nominal tidak valid!");
+    
+    try { await updateDoc(doc(db, 'outlet_profits', id), { usdc: parsed }); } 
+    catch (e) { alert("Gagal merubah data: " + e.message); }
   };
 
   window.deleteOutletRecord = async (id) => { if(confirm("Hapus data outlet ini?")) await deleteDoc(doc(db, 'outlet_profits', id)); };
 
   // --- EKSPOR LOGIC ---
   window.exportToPDF = () => {
+    const filenameStr = document.getElementById('printDateText').innerText.replace(/\s+/g, '_');
     html2pdf().from(document.getElementById('pdfExportArea')).set({
-      margin: 10, filename: `Laporan_Outlet_${todayStrDb}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      margin: 10, filename: `Laporan_${filenameStr}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     }).save();
   };
 
   window.exportToExcel = () => {
     const container = document.getElementById('todayOutletList');
-    if (container.children.length === 0 || document.getElementById('emptyOutletMsg').style.display !== 'none') return alert("Tidak ada data hari ini.");
+    if (container.children.length === 0 || document.getElementById('emptyOutletMsg').style.display !== 'none') return alert("Tidak ada data untuk diekspor.");
     
     let excelData = [ ["Tanggal", "Nama Outlet", "Netto (USDC)"] ];
+    
     container.querySelectorAll('.flex.justify-between').forEach(row => {
-      excelData.push([todayStrDb, row.querySelector('.font-bold').innerText, parseFloat(row.querySelector('.text-emerald-400').innerText.replace('Netto: ', '').replace(' USDC', '').replace(/,/g, ''))]);
+      const name = row.querySelector('.font-bold').innerText;
+      let dateText = document.getElementById('filterStart').value;
+      const dateSpan = row.querySelector('.text-gray-500'); 
+      if(dateSpan) dateText = dateSpan.innerText;
+
+      let nettoVal = 0;
+      const nettoEl = row.querySelector('.text-emerald-400');
+      if (nettoEl) {
+         nettoVal = parseCurrency(nettoEl.innerText.replace('Netto: ', '').replace(' USDC', ''));
+      }
+      excelData.push([dateText, name, nettoVal]);
     });
     
     excelData.push([]);
     excelData.push(["TOTAL KESELURUHAN", document.getElementById('totalUsdcDisplay').innerText, document.getElementById('totalIdrDisplay').innerText]);
     excelData.push(["Kurs Saat Ini", document.getElementById('kursRateText').innerText, ""]);
 
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelData), "Rekap Harian");
-    XLSX.writeFile(wb, `Laporan_Outlet_${todayStrDb}.xlsx`);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelData), "Rekap Keuntungan");
+    XLSX.writeFile(wb, `Laporan_Keuntungan.xlsx`);
   };
 
 </script>
