@@ -68,7 +68,6 @@
       box-shadow: 0 0 10px var(--accent);
     }
 
-    /* Sembunyikan layar secara default */
     #loginScreen, #setupScreen, #passwordScreen, #appScreen {
       display: none;
     }
@@ -158,10 +157,48 @@
       display: none;
     }
 
+    /* Area Preview File */
+    #previewContainer {
+      margin: 15px auto;
+      max-width: 200px;
+      max-height: 150px;
+      display: none;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    #previewContainer img {
+      width: 100%;
+      height: auto;
+      object-fit: cover;
+    }
+
     #selectedFileName {
       color: var(--text-muted);
-      margin: 15px 0;
+      margin: 10px 0;
       font-style: italic;
+    }
+
+    /* Progress Bar Styling */
+    #progressWrapper {
+      width: 100%;
+      background-color: var(--border);
+      border-radius: 4px;
+      margin-top: 15px;
+      display: none;
+      overflow: hidden;
+    }
+    #progressBar {
+      width: 0%;
+      height: 10px;
+      background-color: var(--accent);
+      transition: width 0.2s ease-in-out;
+    }
+    #progressText {
+      font-size: 0.85rem;
+      color: var(--accent);
+      margin-top: 5px;
+      display: none;
     }
 
     table {
@@ -231,7 +268,7 @@
     </div>
     <div class="form-group">
       <label>Supabase Anon/Public Key</label>
-      <input type="password" id="supaKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+      <input type="password" id="supaKey" placeholder="sb_publishable_...">
     </div>
     <div class="form-group">
       <label>Nama Bucket Storage</label>
@@ -271,10 +308,23 @@
     </div>
     
     <div class="upload-section">
-      <button class="btn-primary" onclick="document.getElementById('fileInput').click()">Pilih Berkas / Foto (Mendukung File Besar)</button>
-      <input type="file" id="fileInput" onchange="showFileName()">
+      <button class="btn-primary" onclick="document.getElementById('fileInput').click()">Pilih Berkas / Foto</button>
+      <input type="file" id="fileInput" onchange="handleFileSelected()">
+      
+      <!-- Area Preview -->
+      <div id="previewContainer">
+        <img id="filePreview" src="" alt="Pratinjau File">
+      </div>
+
       <p id="selectedFileName">Tidak ada berkas yang dipilih</p>
-      <button id="uploadBtn" class="btn-primary" style="display: none;" onclick="uploadToSupabaseStorage()">Unggah ke Supabase</button>
+      
+      <!-- Bar Loading Progres -->
+      <div id="progressWrapper">
+        <div id="progressBar"></div>
+      </div>
+      <div id="progressText">0%</div>
+
+      <button id="uploadBtn" class="btn-primary" style="display: none; margin-top: 15px;" onclick="uploadToSupabaseStorage()">Unggah ke Supabase</button>
       <div id="status" class="status"></div>
     </div>
 
@@ -295,11 +345,10 @@
 
 </div>
 
-<!-- Script Utama (Firebase + Supabase SDK) -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, addDoc, deleteDoc as deleteFirestoreDoc, doc as docRefId, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, addDoc, deleteDoc as deleteFirestoreDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
   import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
   const firebaseConfig = {
@@ -392,7 +441,6 @@
     }
   };
 
-  // --- GANTI PASSWORD ---
   window.updatePasswordAccount = async function() {
     const user = auth.currentUser;
     const currentPass = document.getElementById('currentPassword').value;
@@ -428,21 +476,63 @@
     });
   }
 
-  window.showFileName = function() {
+  // --- HANDLE PREVIEW FILE & GAMBAR ---
+  window.handleFileSelected = function() {
     const input = document.getElementById('fileInput');
+    const previewContainer = document.getElementById('previewContainer');
+    const filePreview = document.getElementById('filePreview');
+    const fileNameText = document.getElementById('selectedFileName');
+    const uploadBtn = document.getElementById('uploadBtn');
+
     if (input.files.length > 0) {
-      document.getElementById('selectedFileName').textContent = input.files[0].name;
-      document.getElementById('uploadBtn').style.display = 'inline-block';
+      const file = input.files[0];
+      fileNameText.textContent = file.name;
+      uploadBtn.style.display = 'inline-block';
+
+      // Cek apakah file berupa gambar untuk ditampilkan preview-nya
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          filePreview.src = e.target.result;
+          previewContainer.style.display = 'block';
+        }
+        reader.readAsDataURL(file);
+      } else {
+        // Jika bukan gambar, sembunyikan kotak preview gambar
+        previewContainer.style.display = 'none';
+      }
     }
   };
 
+  // --- UPLOAD DENGAN PROGRESS BAR PERSENTASE ---
   window.uploadToSupabaseStorage = async function() {
     const fileInput = document.getElementById('fileInput');
     const file = fileInput.files[0];
     const stat = document.getElementById('status');
+    const progressWrapper = document.getElementById('progressWrapper');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const uploadBtn = document.getElementById('uploadBtn');
+
     if (!file || !supaClient) return;
 
-    stat.textContent = "> Mengunggah file besar ke Supabase Storage...";
+    uploadBtn.style.display = 'none';
+    progressWrapper.style.display = 'block';
+    progressText.style.display = 'block';
+    stat.textContent = "> Memulai proses unggah...";
+
+    // Simulasi animasi progres naik bertahap agar interaktif saat file diproses
+    let progress = 0;
+    progressBar.style.width = "0%";
+    progressText.textContent = "0%";
+
+    const interval = setInterval(() => {
+      if (progress < 90) {
+        progress += 10;
+        progressBar.style.width = progress + "%";
+        progressText.textContent = progress + "%";
+      }
+    }, 200);
 
     const storagePath = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
 
@@ -453,32 +543,46 @@
 
       if (error) throw error;
 
+      clearInterval(interval);
+      progressBar.style.width = "100%";
+      progressText.textContent = "100%";
+
       const { data: { publicUrl } } = supaClient.storage
         .from(supaBucketName)
         .getPublicUrl(storagePath);
 
-      stat.textContent = "> Menyinkronkan metadata ke Firestore...";
+      stat.textContent = "> Menyinkronkan metadata ke database...";
 
       await addDoc(collection(db, 'user_files'), {
         fileName: file.name,
-        filePath: storagePath, // Disimpan untuk referensi penghapusan file fisik
+        filePath: storagePath,
         fileUrl: publicUrl,
         fileSize: (file.size / (1024 * 1024)).toFixed(2) + " MB",
         createdAt: serverTimestamp()
       });
 
-      stat.textContent = "> Berhasil diunggah!";
-      fileInput.value = "";
-      document.getElementById('selectedFileName').textContent = "Tidak ada berkas yang dipilih";
-      document.getElementById('uploadBtn').style.display = 'none';
+      stat.textContent = "> Berhasil diunggah sepenuhnya!";
+      
+      // Reset tampilan setelah beberapa detik
+      setTimeout(() => {
+        fileInput.value = "";
+        document.getElementById('selectedFileName').textContent = "Tidak ada berkas yang dipilih";
+        document.getElementById('previewContainer').style.display = 'none';
+        progressWrapper.style.display = 'none';
+        progressText.style.display = 'none';
+        stat.textContent = "";
+      }, 2000);
 
     } catch (err) {
+      clearInterval(interval);
       console.error(err);
       stat.textContent = "> Error: " + err.message;
+      uploadBtn.style.display = 'inline-block';
+      progressWrapper.style.display = 'none';
+      progressText.style.display = 'none';
     }
   };
 
-  // --- HAPUS BERKAS DENGAN PASSWORD ---
   window.deleteFile = async function(docId, filePath) {
     const user = auth.currentUser;
     const password = prompt("Keamanan Diperlukan: Masukkan password akun Firebase Anda untuk menghapus berkas ini:");
@@ -486,17 +590,13 @@
     if (!password) return;
 
     try {
-      // Verifikasi password pengguna terlebih dahulu
       const credential = EmailAuthProvider.credential(user.email, password);
       await reauthenticateWithCredential(user, credential);
 
-      if(confirm("Apakah Anda yakin ingin menghapus berkas ini secara permanen dari Supabase dan Database?")) {
-        // 1. Hapus file fisik dari Supabase Storage (jika filePath tersedia)
+      if(confirm("Apakah Anda yakin ingin menghapus berkas ini secara permanen?")) {
         if (filePath) {
           await supaClient.storage.from(supaBucketName).remove([filePath]);
         }
-
-        // 2. Hapus data dari Firebase Firestore
         await deleteFirestoreDoc(doc(db, 'user_files', docId));
         alert("Berhasil dihapus!");
       }
