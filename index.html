@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Penyimpanan Pribadi Saya (B2)</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 30px; background-color: #f4f7f6; }
+    .container { max-width: 800px; margin: auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    h1 { margin-top: 0; color: #333; }
+    .upload-section { margin-bottom: 20px; padding: 15px; border: 2px dashed #ccc; border-radius: 6px; text-align: center; }
+    input[type="file"] { display: none; }
+    .btn-select { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; }
+    .btn-upload { background-color: #28a745; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; display: none; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+    th { background-color: #f8f9fa; }
+    .status { margin-top: 10px; font-weight: bold; color: #555; }
+  </style>
+
+  <!-- Firebase JS SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<div class="container">
+  <h1>Drive Pribadi (Backblaze B2)</h1>
+  
+  <div class="upload-section">
+    <button class="btn-select" onclick="document.getElementById('fileInput').click()">Pilih File / Foto / Aplikasi</button>
+    <input type="file" id="fileInput" onchange="showFileName()">
+    <p id="selectedFileName">Belum ada file dipilih</p>
+    <button id="uploadBtn" class="btn-upload">Mulai Upload</button>
+    <div id="status" class="status"></div>
+  </div>
+
+  <h2>Daftar File</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Nama File</th>
+        <th>Ukuran</th>
+        <th>Tipe</th>
+        <th>Aksi</th>
+      </tr>
+    </thead>
+    <tbody id="fileTableBody"></tbody>
+  </table>
+</div>
+
+<!-- Menggunakan Type Module untuk memanggil AWS SDK (S3) -->
+<script type="module">
+  import { S3Client, PutObjectCommand } from "https://esm.sh/@aws-sdk/client-s3@3.500.0";
+
+  // 1. Konfigurasi Backblaze B2
+  const B2_ENDPOINT = "https://s3.us-west-004.backblazeb2.com"; // Ganti dengan Endpoint Anda
+  const B2_REGION = "us-west-004"; // Ambil dari bagian tengah endpoint
+  const B2_BUCKET = "pribadi-storage-123"; // Ganti dengan nama bucket Anda
+  const B2_ACCESS_KEY = "KEY_ID_ANDA"; 
+  const B2_SECRET_KEY = "APPLICATION_KEY_ANDA";
+
+  const s3 = new S3Client({
+    endpoint: B2_ENDPOINT,
+    region: B2_REGION,
+    credentials: {
+      accessKeyId: B2_ACCESS_KEY,
+      secretAccessKey: B2_SECRET_KEY
+    }
+  });
+
+  // 2. Konfigurasi Firebase Firestore
+  const firebaseConfig = {
+    apiKey: "API_KEY_FIREBASE_ANDA",
+    authDomain: "PROJECT_ID.firebaseapp.com",
+    projectId: "PROJECT_ID_FIREBASE_ANDA",
+    // storageBucket tidak perlu karena kita pakai Backblaze
+  };
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+  const db = firebase.firestore();
+
+  // Tampilkan UI File
+  window.showFileName = function() {
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput.files.length > 0) {
+      document.getElementById('selectedFileName').textContent = fileInput.files[0].name;
+      document.getElementById('uploadBtn').style.display = 'inline-block';
+    }
+  }
+
+  // Fungsi Upload
+  document.getElementById('uploadBtn').addEventListener('click', async () => {
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
+    const statusDiv = document.getElementById('status');
+    if (!file) return;
+
+    statusDiv.textContent = "Mengunggah file ke Backblaze B2...";
+
+    try {
+      // Buat nama file unik
+      const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+
+      // A. Upload ke Backblaze B2
+      const command = new PutObjectCommand({
+        Bucket: B2_BUCKET,
+        Key: fileName,
+        Body: file,
+        ContentType: file.type || "application/octet-stream"
+      });
+
+      await s3.send(command);
+
+      // B. Buat URL Publik dari Backblaze B2
+      // Format B2 Public URL: https://f004.backblazeb2.com/file/<Nama-Bucket>/<Nama-File>
+      // Ganti 'f004' sesuai awalan URL endpoint regional Anda jika berbeda. Biasanya bisa pakai endpoint S3.
+      const publicUrl = `${B2_ENDPOINT}/${B2_BUCKET}/${fileName}`;
+
+      statusDiv.textContent = "Menyimpan metadata ke Firestore...";
+
+      // C. Simpan ke Firestore
+      await db.collection('user_files').add({
+        fileName: file.name,
+        fileUrl: publicUrl,
+        fileSize: (file.size / (1024 * 1024)).toFixed(2) + " MB", // Ubah ke MB
+        fileType: file.type || "Aplikasi/Lainnya",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      statusDiv.textContent = "Upload berhasil!";
+      fileInput.value = "";
+      document.getElementById('selectedFileName').textContent = "Belum ada file dipilih";
+      document.getElementById('uploadBtn').style.display = 'none';
+
+    } catch (error) {
+      console.error(error);
+      statusDiv.textContent = "Gagal mengunggah: " + error.message;
+    }
+  });
+
+  // Tampilkan data secara Realtime dari Firestore
+  db.collection('user_files').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
+    const tableBody = document.getElementById('fileTableBody');
+    tableBody.innerHTML = '';
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${data.fileName}</td>
+        <td>${data.fileSize}</td>
+        <td>${data.fileType}</td>
+        <td><a href="${data.fileUrl}" target="_blank" download>Unduh</a></td>
+      `;
+      tableBody.appendChild(row);
+    });
+  });
+</script>
+
+</body>
+</html>
