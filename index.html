@@ -34,7 +34,7 @@
 
 <div class="max-w-5xl mx-auto space-y-6">
 
-  <!-- LAYAR LOGIN (Disembunyikan default agar tidak flicker saat cek sesi) -->
+  <!-- LAYAR LOGIN -->
   <div id="loginScreen" class="corporate-card p-8 rounded-lg max-w-md mx-auto mt-20 shadow-lg hidden">
     <h2 class="text-2xl font-bold tracking-wide mb-1 text-slate-800 border-b pb-2">Login Administrasi</h2>
     <p class="text-slate-500 text-xs mb-6">Masukkan kredensial akun Anda untuk mengakses sistem.</p>
@@ -89,7 +89,7 @@
     </div>
 
     <!-- ============================================== -->
-    <!-- TAB 1: KALKULATOR OUTLET (TAMPIL DEFAULT)      -->
+    <!-- TAB 1: KALKULATOR OUTLET                       -->
     <!-- ============================================== -->
     <div id="tab-calc" class="space-y-6">
       <div id="pdfExportArea" class="bg-white p-6 rounded border border-slate-200 relative space-y-4">
@@ -302,7 +302,7 @@
   let supaClient = null, supaBucketName = "", activeFileDocId = null;
   let currentKursUSD = 16000;
   
-  // Tanggal Lokal Perangkat
+  // Tanggal Lokal Perangkat (YYYY-MM-DD)
   const localNow = new Date();
   const lYear = localNow.getFullYear();
   const lMonth = String(localNow.getMonth() + 1).padStart(2, '0');
@@ -433,6 +433,9 @@
             </td>
           </tr>`;
       });
+    }, (error) => {
+      console.error("Firestore user_files error:", error);
+      alert("Gagal membaca arsip berkas: " + error.message);
     });
   }
 
@@ -462,12 +465,15 @@
   };
 
 
-  // --- OUTLET CALCULATOR LOGIC (CLIENT-SIDE FILTERING & ROBUST DATA SYNC) ---
+  // --- OUTLET CALCULATOR LOGIC (DENGAN ERROR HANDLER & FIX FILTER) ---
   function initOutletListener() {
     onSnapshot(collection(db, 'outlet_profits'), (snap) => {
       allOutletData = [];
       snap.forEach(d => allOutletData.push({ id: d.id, ...d.data() }));
       applyDateFilter();
+    }, (error) => {
+      console.error("Firestore outlet_profits error:", error);
+      alert("Gagal membaca database outlet (Periksa Firestore Rules Anda): " + error.message);
     });
   }
 
@@ -486,6 +492,8 @@
     const parts = start.split('-');
     const dateObjStart = new Date(parts[0], parts[1] - 1, parts[2]);
     const dayOfWeek = dateObjStart.getDay(); 
+    // Catatan: Jika ingin memaksa form selalu bisa diinput meskipun weekend (Sabtu/Minggu), 
+    // hapus baris pengecekan isWeekend di bawah ini.
     const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6); 
     
     const optionsId = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
@@ -510,7 +518,7 @@
        document.getElementById('holidayBanner').style.display = 'none';
     }
 
-    // Filter secara client-side agar data pasti muncul tanpa indeks kompleks
+    // Filter client-side
     const filteredItems = allOutletData.filter(d => d.dateStr >= start && d.dateStr <= end);
 
     const container = document.getElementById('todayOutletList'); container.innerHTML = '';
