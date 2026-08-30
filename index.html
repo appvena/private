@@ -144,6 +144,12 @@
     <div id="tab-calc" class="space-y-6 hidden">
       <div id="pdfExportArea" class="bg-gray-950/40 p-6 rounded-xl border border-gray-800 relative">
         
+        <!-- LIVE CLOCK BANNER -->
+        <div class="mb-4 bg-gray-900/80 border border-emerald-500/30 p-3 rounded-xl flex justify-between items-center text-xs font-mono text-emerald-400 shadow-inner">
+          <div>Status Sistem: <span class="text-white font-bold">ONLINE (Live)</span></div>
+          <div id="liveClockDisplay" class="text-sm font-bold tracking-wider">Memuat Waktu...</div>
+        </div>
+
         <!-- Header & Filter Tanggal -->
         <div class="flex flex-wrap justify-between items-start gap-4 border-b border-gray-800 pb-4">
           <div>
@@ -245,6 +251,15 @@
   import { getFirestore, doc, setDoc, getDoc, deleteDoc, updateDoc, collection, addDoc, onSnapshot, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
   import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+  // --- JAM & TANGGAL LIVE REAL-TIME ---
+  function updateLiveClock() {
+    const now = new Date();
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+    document.getElementById('liveClockDisplay').textContent = now.toLocaleDateString('id-ID', options);
+  }
+  setInterval(updateLiveClock, 1000);
+  updateLiveClock();
+
   // --- LOGIKA TAB MENU ---
   window.switchTab = function(tabName) {
     const tabStorage = document.getElementById('tab-storage');
@@ -302,7 +317,7 @@
   let supaClient = null, supaBucketName = "", activeFileDocId = null;
   let currentKursUSD = 16000;
   
-  // Tanggal Hari Ini Setup
+  // Tanggal Hari Ini Otomatis (Live Date)
   const todayStrDb = new Date().toISOString().split('T')[0];
   document.getElementById('filterStart').value = todayStrDb;
   document.getElementById('filterEnd').value = todayStrDb;
@@ -456,8 +471,6 @@
     }
 
     const isSingleDay = (start === end);
-    
-    // Perbaikan akurat membaca hari dari string YYYY-MM-DD tanpa geser zona waktu
     const parts = start.split('-');
     const dateObjStart = new Date(parts[0], parts[1] - 1, parts[2]);
     const dayOfWeek = dateObjStart.getDay(); 
