@@ -96,7 +96,7 @@
         
         <!-- LIVE CLOCK & STATUS BANNER -->
         <div class="bg-slate-50 border border-slate-300 p-2.5 rounded flex justify-between items-center text-xs font-mono text-slate-700">
-          <div>Status: <span class="text-emerald-700 font-bold">TERHUBUNG (LIVE)</span></div>
+          <div>Status: <span id="dbStatusText" class="text-emerald-700 font-bold">Menghubungkan Database...</span></div>
           <div id="liveClockDisplay" class="font-bold">Memuat Waktu...</div>
         </div>
 
@@ -154,7 +154,7 @@
 
         <!-- Daftar Outlet -->
         <div id="todayOutletList" class="space-y-3 mt-4">
-          <div class="text-slate-400 text-center text-sm italic py-4" id="emptyOutletMsg">Belum ada data pada tanggal ini.</div>
+          <div class="text-slate-400 text-center text-sm italic py-4" id="emptyOutletMsg">Memuat data dari database...</div>
         </div>
 
         <!-- Total Kalkulasi -->
@@ -231,10 +231,10 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc, deleteDoc, updateDoc, collection, addDoc, onSnapshot, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
   import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-  // --- AUTO LOGOUT 5 MENIT (INACTIVITY TIMER) ---
+  // --- AUTO LOGOUT 5 MENIT ---
   let inactivityTimer;
   function resetInactivityTimer() {
     clearTimeout(inactivityTimer);
@@ -258,7 +258,7 @@
   setInterval(updateLiveClock, 1000);
   updateLiveClock();
 
-  // --- LOGIKA TAB MENU (DEFAULT: CALC) ---
+  // --- TAB MENU ---
   window.switchTab = function(tabName) {
     const tabStorage = document.getElementById('tab-storage');
     const tabCalc = document.getElementById('tab-calc');
@@ -276,13 +276,10 @@
     }
   };
 
-  // --- FORMAT PEMISAH RIBUAN ---
+  // --- FORMAT RIBUAN ---
   window.formatInputCurrency = function(input) {
     let cleanVal = input.value.replace(/\D/g, ''); 
-    if (!cleanVal) {
-      input.value = '';
-      return;
-    }
+    if (!cleanVal) { input.value = ''; return; }
     input.value = Number(cleanVal).toLocaleString('id-ID');
   };
   
@@ -302,7 +299,6 @@
   let supaClient = null, supaBucketName = "", activeFileDocId = null;
   let currentKursUSD = 16000;
   
-  // Tanggal Lokal Perangkat (YYYY-MM-DD)
   const localNow = new Date();
   const lYear = localNow.getFullYear();
   const lMonth = String(localNow.getMonth() + 1).padStart(2, '0');
@@ -371,7 +367,7 @@
     }
   };
 
-  // --- CYBERSTORAGE LOGIC ---
+  // --- CYBERSTORAGE ---
   window.handleFileSelected = function() {
     const input = document.getElementById('fileInput');
     if (input.files.length > 0) {
@@ -411,7 +407,7 @@
   };
 
   function loadFiles() {
-    onSnapshot(query(collection(db, 'user_files')), (snap) => {
+    onSnapshot(collection(db, 'user_files'), (snap) => {
       const tbody = document.getElementById('fileTableBody'); tbody.innerHTML = '';
       if (snap.empty) { tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-400">Direktori arsip kosong.</td></tr>`; return; }
       
@@ -435,7 +431,6 @@
       });
     }, (error) => {
       console.error("Firestore user_files error:", error);
-      alert("Gagal membaca arsip berkas: " + error.message);
     });
   }
 
@@ -459,21 +454,32 @@
         if (path) await supaClient.storage.from(supaBucketName).remove([path]);
         await deleteDoc(doc(db, 'user_files', docId)); alert("Berhasil dihapus!");
       }
-    } catch (e) { 
-      alert("Password salah atau gagal menghapus.");
-    }
+    } catch (e) { alert("Password salah atau gagal menghapus."); }
   };
 
+  // --- OUTLET CALCULATOR ---
+  async function initOutletListener() {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'outlet_profits'));
+      allOutletData = [];
+      querySnapshot.forEach((docSnap) => {
+        allOutletData.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      document.getElementById('dbStatusText').textContent = `TERHUBUNG (Total Data: ${allOutletData.length})`;
+      applyDateFilter();
+    } catch (err) {
+      console.error("Gagal mengambil data awal:", err);
+      document.getElementById('dbStatusText').textContent = `ERROR: ${err.message}`;
+      document.getElementById('dbStatusText').className = "text-red-600 font-bold";
+    }
 
-  // --- OUTLET CALCULATOR LOGIC (DENGAN ERROR HANDLER & FIX FILTER) ---
-  function initOutletListener() {
     onSnapshot(collection(db, 'outlet_profits'), (snap) => {
       allOutletData = [];
       snap.forEach(d => allOutletData.push({ id: d.id, ...d.data() }));
+      document.getElementById('dbStatusText').textContent = `TERHUBUNG (Total Data: ${allOutletData.length})`;
       applyDateFilter();
     }, (error) => {
-      console.error("Firestore outlet_profits error:", error);
-      alert("Gagal membaca database outlet (Periksa Firestore Rules Anda): " + error.message);
+      console.error("Firestore Error:", error);
     });
   }
 
@@ -492,8 +498,6 @@
     const parts = start.split('-');
     const dateObjStart = new Date(parts[0], parts[1] - 1, parts[2]);
     const dayOfWeek = dateObjStart.getDay(); 
-    // Catatan: Jika ingin memaksa form selalu bisa diinput meskipun weekend (Sabtu/Minggu), 
-    // hapus baris pengecekan isWeekend di bawah ini.
     const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6); 
     
     const optionsId = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
@@ -518,12 +522,12 @@
        document.getElementById('holidayBanner').style.display = 'none';
     }
 
-    // Filter client-side
     const filteredItems = allOutletData.filter(d => d.dateStr >= start && d.dateStr <= end);
 
     const container = document.getElementById('todayOutletList'); container.innerHTML = '';
     if (filteredItems.length === 0) {
       document.getElementById('emptyOutletMsg').style.display = 'block';
+      document.getElementById('emptyOutletMsg').textContent = `Belum ada data outlet pada tanggal ini. (Total data di DB: ${allOutletData.length})`;
       document.getElementById('totalUsdcDisplay').textContent = "0 USDC";
       document.getElementById('totalIdrDisplay').textContent = "Rp 0";
       return;
@@ -587,6 +591,7 @@
       
       document.getElementById('outletName').value = ''; 
       document.getElementById('inputUSDC').value = '';
+      initOutletListener();
     } catch (error) {
       alert("Gagal menyimpan data: " + error.message);
     }
@@ -599,13 +604,21 @@
     const parsed = parseCurrency(newVal);
     if (isNaN(parsed)) return alert("Format nominal tidak valid!");
     
-    try { await updateDoc(doc(db, 'outlet_profits', id), { usdc: parsed }); } 
+    try { 
+      await updateDoc(doc(db, 'outlet_profits', id), { usdc: parsed }); 
+      initOutletListener();
+    } 
     catch (e) { alert("Gagal merubah data: " + e.message); }
   };
 
-  window.deleteOutletRecord = async (id) => { if(confirm("Hapus data outlet ini?")) await deleteDoc(doc(db, 'outlet_profits', id)); };
+  window.deleteOutletRecord = async (id) => { 
+    if(confirm("Hapus data outlet ini?")) {
+      await deleteDoc(doc(db, 'outlet_profits', id));
+      initOutletListener();
+    }
+  };
 
-  // --- EKSPOR LOGIC ---
+  // --- EKSPOR ---
   window.exportToPDF = () => {
     const filenameStr = document.getElementById('printDateText').innerText.replace(/\s+/g, '_');
     html2pdf().from(document.getElementById('pdfExportArea')).set({
