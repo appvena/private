@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CyberStorage // Supabase + Firebase</title>
+  <title>CyberStorage // Deep Space Node</title>
   <style>
     :root {
-      --bg-color: #0b0f19;
-      --card-bg: #111827;
+      --bg-color: #030712;
+      --card-bg: rgba(17, 24, 39, 0.75);
       --accent: #3ecf8e;
       --accent-hover: #34b27b;
       --text-main: #f3f4f6;
       --text-muted: #9ca3af;
-      --border: #1f2937;
+      --border: rgba(75, 85, 99, 0.4);
       --danger: #ef4444;
       --warning: #ffc107;
     }
@@ -23,21 +23,38 @@
       color: var(--text-main);
       margin: 0;
       padding: 20px;
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Animasi Latar Belakang Luar Angkasa */
+    #spaceCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
     }
 
     .container {
-      max-width: 900px;
-      margin: 40px auto;
+      max-width: 950px;
+      margin: 30px auto;
       background: var(--card-bg);
+      backdrop-filter: blur(12px);
       padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(62, 207, 142, 0.05);
+      border-radius: 16px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
       border: 1px solid var(--border);
+      position: relative;
+      z-index: 1;
     }
 
     h1, h2 {
       color: var(--text-main);
-      letter-spacing: 1px;
+      letter-spacing: 1.5px;
     }
 
     .header-flex {
@@ -57,6 +74,7 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      text-shadow: 0 0 10px rgba(62, 207, 142, 0.5);
     }
     .header-flex h1::before {
       content: '';
@@ -65,7 +83,7 @@
       height: 12px;
       background-color: var(--accent);
       border-radius: 50%;
-      box-shadow: 0 0 10px var(--accent);
+      box-shadow: 0 0 12px var(--accent);
     }
 
     #loginScreen, #setupScreen, #passwordScreen, #appScreen {
@@ -80,7 +98,7 @@
       display: block;
       font-size: 0.85rem;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 1px;
       color: var(--text-muted);
       margin-bottom: 8px;
     }
@@ -88,24 +106,25 @@
     .form-group input {
       width: 100%;
       padding: 12px;
-      background: #0b0f19;
+      background: rgba(3, 7, 18, 0.8);
       border: 1px solid var(--border);
-      border-radius: 6px;
+      border-radius: 8px;
       color: var(--text-main);
       font-size: 1rem;
       box-sizing: border-box;
       outline: none;
-      transition: border-color 0.3s;
+      transition: all 0.3s;
     }
 
     .form-group input:focus {
       border-color: var(--accent);
+      box-shadow: 0 0 8px rgba(62, 207, 142, 0.3);
     }
 
     button {
       padding: 10px 20px;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       cursor: pointer;
       font-weight: 600;
       transition: all 0.3s;
@@ -114,10 +133,11 @@
     .btn-primary {
       background-color: var(--accent);
       color: #000;
+      box-shadow: 0 0 10px rgba(62, 207, 142, 0.2);
     }
     .btn-primary:hover {
       background-color: var(--accent-hover);
-      box-shadow: 0 0 15px rgba(62, 207, 142, 0.3);
+      box-shadow: 0 0 20px rgba(62, 207, 142, 0.5);
     }
 
     .btn-warning {
@@ -136,7 +156,7 @@
     }
 
     .btn-secondary {
-      background-color: #1f2937;
+      background-color: rgba(31, 41, 55, 0.8);
       color: var(--text-main);
       border: 1px solid var(--border);
     }
@@ -145,11 +165,11 @@
     }
 
     .upload-section {
-      background: #0b0f19;
+      background: rgba(3, 7, 18, 0.6);
       margin-bottom: 30px;
       padding: 30px;
       border: 2px dashed var(--border);
-      border-radius: 8px;
+      border-radius: 10px;
       text-align: center;
     }
 
@@ -220,14 +240,22 @@
       background: rgba(255, 255, 255, 0.02);
     }
 
-    td a, td span.preview-link {
+    td a, td span.action-link {
       color: var(--accent);
       text-decoration: none;
       cursor: pointer;
-      margin-right: 15px;
+      margin-right: 12px;
     }
-    td a:hover, td span.preview-link:hover {
+    td a:hover, td span.action-link:hover {
       text-decoration: underline;
+    }
+
+    .note-text {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      display: block;
+      margin-top: 4px;
+      font-style: italic;
     }
 
     .status {
@@ -237,8 +265,8 @@
       font-family: monospace;
     }
 
-    /* Modal Pratinjau Fullscreen */
-    #previewModal {
+    /* Modal Styling */
+    #previewModal, #noteModal {
       display: none;
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
@@ -248,56 +276,63 @@
       align-items: center;
       flex-direction: column;
     }
-    #previewContentContainer {
+    .modal-box {
       max-width: 85%;
-      max-height: 80%;
+      width: 400px;
       background: #111827;
-      padding: 15px;
-      border-radius: 8px;
+      padding: 20px;
+      border-radius: 12px;
       border: 1px solid var(--border);
       text-align: center;
       position: relative;
+    }
+    .modal-box textarea {
+      width: 100%;
+      height: 100px;
+      background: #030712;
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      resize: none;
+      outline: none;
+      box-sizing: border-box;
     }
     #previewModal img, #previewModal iframe {
       max-width: 100%;
       max-height: 70vh;
       border-radius: 4px;
     }
-    .close-modal {
-      margin-top: 15px;
-      background: var(--danger);
-      color: white;
-      padding: 8px 16px;
-      border-radius: 4px;
-      cursor: pointer;
-      border: none;
-    }
   </style>
 </head>
 <body>
 
+<!-- Latar Belakang Digital Luar Angkasa (Canvas) -->
+<canvas id="spaceCanvas"></canvas>
+
 <div class="container">
   
-  <!-- 1. LAYAR LOGIN FIREBASE -->
+  <!-- 1. LAYAR LOGIN (TEMA LUAR ANGKASA) -->
   <div id="loginScreen">
-    <h2>System Access // Login</h2>
-    <p style="color: var(--text-muted); margin-bottom: 25px;">Masukkan akun Firebase Anda untuk masuk.</p>
+    <h2>Deep Space Access // Login</h2>
+    <p style="color: var(--text-muted); margin-bottom: 25px;">Masukkan kredensial orbital Anda untuk memulai.</p>
     <div class="form-group">
       <label>Email Address</label>
-      <input type="email" id="loginEmail" placeholder="user@domain.com">
+      <input type="email" id="loginEmail" placeholder="commander@space.org">
     </div>
     <div class="form-group">
       <label>Password</label>
       <input type="password" id="loginPass" placeholder="••••••••">
     </div>
-    <button class="btn-primary" onclick="login()">Inisialisasi Masuk</button>
+    <button class="btn-primary" onclick="login()">Inisialisasi Akses</button>
     <div id="loginStatus" class="status"></div>
   </div>
 
   <!-- 2. LAYAR SETUP SUPABASE API -->
   <div id="setupScreen">
     <h2>Pengaturan Supabase Storage</h2>
-    <p style="color: var(--text-muted); margin-bottom: 25px;">Masukkan kredensial Supabase Anda untuk penyimpanan file besar.</p>
+    <p style="color: var(--text-muted); margin-bottom: 25px;">Masukkan kredensial Supabase Anda untuk penyimpanan data besar.</p>
     <div class="form-group">
       <label>Supabase Project URL</label>
       <input type="text" id="supaUrl" placeholder="https://xxxx.supabase.co">
@@ -317,17 +352,17 @@
 
   <!-- 3. LAYAR GANTI PASSWORD -->
   <div id="passwordScreen">
-    <h2>Pengaturan Keamanan // Ganti Password</h2>
-    <p style="color: var(--text-muted); margin-bottom: 25px;">Perbarui password akun Firebase Anda.</p>
+    <h2>Keamanan Orbital // Ganti Password</h2>
+    <p style="color: var(--text-muted); margin-bottom: 25px;">Perbarui sandi akses Anda.</p>
     <div class="form-group">
-      <label>Password Saat Ini (Untuk Konfirmasi)</label>
+      <label>Password Saat Ini</label>
       <input type="password" id="currentPassword" placeholder="••••••••">
     </div>
     <div class="form-group">
       <label>Password Baru</label>
       <input type="password" id="newPassword" placeholder="••••••••">
     </div>
-    <button class="btn-primary" onclick="updatePasswordAccount()">Simpan Password Baru</button>
+    <button class="btn-primary" onclick="updatePasswordAccount()">Simpan Sandi Baru</button>
     <button class="btn-secondary" onclick="showScreen('appScreen')" style="margin-left: 10px;">Kembali</button>
     <div id="passwordStatus" class="status"></div>
   </div>
@@ -335,7 +370,7 @@
   <!-- 4. LAYAR UTAMA DASHBOARD -->
   <div id="appScreen">
     <div class="header-flex">
-      <h1>CyberStorage <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">[Supabase Node]</span></h1>
+      <h1>CyberStorage <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">[Space Node Active]</span></h1>
       <div>
         <button class="btn-secondary" onclick="showScreen('passwordScreen')">Ganti Password</button>
         <button class="btn-warning" onclick="resetSupabaseKeys()">Ubah Konfigurasi</button>
@@ -344,7 +379,7 @@
     </div>
     
     <div class="upload-section">
-      <button class="btn-primary" onclick="document.getElementById('fileInput').click()">Pilih Berkas / Foto</button>
+      <button class="btn-primary" onclick="document.getElementById('fileInput').click()">Pilih Berkas / Foto Orbital</button>
       <input type="file" id="fileInput" onchange="handleFileSelected()">
       
       <div id="previewContainer">
@@ -358,41 +393,93 @@
       </div>
       <div id="progressText">0%</div>
 
-      <button id="uploadBtn" class="btn-primary" style="display: none; margin-top: 15px;" onclick="uploadToSupabaseStorage()">Unggah ke Supabase</button>
+      <button id="uploadBtn" class="btn-primary" style="display: none; margin-top: 15px;" onclick="uploadToSupabaseStorage()">Unggah ke Orbit</button>
       <div id="status" class="status"></div>
     </div>
 
-    <h2>Direktori Berkas</h2>
+    <h2>Direktori Berkas Orbital</h2>
     <table>
       <thead>
         <tr>
-          <th>Nama Berkas</th>
+          <th>Nama Berkas & Catatan</th>
           <th>Ukuran</th>
           <th>Aksi</th>
         </tr>
       </thead>
       <tbody id="fileTableBody">
-        <tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Memuat data...</td></tr>
+        <tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Memindai sektor...</td></tr>
       </tbody>
     </table>
   </div>
 
 </div>
 
-<!-- MODAL POPUP PRATINJAU -->
+<!-- MODAL PRATINJAU FILE -->
 <div id="previewModal">
-  <div id="previewContentContainer">
+  <div class="modal-box" style="width: auto; max-width: 85%;">
     <div id="modalBody"></div>
-    <button class="close-modal" onclick="closePreviewModal()">Tutup Pratinjau</button>
+    <button class="btn-danger" onclick="closePreviewModal()" style="margin-top: 15px;">Tutup Pratinjau</button>
+  </div>
+</div>
+
+<!-- MODAL TAMBAH/EDIT CATATAN -->
+<div id="noteModal">
+  <div class="modal-box">
+    <h3>Catatan Berkas</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">Tambahkan atau ubah catatan untuk file ini.</p>
+    <textarea id="noteInputText" placeholder="Tulis catatan di sini..."></textarea>
+    <div>
+      <button class="btn-primary" onclick="saveFileNote()">Simpan Catatan</button>
+      <button class="btn-secondary" onclick="closeNoteModal()" style="margin-left: 8px;">Batal</button>
+    </div>
   </div>
 </div>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, addDoc, deleteDoc as deleteFirestoreDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, getDoc, deleteDoc, updateDoc, collection, addDoc, deleteDoc as deleteFirestoreDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
   import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+  // --- ANIMASI BINTANG LUAR ANGKASA ---
+  const canvas = document.getElementById('spaceCanvas');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+  const numStars = 120;
+
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  for (let i = 0; i < numStars; i++) {
+    stars.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      radius: Math.random() * 1.5,
+      alpha: Math.random(),
+      speed: Math.random() * 0.02 + 0.005
+    });
+  }
+
+  function animateSpace() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#ffffff";
+    stars.forEach(star => {
+      ctx.globalAlpha = star.alpha;
+      ctx.beginPath();
+      ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+      ctx.fill();
+      star.alpha += star.speed;
+      if (star.alpha > 1 || star.alpha < 0.2) star.speed = -star.speed;
+    });
+    requestAnimationFrame(animateSpace);
+  }
+  animateSpace();
+
+  // --- INISIALISASI FIREBASE & SUPABASE ---
   const firebaseConfig = {
     apiKey: "AIzaSyBYyVRU9cweEaniUkM3ZF2YeHhdxo3WrUA",
     authDomain: "privatedatasaya.firebaseapp.com",
@@ -408,6 +495,7 @@
 
   let supaClient = null;
   let supaBucketName = "";
+  let activeFileDocId = null;
 
   onAuthStateChanged(auth, async (user) => {
     if (user) {
@@ -421,7 +509,7 @@
     const email = document.getElementById('loginEmail').value;
     const pass = document.getElementById('loginPass').value;
     const stat = document.getElementById('loginStatus');
-    stat.textContent = "> Menghubungkan...";
+    stat.textContent = "> Menghubungkan ke orbit...";
 
     signInWithEmailAndPassword(auth, email, pass).catch(err => {
       stat.textContent = "> Gagal: " + err.message;
@@ -490,20 +578,20 @@
     const stat = document.getElementById('passwordStatus');
 
     if (!currentPass || !newPass) {
-      stat.textContent = "> Harap isi semua kolom password!";
+      stat.textContent = "> Harap isi semua kolom sandi!";
       return;
     }
 
-    stat.textContent = "> Memverifikasi password...";
+    stat.textContent = "> Memverifikasi sandi...";
 
     try {
       const credential = EmailAuthProvider.credential(user.email, currentPass);
       await reauthenticateWithCredential(user, credential);
 
-      stat.textContent = "> Memperbarui password...";
+      stat.textContent = "> Memperbarui sandi...";
       await updatePassword(user, newPass);
 
-      stat.textContent = "> Password berhasil diubah!";
+      stat.textContent = "> Sandi berhasil diubah!";
       document.getElementById('currentPassword').value = '';
       document.getElementById('newPassword').value = '';
       setTimeout(() => showScreen('appScreen'), 1500);
@@ -557,7 +645,7 @@
     uploadBtn.style.display = 'none';
     progressWrapper.style.display = 'block';
     progressText.style.display = 'block';
-    stat.textContent = "> Memproses unggahan...";
+    stat.textContent = "> Mengunggah ke orbit...";
 
     let progress = 0;
     progressBar.style.width = "0%";
@@ -595,10 +683,11 @@
         filePath: storagePath,
         fileUrl: publicUrl,
         fileSize: (file.size / (1024 * 1024)).toFixed(2) + " MB",
+        note: "",
         createdAt: serverTimestamp()
       });
 
-      stat.textContent = "> Berhasil diunggah sepenuhnya!";
+      stat.textContent = "> Berhasil diunggah ke orbit!";
       
       setTimeout(() => {
         fileInput.value = "";
@@ -619,7 +708,33 @@
     }
   };
 
-  // --- FUNGSI PREVIEW MODAL FILE YANG SUDAH MASUK ---
+  // --- MANAJEMEN CATATAN BERKAS ---
+  window.openNoteModal = function(docId, currentNote) {
+    activeFileDocId = docId;
+    document.getElementById('noteInputText').value = currentNote || '';
+    document.getElementById('noteModal').style.display = 'flex';
+  };
+
+  window.closeNoteModal = function() {
+    document.getElementById('noteModal').style.display = 'none';
+    activeFileDocId = null;
+  };
+
+  window.saveFileNote = async function() {
+    if (!activeFileDocId) return;
+    const newNote = document.getElementById('noteInputText').value.trim();
+
+    try {
+      await updateDoc(doc(db, 'user_files', activeFileDocId), {
+        note: newNote
+      });
+      closeNoteModal();
+    } catch (err) {
+      alert("Gagal menyimpan catatan: " + err.message);
+    }
+  };
+
+  // --- PRATINJAU FILE ---
   window.openPreview = function(fileUrl, fileName) {
     const modal = document.getElementById('previewModal');
     const modalBody = document.getElementById('modalBody');
@@ -632,7 +747,7 @@
     } else if (ext === 'pdf') {
       modalBody.innerHTML = `<iframe src="${fileUrl}" width="100%" height="450px" style="border:none;"></iframe>`;
     } else {
-      modalBody.innerHTML = `<p style="color: var(--text-muted); padding: 20px;">Pratinjau tidak tersedia untuk jenis file ini (.${ext}). Silakan langsung unduh file.</p>`;
+      modalBody.innerHTML = `<p style="color: var(--text-muted); padding: 20px;">Pratinjau tidak tersedia untuk jenis file ini (.${ext}).</p>`;
     }
 
     modal.style.display = 'flex';
@@ -645,7 +760,7 @@
 
   window.deleteFile = async function(docId, filePath) {
     const user = auth.currentUser;
-    const password = prompt("Keamanan Diperlukan: Masukkan password akun Firebase Anda untuk menghapus berkas ini:");
+    const password = prompt("Keamanan Orbital: Masukkan sandi akun Anda untuk menghapus berkas ini:");
     
     if (!password) return;
 
@@ -653,15 +768,15 @@
       const credential = EmailAuthProvider.credential(user.email, password);
       await reauthenticateWithCredential(user, credential);
 
-      if(confirm("Apakah Anda yakin ingin menghapus berkas ini secara permanen?")) {
+      if(confirm("Apakah Anda yakin ingin menghapus berkas ini dari orbit secara permanen?")) {
         if (filePath) {
           await supaClient.storage.from(supaBucketName).remove([filePath]);
         }
         await deleteFirestoreDoc(doc(db, 'user_files', docId));
-        alert("Berhasil dihapus!");
+        alert("Berkas berhasil dihapus!");
       }
     } catch (err) {
-      alert("Gagal menghapus berkas. Password salah atau terjadi kesalahan: " + err.message);
+      alert("Penghapusan dibatalkan. Sandi salah atau terjadi kesalahan: " + err.message);
     }
   };
 
@@ -672,19 +787,25 @@
       tbody.innerHTML = '';
       
       if(snap.empty) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Direktori kosong.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Sektor kosong. Belum ada berkas diorbit.</td></tr>`;
         return;
       }
 
       snap.forEach(documentSnapshot => {
         const d = documentSnapshot.data();
         const docId = documentSnapshot.id;
+        const noteDisplay = d.note ? `<span class="note-text">Catatan: ${d.note}</span>` : `<span class="note-text" style="opacity: 0.5;">Belum ada catatan</span>`;
+
         tbody.innerHTML += `<tr>
-          <td>${d.fileName}</td>
+          <td>
+            <strong>${d.fileName}</strong>
+            ${noteDisplay}
+          </td>
           <td>${d.fileSize}</td>
           <td>
-            <span class="preview-link" onclick="openPreview('${d.fileUrl}', '${d.fileName}')">Pratinjau</span>
-            <a href="${d.fileUrl}" target="_blank" download style="margin-right: 15px;">Unduh</a>
+            <span class="action-link" onclick="openPreview('${d.fileUrl}', '${d.fileName}')">Pratinjau</span>
+            <a href="${d.fileUrl}" target="_blank" download>Unduh</a>
+            <span class="action-link" onclick="openNoteModal('${docId}', '${d.note || ''}')">Catatan</span>
             <a href="#" onclick="deleteFile('${docId}', '${d.filePath || ''}')" style="color: var(--danger);">Hapus</a>
           </td>
         </tr>`;
