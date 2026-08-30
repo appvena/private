@@ -140,7 +140,6 @@
 
     </div>
 
-
     <!-- ============================================== -->
     <!-- TAB 2: KALKULATOR OUTLET (SEMBUNYI DEFAULT)    -->
     <!-- ============================================== -->
@@ -226,7 +225,8 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc, deleteDoc, updateDoc, collection, addDoc, onSnapshot, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  // Menghapus orderBy agar tidak memicu error Index Firestore
+  import { getFirestore, doc, setDoc, getDoc, deleteDoc, updateDoc, collection, addDoc, onSnapshot, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
   import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
   // --- LOGIKA TAB MENU ---
@@ -237,13 +237,11 @@
     const btnCalc = document.getElementById('btnTabCalc');
 
     if (tabName === 'storage') {
-      tabStorage.classList.remove('hidden');
-      tabCalc.classList.add('hidden');
+      tabStorage.classList.remove('hidden'); tabCalc.classList.add('hidden');
       btnStorage.className = "pb-3 border-b-2 border-emerald-400 text-emerald-400 font-bold transition";
       btnCalc.className = "pb-3 text-gray-400 hover:text-gray-200 transition border-b-2 border-transparent hover:border-gray-500";
     } else {
-      tabStorage.classList.add('hidden');
-      tabCalc.classList.remove('hidden');
+      tabStorage.classList.add('hidden'); tabCalc.classList.remove('hidden');
       btnCalc.className = "pb-3 border-b-2 border-emerald-400 text-emerald-400 font-bold transition";
       btnStorage.className = "pb-3 text-gray-400 hover:text-gray-200 transition border-b-2 border-transparent hover:border-gray-500";
     }
@@ -281,7 +279,6 @@
   const optionsId = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
   document.getElementById('displayDate').textContent = todayDateObj.toLocaleDateString('id-ID', optionsId);
 
-  // Fetch Kurs Real-Time
   fetch('https://open.er-api.com/v6/latest/USD').then(r=>r.json()).then(d => {
     if(d?.rates?.IDR) { 
         currentKursUSD = d.rates.IDR; 
@@ -324,54 +321,52 @@
   // --- CYBERSTORAGE LOGIC ---
   window.handleFileSelected = function() {
     const input = document.getElementById('fileInput');
-    const previewContainer = document.getElementById('previewContainer');
-    const filePreview = document.getElementById('filePreview');
     if (input.files.length > 0) {
-      const file = input.files[0];
-      document.getElementById('selectedFileName').textContent = file.name;
+      document.getElementById('selectedFileName').textContent = input.files[0].name;
       document.getElementById('uploadBtn').style.display = 'block';
-      if (file.type.startsWith('image/')) {
+      if (input.files[0].type.startsWith('image/')) {
         const reader = new FileReader();
-        reader.onload = e => { filePreview.src = e.target.result; previewContainer.style.display = 'block'; }
-        reader.readAsDataURL(file);
-      } else { previewContainer.style.display = 'none'; }
+        reader.onload = e => { document.getElementById('filePreview').src = e.target.result; document.getElementById('previewContainer').style.display = 'block'; }
+        reader.readAsDataURL(input.files[0]);
+      } else { document.getElementById('previewContainer').style.display = 'none'; }
     }
   };
 
   window.uploadToSupabaseStorage = async function() {
-    const fileInput = document.getElementById('fileInput');
-    const file = fileInput.files[0];
-    const stat = document.getElementById('status');
-    const pw = document.getElementById('progressWrapper'), pb = document.getElementById('progressBar'), pt = document.getElementById('progressText');
+    const file = document.getElementById('fileInput').files[0];
     if (!file || !supaClient) return;
 
     document.getElementById('uploadBtn').style.display = 'none';
-    pw.style.display = 'block'; pt.style.display = 'block';
-    let progress = 0; const interval = setInterval(() => { if (progress < 90) { progress += 10; pb.style.width = progress + '%'; pt.textContent = progress + '%'; } }, 200);
-
+    document.getElementById('progressWrapper').style.display = 'block'; 
+    document.getElementById('progressText').style.display = 'block';
+    
+    let progress = 0; 
+    const interval = setInterval(() => { if (progress < 90) { progress += 10; document.getElementById('progressBar').style.width = progress + '%'; document.getElementById('progressText').textContent = progress + '%'; } }, 200);
     const storagePath = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+
     try {
       const { error } = await supaClient.storage.from(supaBucketName).upload(storagePath, file);
       if (error) throw error;
-      clearInterval(interval); pb.style.width = '100%'; pt.textContent = '100%';
+      clearInterval(interval); document.getElementById('progressBar').style.width = '100%'; document.getElementById('progressText').textContent = '100%';
       const { data: { publicUrl } } = supaClient.storage.from(supaBucketName).getPublicUrl(storagePath);
-
-      await addDoc(collection(db, 'user_files'), {
-        fileName: file.name, filePath: storagePath, fileUrl: publicUrl, fileSize: (file.size / (1024 * 1024)).toFixed(2) + " MB", note: "", createdAt: serverTimestamp()
-      });
-      stat.textContent = "> Berhasil diunggah!";
-      setTimeout(() => { fileInput.value = ""; document.getElementById('selectedFileName').textContent = "Tidak ada berkas"; document.getElementById('previewContainer').style.display = 'none'; pw.style.display = 'none'; pt.style.display = 'none'; stat.textContent = ""; }, 2000);
+      await addDoc(collection(db, 'user_files'), { fileName: file.name, filePath: storagePath, fileUrl: publicUrl, fileSize: (file.size / (1024 * 1024)).toFixed(2) + " MB", note: "", createdAt: serverTimestamp() });
+      document.getElementById('status').textContent = "> Berhasil diunggah!";
+      setTimeout(() => { document.getElementById('fileInput').value = ""; document.getElementById('selectedFileName').textContent = "Tidak ada berkas"; document.getElementById('previewContainer').style.display = 'none'; document.getElementById('progressWrapper').style.display = 'none'; document.getElementById('progressText').style.display = 'none'; document.getElementById('status').textContent = ""; }, 2000);
     } catch (err) {
-      clearInterval(interval); stat.textContent = "> Error: " + err.message; document.getElementById('uploadBtn').style.display = 'block'; pw.style.display = 'none'; pt.style.display = 'none';
+      clearInterval(interval); document.getElementById('status').textContent = "> Error: " + err.message; document.getElementById('uploadBtn').style.display = 'block'; document.getElementById('progressWrapper').style.display = 'none'; document.getElementById('progressText').style.display = 'none';
     }
   };
 
   function loadFiles() {
-    onSnapshot(query(collection(db, 'user_files'), orderBy('createdAt', 'desc')), (snap) => {
+    onSnapshot(query(collection(db, 'user_files')), (snap) => {
       const tbody = document.getElementById('fileTableBody'); tbody.innerHTML = '';
       if (snap.empty) { tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-500">Sektor kosong. Belum ada berkas.</td></tr>`; return; }
-      snap.forEach(docSnap => {
-        const d = docSnap.data(); const docId = docSnap.id;
+      
+      let items = [];
+      snap.forEach(d => items.push({ id: d.id, ...d.data() }));
+      items.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+      items.forEach(d => {
         const noteText = d.note ? `<span class="block text-xs text-gray-400 italic mt-1 font-mono">📝 ${d.note}</span>` : `<span class="block text-xs text-gray-600 italic mt-1">Tanpa catatan</span>`;
         tbody.innerHTML += `
           <tr class="border-b border-gray-800 hover:bg-white/[0.02] transition">
@@ -380,8 +375,8 @@
             <td class="p-4 space-x-3 text-right">
               <span class="text-emerald-400 cursor-pointer hover:text-emerald-300 font-semibold" onclick="openPreview('${d.fileUrl}', '${d.fileName}')">Pratinjau</span>
               <a href="${d.fileUrl}" target="_blank" download class="text-emerald-400 hover:text-emerald-300 font-semibold">Unduh</a>
-              <span class="text-amber-400 cursor-pointer hover:text-amber-300 font-semibold" onclick="openNoteModal('${docId}', '${d.note || ''}')">Catatan</span>
-              <span class="text-red-400 cursor-pointer hover:text-red-300 font-semibold" onclick="deleteFile('${docId}', '${d.filePath || ''}')">Hapus</span>
+              <span class="text-amber-400 cursor-pointer hover:text-amber-300 font-semibold" onclick="openNoteModal('${d.id}', '${d.note || ''}')">Catatan</span>
+              <span class="text-red-400 cursor-pointer hover:text-red-300 font-semibold" onclick="deleteFile('${d.id}', '${d.filePath || ''}')">Hapus</span>
             </td>
           </tr>`;
       });
@@ -391,7 +386,7 @@
   window.openPreview = (url, name) => {
     const modalBody = document.getElementById('modalBody'); const ext = name.split('.').pop().toLowerCase();
     modalBody.innerHTML = ['jpg','jpeg','png','gif','webp'].includes(ext) ? `<img src="${url}" class="max-h-[60vh] rounded shadow-lg border border-gray-700">` : 
-                          (ext === 'pdf' ? `<iframe src="${url}" width="100%" height="450px" class="border-0 rounded border border-gray-700"></iframe>` : `<p class="text-gray-400">Pratinjau tidak didukung untuk format ini.</p>`);
+                          (ext === 'pdf' ? `<iframe src="${url}" width="100%" height="450px" class="border-0 rounded border border-gray-700"></iframe>` : `<p class="text-gray-400">Pratinjau tidak didukung.</p>`);
     document.getElementById('previewModal').style.display = 'flex';
   };
   window.closePreviewModal = () => document.getElementById('previewModal').style.display = 'none';
@@ -399,9 +394,9 @@
   window.openNoteModal = (id, note) => { activeFileDocId = id; document.getElementById('noteInputText').value = note; document.getElementById('noteModal').style.display = 'flex'; };
   window.closeNoteModal = () => { document.getElementById('noteModal').style.display = 'none'; activeFileDocId = null; };
   window.saveFileNote = async () => { if(activeFileDocId) { await updateDoc(doc(db, 'user_files', activeFileDocId), { note: document.getElementById('noteInputText').value.trim() }); closeNoteModal(); } };
-
+  
   window.deleteFile = async (docId, path) => {
-    const password = prompt("Keamanan Orbital: Masukkan sandi akun Anda untuk menghapus berkas ini:");
+    const password = prompt("Masukkan sandi akun Anda untuk menghapus berkas ini:");
     if (!password) return;
     try {
       await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(auth.currentUser.email, password));
@@ -420,7 +415,9 @@
       document.getElementById('holidayBanner').style.display = 'block';
     }
     
-    onSnapshot(query(collection(db, 'outlet_profits'), where('dateStr', '==', todayStrDb), orderBy('createdAt', 'asc')), (snap) => {
+    // Hilangkan orderBy untuk mencegah error Firebase Index
+    const q = query(collection(db, 'outlet_profits'), where('dateStr', '==', todayStrDb));
+    onSnapshot(q, (snap) => {
       const container = document.getElementById('todayOutletList'); container.innerHTML = '';
       if (snap.empty) {
         document.getElementById('emptyOutletMsg').style.display = 'block';
@@ -431,9 +428,14 @@
       
       document.getElementById('emptyOutletMsg').style.display = 'none';
       let sumUSDC = 0;
+      let items = [];
+      snap.forEach(d => items.push({ id: d.id, ...d.data() }));
+      
+      // Sort manual menggunakan Javascript
+      items.sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
 
-      snap.forEach(docSnap => {
-        const d = docSnap.data(); sumUSDC += d.usdc;
+      items.forEach(d => {
+        sumUSDC += d.usdc;
         container.innerHTML += `
           <div class="flex justify-between items-center p-4 bg-gray-900 border border-gray-700 rounded-lg shadow-md hover:border-emerald-500/50 transition group">
             <div>
@@ -441,7 +443,7 @@
             </div>
             <div class="text-right">
               <span class="text-emerald-400 font-bold text-lg block tracking-wide">Netto: ${d.usdc.toLocaleString(undefined, {minimumFractionDigits: 2})} USDC</span>
-              <button onclick="deleteOutletRecord('${docSnap.id}')" class="text-red-400 text-xs hover:text-red-300 font-semibold mt-1 no-print">Hapus Data</button>
+              <button onclick="deleteOutletRecord('${d.id}')" class="text-red-400 text-xs hover:text-red-300 font-semibold mt-1 no-print">Hapus Data</button>
             </div>
           </div>
         `;
@@ -453,11 +455,30 @@
   }
 
   window.saveOutletData = async () => {
-    const outlet = document.getElementById('outletName').value.trim(), usdc = parseFloat(document.getElementById('inputUSDC').value);
-    if (!outlet || isNaN(usdc)) return alert("Isi nama outlet dan nominal USDC!");
-    await addDoc(collection(db, 'outlet_profits'), { dateStr: todayStrDb, outlet: outlet, usdc: usdc, createdAt: serverTimestamp() });
-    document.getElementById('outletName').value = ''; document.getElementById('inputUSDC').value = '';
+    try {
+      const outlet = document.getElementById('outletName').value.trim();
+      const usdc = parseFloat(document.getElementById('inputUSDC').value);
+      
+      if (!outlet || isNaN(usdc)) {
+        alert("Harap isi nama outlet dan nominal USDC terlebih dahulu!");
+        return;
+      }
+      
+      await addDoc(collection(db, 'outlet_profits'), { 
+        dateStr: todayStrDb, 
+        outlet: outlet, 
+        usdc: usdc, 
+        createdAt: serverTimestamp() 
+      });
+      
+      document.getElementById('outletName').value = ''; 
+      document.getElementById('inputUSDC').value = '';
+    } catch (error) {
+      alert("Gagal menyimpan data: " + error.message);
+      console.error(error);
+    }
   };
+
   window.deleteOutletRecord = async (id) => { if(confirm("Hapus data outlet ini?")) await deleteDoc(doc(db, 'outlet_profits', id)); };
 
   // --- EKSPOR LOGIC ---
