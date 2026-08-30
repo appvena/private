@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CyberStorage // Private Cloud</title>
+  <title>CyberStorage // Supabase + Firebase</title>
   <style>
     :root {
       --bg-color: #0b0f19;
       --card-bg: #111827;
-      --accent: #00ffcc;
-      --accent-hover: #00b386;
+      --accent: #3ecf8e;
+      --accent-hover: #34b27b;
       --text-main: #f3f4f6;
       --text-muted: #9ca3af;
       --border: #1f2937;
@@ -31,7 +31,7 @@
       background: var(--card-bg);
       padding: 30px;
       border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0, 255, 204, 0.05);
+      box-shadow: 0 10px 30px rgba(62, 207, 142, 0.05);
       border: 1px solid var(--border);
     }
 
@@ -47,6 +47,8 @@
       border-bottom: 1px solid var(--border);
       padding-bottom: 15px;
       margin-bottom: 25px;
+      flex-wrap: wrap;
+      gap: 15px;
     }
 
     .header-flex h1 {
@@ -67,7 +69,7 @@
     }
 
     /* Sembunyikan layar secara default */
-    #loginScreen, #setupScreen, #appScreen {
+    #loginScreen, #setupScreen, #passwordScreen, #appScreen {
       display: none;
     }
 
@@ -116,7 +118,7 @@
     }
     .btn-primary:hover {
       background-color: var(--accent-hover);
-      box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);
+      box-shadow: 0 0 15px rgba(62, 207, 142, 0.3);
     }
 
     .btn-warning {
@@ -132,6 +134,15 @@
     .btn-danger:hover {
       background-color: var(--danger);
       color: #fff;
+    }
+
+    .btn-secondary {
+      background-color: #1f2937;
+      color: var(--text-main);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover {
+      background-color: #374151;
     }
 
     .upload-section {
@@ -210,42 +221,60 @@
     <div id="loginStatus" class="status"></div>
   </div>
 
-  <!-- 2. LAYAR SETUP GITHUB TOKEN DI DALAM APLIKASI -->
+  <!-- 2. LAYAR SETUP SUPABASE API -->
   <div id="setupScreen">
-    <h2>Pengaturan Token GitHub (API Key)</h2>
-    <p style="color: var(--text-muted); margin-bottom: 25px;">Masukkan detail GitHub Anda. Data ini akan disimpan aman di Firestore Anda.</p>
+    <h2>Pengaturan Supabase Storage</h2>
+    <p style="color: var(--text-muted); margin-bottom: 25px;">Masukkan kredensial Supabase Anda untuk penyimpanan file besar.</p>
     <div class="form-group">
-      <label>Username GitHub</label>
-      <input type="text" id="gitUsername" placeholder="appvena">
+      <label>Supabase Project URL</label>
+      <input type="text" id="supaUrl" placeholder="https://xxxx.supabase.co">
     </div>
     <div class="form-group">
-      <label>Nama Repository</label>
-      <input type="text" id="gitRepo" placeholder="private">
+      <label>Supabase Anon/Public Key</label>
+      <input type="password" id="supaKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
     </div>
     <div class="form-group">
-      <label>GitHub Token (ghp_...)</label>
-      <input type="password" id="gitToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+      <label>Nama Bucket Storage</label>
+      <input type="text" id="supaBucket" placeholder="uploads">
     </div>
-    <button class="btn-primary" onclick="saveGitHubKeys()">Simpan Pengaturan</button>
+    <button class="btn-primary" onclick="saveSupabaseKeys()">Simpan Pengaturan</button>
     <button class="btn-danger" onclick="logout()" style="margin-left: 10px;">Keluar</button>
     <div id="setupStatus" class="status"></div>
   </div>
 
-  <!-- 3. LAYAR UTAMA DASHBOARD -->
+  <!-- 3. LAYAR GANTI PASSWORD -->
+  <div id="passwordScreen">
+    <h2>Pengaturan Keamanan // Ganti Password</h2>
+    <p style="color: var(--text-muted); margin-bottom: 25px;">Perbarui password akun Firebase Anda.</p>
+    <div class="form-group">
+      <label>Password Saat Ini (Untuk Konfirmasi)</label>
+      <input type="password" id="currentPassword" placeholder="••••••••">
+    </div>
+    <div class="form-group">
+      <label>Password Baru</label>
+      <input type="password" id="newPassword" placeholder="••••••••">
+    </div>
+    <button class="btn-primary" onclick="updatePasswordAccount()">Simpan Password Baru</button>
+    <button class="btn-secondary" onclick="showScreen('appScreen')" style="margin-left: 10px;">Kembali</button>
+    <div id="passwordStatus" class="status"></div>
+  </div>
+
+  <!-- 4. LAYAR UTAMA DASHBOARD -->
   <div id="appScreen">
     <div class="header-flex">
-      <h1>CyberStorage <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">[Node Aktif]</span></h1>
+      <h1>CyberStorage <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">[Supabase Node]</span></h1>
       <div>
-        <button class="btn-warning" onclick="resetGitHubKeys()">Ubah Token</button>
+        <button class="btn-secondary" onclick="showScreen('passwordScreen')">Ganti Password</button>
+        <button class="btn-warning" onclick="resetSupabaseKeys()">Ubah Konfigurasi</button>
         <button class="btn-danger" onclick="logout()">Keluar</button>
       </div>
     </div>
     
     <div class="upload-section">
-      <button class="btn-primary" onclick="document.getElementById('fileInput').click()">Pilih Berkas / Foto</button>
+      <button class="btn-primary" onclick="document.getElementById('fileInput').click()">Pilih Berkas / Foto (Mendukung File Besar)</button>
       <input type="file" id="fileInput" onchange="showFileName()">
       <p id="selectedFileName">Tidak ada berkas yang dipilih</p>
-      <button id="uploadBtn" class="btn-primary" style="display: none;" onclick="uploadToGitHubAndFirebase()">Unggah ke Cloud</button>
+      <button id="uploadBtn" class="btn-primary" style="display: none;" onclick="uploadToSupabaseStorage()">Unggah ke Supabase</button>
       <div id="status" class="status"></div>
     </div>
 
@@ -266,11 +295,12 @@
 
 </div>
 
-<!-- Script Utama -->
+<!-- Script Utama (Firebase + Supabase SDK) -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, addDoc, deleteDoc as deleteFirestoreDoc, doc as docRefId, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
   const firebaseConfig = {
     apiKey: "AIzaSyBYyVRU9cweEaniUkM3ZF2YeHhdxo3WrUA",
@@ -285,11 +315,12 @@
   const auth = getAuth(app);
   const db = getFirestore(app);
 
-  let githubConfigData = null;
+  let supaClient = null;
+  let supaBucketName = "";
 
   onAuthStateChanged(auth, async (user) => {
     if (user) {
-      await checkGitHubSettings(user.uid);
+      await checkSupabaseSettings(user.uid);
     } else {
       showScreen('loginScreen');
     }
@@ -308,17 +339,19 @@
 
   window.logout = () => signOut(auth);
 
-  async function checkGitHubSettings(uid) {
+  async function checkSupabaseSettings(uid) {
     try {
-      const docRef = doc(db, 'settings', uid);
+      const docRef = doc(db, 'settings', 'supabase_' + uid);
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
-        githubConfigData = docSnap.data();
+        const config = docSnap.data();
+        supaClient = createClient(config.url, config.key);
+        supaBucketName = config.bucket;
         showScreen('appScreen');
         loadFiles();
       } else {
-        showScreen('setupScreen'); // Form input token akan muncul di sini
+        showScreen('setupScreen');
       }
     } catch (err) {
       console.error(err);
@@ -326,41 +359,71 @@
     }
   }
 
-  window.saveGitHubKeys = async function() {
+  window.saveSupabaseKeys = async function() {
     const user = auth.currentUser;
     if (!user) return;
 
     const config = {
-      username: document.getElementById('gitUsername').value.trim(),
-      repo: document.getElementById('gitRepo').value.trim(),
-      token: document.getElementById('gitToken').value.trim()
+      url: document.getElementById('supaUrl').value.trim(),
+      key: document.getElementById('supaKey').value.trim(),
+      bucket: document.getElementById('supaBucket').value.trim()
     };
 
-    if (!config.username || !config.repo || !config.token) {
+    if (!config.url || !config.key || !config.bucket) {
       document.getElementById('setupStatus').textContent = "> Harap isi semua kolom!";
       return;
     }
 
-    document.getElementById('setupStatus').textContent = "> Menyimpan ke Firestore...";
+    document.getElementById('setupStatus').textContent = "> Menyimpan konfigurasi...";
     
     try {
-      await setDoc(doc(db, 'settings', user.uid), config);
-      await checkGitHubSettings(user.uid);
+      await setDoc(doc(db, 'settings', 'supabase_' + user.uid), config);
+      await checkSupabaseSettings(user.uid);
     } catch (err) {
       document.getElementById('setupStatus').textContent = "> Gagal menyimpan: " + err.message;
     }
   };
 
-  window.resetGitHubKeys = async function() {
+  window.resetSupabaseKeys = async function() {
     const user = auth.currentUser;
-    if (user && confirm("Ingin mengubah pengaturan token GitHub?")) {
-      await deleteDoc(doc(db, 'settings', user.uid));
-      checkGitHubSettings(user.uid);
+    if (user && confirm("Ingin mengubah konfigurasi Supabase?")) {
+      await deleteDoc(doc(db, 'settings', 'supabase_' + user.uid));
+      checkSupabaseSettings(user.uid);
     }
   };
 
-  function showScreen(id) {
-    ['loginScreen', 'setupScreen', 'appScreen'].forEach(s => {
+  // --- GANTI PASSWORD ---
+  window.updatePasswordAccount = async function() {
+    const user = auth.currentUser;
+    const currentPass = document.getElementById('currentPassword').value;
+    const newPass = document.getElementById('newPassword').value;
+    const stat = document.getElementById('passwordStatus');
+
+    if (!currentPass || !newPass) {
+      stat.textContent = "> Harap isi semua kolom password!";
+      return;
+    }
+
+    stat.textContent = "> Memverifikasi password...";
+
+    try {
+      const credential = EmailAuthProvider.credential(user.email, currentPass);
+      await reauthenticateWithCredential(user, credential);
+
+      stat.textContent = "> Memperbarui password...";
+      await updatePassword(user, newPass);
+
+      stat.textContent = "> Password berhasil diubah!";
+      document.getElementById('currentPassword').value = '';
+      document.getElementById('newPassword').value = '';
+      setTimeout(() => showScreen('appScreen'), 1500);
+    } catch (err) {
+      stat.textContent = "> Gagal: " + err.message;
+    }
+  };
+
+  window.showScreen = function(id) {
+    ['loginScreen', 'setupScreen', 'passwordScreen', 'appScreen'].forEach(s => {
       document.getElementById(s).style.display = (s === id) ? 'block' : 'none';
     });
   }
@@ -373,59 +436,73 @@
     }
   };
 
-  window.uploadToGitHubAndFirebase = async function() {
+  window.uploadToSupabaseStorage = async function() {
     const fileInput = document.getElementById('fileInput');
     const file = fileInput.files[0];
     const stat = document.getElementById('status');
-    if (!file || !githubConfigData) return;
+    if (!file || !supaClient) return;
 
-    stat.textContent = "> Membaca berkas...";
+    stat.textContent = "> Mengunggah file besar ke Supabase Storage...";
 
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = async function() {
-      const base64Content = reader.result.split(',')[1];
-      const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
-      const githubPath = `uploads/${fileName}`;
+    const storagePath = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
 
-      stat.textContent = "> Mengirim ke GitHub API...";
+    try {
+      const { data, error } = await supaClient.storage
+        .from(supaBucketName)
+        .upload(storagePath, file);
 
-      try {
-        const response = await fetch(`https://api.github.com/repos/${githubConfigData.username}/${githubConfigData.repo}/contents/${githubPath}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `token ${githubConfigData.token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            message: `Upload file: ${file.name}`,
-            content: base64Content
-          })
-        });
+      if (error) throw error;
 
-        if (!response.ok) throw new Error("Gagal mengirim ke GitHub (Periksa kembali Token & Nama Repository Anda)");
+      const { data: { publicUrl } } = supaClient.storage
+        .from(supaBucketName)
+        .getPublicUrl(storagePath);
 
-        const fileUrl = `https://raw.githubusercontent.com/${githubConfigData.username}/${githubConfigData.repo}/main/${githubPath}`;
+      stat.textContent = "> Menyinkronkan metadata ke Firestore...";
 
-        stat.textContent = "> Menyinkronkan ke database...";
+      await addDoc(collection(db, 'user_files'), {
+        fileName: file.name,
+        filePath: storagePath, // Disimpan untuk referensi penghapusan file fisik
+        fileUrl: publicUrl,
+        fileSize: (file.size / (1024 * 1024)).toFixed(2) + " MB",
+        createdAt: serverTimestamp()
+      });
 
-        await addDoc(collection(db, 'user_files'), {
-          fileName: file.name,
-          fileUrl: fileUrl,
-          fileSize: (file.size / (1024 * 1024)).toFixed(2) + " MB",
-          createdAt: serverTimestamp()
-        });
+      stat.textContent = "> Berhasil diunggah!";
+      fileInput.value = "";
+      document.getElementById('selectedFileName').textContent = "Tidak ada berkas yang dipilih";
+      document.getElementById('uploadBtn').style.display = 'none';
 
-        stat.textContent = "> Berhasil diunggah!";
-        fileInput.value = "";
-        document.getElementById('selectedFileName').textContent = "Tidak ada berkas yang dipilih";
-        document.getElementById('uploadBtn').style.display = 'none';
+    } catch (err) {
+      console.error(err);
+      stat.textContent = "> Error: " + err.message;
+    }
+  };
 
-      } catch (err) {
-        console.error(err);
-        stat.textContent = "> Error: " + err.message;
+  // --- HAPUS BERKAS DENGAN PASSWORD ---
+  window.deleteFile = async function(docId, filePath) {
+    const user = auth.currentUser;
+    const password = prompt("Keamanan Diperlukan: Masukkan password akun Firebase Anda untuk menghapus berkas ini:");
+    
+    if (!password) return;
+
+    try {
+      // Verifikasi password pengguna terlebih dahulu
+      const credential = EmailAuthProvider.credential(user.email, password);
+      await reauthenticateWithCredential(user, credential);
+
+      if(confirm("Apakah Anda yakin ingin menghapus berkas ini secara permanen dari Supabase dan Database?")) {
+        // 1. Hapus file fisik dari Supabase Storage (jika filePath tersedia)
+        if (filePath) {
+          await supaClient.storage.from(supaBucketName).remove([filePath]);
+        }
+
+        // 2. Hapus data dari Firebase Firestore
+        await deleteFirestoreDoc(doc(db, 'user_files', docId));
+        alert("Berhasil dihapus!");
       }
-    };
+    } catch (err) {
+      alert("Gagal menghapus berkas. Password salah atau terjadi kesalahan: " + err.message);
+    }
   };
 
   function loadFiles() {
@@ -439,12 +516,16 @@
         return;
       }
 
-      snap.forEach(document => {
-        const d = document.data();
+      snap.forEach(documentSnapshot => {
+        const d = documentSnapshot.data();
+        const docId = documentSnapshot.id;
         tbody.innerHTML += `<tr>
           <td>${d.fileName}</td>
           <td>${d.fileSize}</td>
-          <td><a href="${d.fileUrl}" target="_blank" download>Unduh</a></td>
+          <td>
+            <a href="${d.fileUrl}" target="_blank" download style="margin-right: 15px;">Unduh</a>
+            <a href="#" onclick="deleteFile('${docId}', '${d.filePath || ''}')" style="color: var(--danger);">Hapus</a>
+          </td>
         </tr>`;
       });
     });
