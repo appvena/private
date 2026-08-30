@@ -14,6 +14,7 @@
       --text-muted: #9ca3af;
       --border: #1f2937;
       --danger: #ef4444;
+      --warning: #ffc107;
     }
 
     body {
@@ -65,7 +66,8 @@
       box-shadow: 0 0 10px var(--accent);
     }
 
-    #loginScreen, #appScreen {
+    /* Sembunyikan layar secara default */
+    #loginScreen, #setupScreen, #appScreen {
       display: none;
     }
 
@@ -117,6 +119,11 @@
       box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);
     }
 
+    .btn-warning {
+      background-color: var(--warning);
+      color: #000;
+    }
+
     .btn-danger {
       background-color: transparent;
       color: var(--danger);
@@ -134,10 +141,6 @@
       border: 2px dashed var(--border);
       border-radius: 8px;
       text-align: center;
-      transition: border-color 0.3s;
-    }
-    .upload-section:hover {
-      border-color: var(--accent);
     }
 
     input[type="file"] {
@@ -191,10 +194,10 @@
 
 <div class="container">
   
-  <!-- LAYAR LOGIN -->
+  <!-- 1. LAYAR LOGIN FIREBASE -->
   <div id="loginScreen">
     <h2>System Access // Login</h2>
-    <p style="color: var(--text-muted); margin-bottom: 25px;">Autentikasi Firebase diperlukan untuk masuk.</p>
+    <p style="color: var(--text-muted); margin-bottom: 25px;">Masukkan akun Firebase Anda untuk masuk.</p>
     <div class="form-group">
       <label>Email Address</label>
       <input type="email" id="loginEmail" placeholder="user@domain.com">
@@ -207,11 +210,35 @@
     <div id="loginStatus" class="status"></div>
   </div>
 
-  <!-- LAYAR UTAMA DASHBOARD -->
+  <!-- 2. LAYAR SETUP GITHUB TOKEN DI DALAM APLIKASI -->
+  <div id="setupScreen">
+    <h2>Pengaturan Token GitHub (API Key)</h2>
+    <p style="color: var(--text-muted); margin-bottom: 25px;">Masukkan detail GitHub Anda. Data ini akan disimpan aman di Firestore Anda.</p>
+    <div class="form-group">
+      <label>Username GitHub</label>
+      <input type="text" id="gitUsername" placeholder="appvena">
+    </div>
+    <div class="form-group">
+      <label>Nama Repository</label>
+      <input type="text" id="gitRepo" placeholder="private">
+    </div>
+    <div class="form-group">
+      <label>GitHub Token (ghp_...)</label>
+      <input type="password" id="gitToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+    </div>
+    <button class="btn-primary" onclick="saveGitHubKeys()">Simpan Pengaturan</button>
+    <button class="btn-danger" onclick="logout()" style="margin-left: 10px;">Keluar</button>
+    <div id="setupStatus" class="status"></div>
+  </div>
+
+  <!-- 3. LAYAR UTAMA DASHBOARD -->
   <div id="appScreen">
     <div class="header-flex">
-      <h1>CyberStorage <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">[Firebase + GitHub]</span></h1>
-      <button class="btn-danger" onclick="logout()">Putuskan Sesi</button>
+      <h1>CyberStorage <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">[Node Aktif]</span></h1>
+      <div>
+        <button class="btn-warning" onclick="resetGitHubKeys()">Ubah Token</button>
+        <button class="btn-danger" onclick="logout()">Keluar</button>
+      </div>
     </div>
     
     <div class="upload-section">
@@ -232,20 +259,19 @@
         </tr>
       </thead>
       <tbody id="fileTableBody">
-        <tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Memuat data dari database...</td></tr>
+        <tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Memuat data...</td></tr>
       </tbody>
     </table>
   </div>
 
 </div>
 
-<!-- Script Utama Firebase & GitHub API -->
+<!-- Script Utama -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-  // 1. Konfigurasi Firebase Anda
   const firebaseConfig = {
     apiKey: "AIzaSyBYyVRU9cweEaniUkM3ZF2YeHhdxo3WrUA",
     authDomain: "privatedatasaya.firebaseapp.com",
@@ -259,20 +285,13 @@
   const auth = getAuth(app);
   const db = getFirestore(app);
 
-  // 2. Konfigurasi GitHub Anda (Untuk simpan file fisik)
-  const GITHUB_USERNAME = "appvena"; // Sesuai akun Anda
-  const GITHUB_REPO = "private";     // Sesuai repo Anda
-  const GITHUB_TOKEN = "MASUKKAN_TOKEN_GITHUB_CLASSIC_ANDA_DISINI"; 
+  let githubConfigData = null;
 
-  // Cek Status Auth
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, async (user) => {
     if (user) {
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('appScreen').style.display = 'block';
-      loadFiles();
+      await checkGitHubSettings(user.uid);
     } else {
-      document.getElementById('loginScreen').style.display = 'block';
-      document.getElementById('appScreen').style.display = 'none';
+      showScreen('loginScreen');
     }
   });
 
@@ -280,14 +299,71 @@
     const email = document.getElementById('loginEmail').value;
     const pass = document.getElementById('loginPass').value;
     const stat = document.getElementById('loginStatus');
-    stat.textContent = "> Menghubungkan ke server...";
+    stat.textContent = "> Menghubungkan...";
 
     signInWithEmailAndPassword(auth, email, pass).catch(err => {
-      stat.textContent = "> Akses ditolak: " + err.message;
+      stat.textContent = "> Gagal: " + err.message;
     });
   };
 
   window.logout = () => signOut(auth);
+
+  async function checkGitHubSettings(uid) {
+    try {
+      const docRef = doc(db, 'settings', uid);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        githubConfigData = docSnap.data();
+        showScreen('appScreen');
+        loadFiles();
+      } else {
+        showScreen('setupScreen'); // Form input token akan muncul di sini
+      }
+    } catch (err) {
+      console.error(err);
+      showScreen('setupScreen');
+    }
+  }
+
+  window.saveGitHubKeys = async function() {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const config = {
+      username: document.getElementById('gitUsername').value.trim(),
+      repo: document.getElementById('gitRepo').value.trim(),
+      token: document.getElementById('gitToken').value.trim()
+    };
+
+    if (!config.username || !config.repo || !config.token) {
+      document.getElementById('setupStatus').textContent = "> Harap isi semua kolom!";
+      return;
+    }
+
+    document.getElementById('setupStatus').textContent = "> Menyimpan ke Firestore...";
+    
+    try {
+      await setDoc(doc(db, 'settings', user.uid), config);
+      await checkGitHubSettings(user.uid);
+    } catch (err) {
+      document.getElementById('setupStatus').textContent = "> Gagal menyimpan: " + err.message;
+    }
+  };
+
+  window.resetGitHubKeys = async function() {
+    const user = auth.currentUser;
+    if (user && confirm("Ingin mengubah pengaturan token GitHub?")) {
+      await deleteDoc(doc(db, 'settings', user.uid));
+      checkGitHubSettings(user.uid);
+    }
+  };
+
+  function showScreen(id) {
+    ['loginScreen', 'setupScreen', 'appScreen'].forEach(s => {
+      document.getElementById(s).style.display = (s === id) ? 'block' : 'none';
+    });
+  }
 
   window.showFileName = function() {
     const input = document.getElementById('fileInput');
@@ -301,9 +377,9 @@
     const fileInput = document.getElementById('fileInput');
     const file = fileInput.files[0];
     const stat = document.getElementById('status');
-    if (!file) return;
+    if (!file || !githubConfigData) return;
 
-    stat.textContent = "> Mengonversi stream data...";
+    stat.textContent = "> Membaca berkas...";
 
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -312,13 +388,13 @@
       const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
       const githubPath = `uploads/${fileName}`;
 
-      stat.textContent = "> Mengirim paket ke GitHub repository...";
+      stat.textContent = "> Mengirim ke GitHub API...";
 
       try {
-        const response = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${GITHUB_REPO}/contents/${githubPath}`, {
+        const response = await fetch(`https://api.github.com/repos/${githubConfigData.username}/${githubConfigData.repo}/contents/${githubPath}`, {
           method: 'PUT',
           headers: {
-            'Authorization': `token ${GITHUB_TOKEN}`,
+            'Authorization': `token ${githubConfigData.token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -327,11 +403,11 @@
           })
         });
 
-        if (!response.ok) throw new Error("Gagal mengirim payload ke GitHub API");
+        if (!response.ok) throw new Error("Gagal mengirim ke GitHub (Periksa kembali Token & Nama Repository Anda)");
 
-        const fileUrl = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${GITHUB_REPO}/main/${githubPath}`;
+        const fileUrl = `https://raw.githubusercontent.com/${githubConfigData.username}/${githubConfigData.repo}/main/${githubPath}`;
 
-        stat.textContent = "> Menyinkronkan metadata ke Firestore...";
+        stat.textContent = "> Menyinkronkan ke database...";
 
         await addDoc(collection(db, 'user_files'), {
           fileName: file.name,
@@ -340,14 +416,14 @@
           createdAt: serverTimestamp()
         });
 
-        stat.textContent = "> Transaksi unggah sukses!";
+        stat.textContent = "> Berhasil diunggah!";
         fileInput.value = "";
         document.getElementById('selectedFileName').textContent = "Tidak ada berkas yang dipilih";
         document.getElementById('uploadBtn').style.display = 'none';
 
       } catch (err) {
         console.error(err);
-        stat.textContent = "> Error sistem: " + err.message;
+        stat.textContent = "> Error: " + err.message;
       }
     };
   };
