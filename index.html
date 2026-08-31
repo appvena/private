@@ -523,17 +523,21 @@
     }
 
     const filteredItems = allOutletData.filter(d => d.dateStr >= start && d.dateStr <= end);
+    const container = document.getElementById('todayOutletList');
 
-    const container = document.getElementById('todayOutletList'); container.innerHTML = '';
+    // FIX: bangun ulang pesan "kosong" via innerHTML alih-alih mereferensikan
+    // elemen #emptyOutletMsg yang sudah terhapus oleh container.innerHTML = ''
+    // sebelumnya. Referensi ke elemen yang sudah tidak ada di DOM menghasilkan
+    // null dan melempar error diam-diam di console, sehingga daftar & total
+    // tidak pernah ter-render.
     if (filteredItems.length === 0) {
-      document.getElementById('emptyOutletMsg').style.display = 'block';
-      document.getElementById('emptyOutletMsg').textContent = `Belum ada data outlet pada tanggal ini. (Total data di DB: ${allOutletData.length})`;
+      container.innerHTML = `<div class="text-slate-400 text-center text-sm italic py-4" id="emptyOutletMsg">Belum ada data outlet pada tanggal ini. (Total data di DB: ${allOutletData.length})</div>`;
       document.getElementById('totalUsdcDisplay').textContent = "0 USDC";
       document.getElementById('totalIdrDisplay').textContent = "Rp 0";
       return;
     }
-    
-    document.getElementById('emptyOutletMsg').style.display = 'none';
+
+    container.innerHTML = '';
     let sumUSDC = 0;
     
     filteredItems.sort((a, b) => {
@@ -628,7 +632,7 @@
 
   window.exportToExcel = () => {
     const container = document.getElementById('todayOutletList');
-    if (container.children.length === 0 || document.getElementById('emptyOutletMsg').style.display !== 'none') return alert("Tidak ada data untuk diekspor.");
+    if (container.children.length === 0 || document.getElementById('emptyOutletMsg')) return alert("Tidak ada data untuk diekspor.");
     
     let excelData = [ ["Tanggal", "Nama Outlet", "Netto (USDC)"] ];
     
