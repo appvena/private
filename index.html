@@ -87,7 +87,7 @@
       <div class="flex items-center gap-2 flex-wrap">
         <div class="bg-blue-900 text-white font-bold px-2.5 py-1 rounded text-[10px] sm:text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-sm sm:text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 1 September 2026, 01:00 WIB">v3.3.0 (build 2026-09-01.0100)</span>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 1 September 2026, 02:20 WIB">v3.4.0 (build 2026-09-01.0220)</span>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <span class="hidden sm:inline text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 5m)</span>
@@ -305,7 +305,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.3.0 (build 2026-09-01.0100)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.4.0 (build 2026-09-01.0220)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -428,7 +428,7 @@
   let allOutletData = [];
   let geraiRoster = []; // daftar tetap {id, outlet, gerai, active} - persisten lintas hari, tidak terikat tanggal tertentu
   const syncedRosterKeys = new Set(); // guard supaya tidak menulis berulang dalam sesi yang sama
-  let dedupeRosterDone = false; // guard supaya proses bersih-bersih duplikat lama cuma jalan sekali per sesi
+  let dedupeRosterRunning = false; // guard supaya proses bersih-bersih duplikat tidak tumpang tindih dengan dirinya sendiri
 
   // Firestore doc id tidak boleh mengandung '/', jadi nama outlet/gerai di-encode dulu.
   function outletDocId(outletName) {
@@ -439,8 +439,10 @@
   // acak). Dengan ini, menulis ke gerai_roster memakai setDoc (bukan addDoc) tidak
   // akan PERNAH bisa membuat duplikat - dipanggil sekali atau seratus kali
   // bersamaan, hasilnya tetap 1 dokumen yang sama (menimpa, bukan menambah baru).
+  // Nama outlet/gerai di-trim dulu supaya spasi tak sengaja (misal "2115288 ")
+  // tidak dianggap sebagai gerai yang berbeda dari "2115288".
   function geraiRosterDocId(outlet, gerai) {
-    return outletDocId(outlet) + '__gerai__' + outletDocId(gerai);
+    return outletDocId(outlet.trim()) + '__gerai__' + outletDocId(gerai.trim());
   }
 
   // Migrasi otomatis: data outlet_profits yang dibuat SEBELUM fitur roster ada
@@ -450,11 +452,11 @@
   // kombinasi (idempotent - aman dipanggil berkali-kali, tidak bisa duplikat
   // karena pakai setDoc dengan ID deterministik).
   async function syncRosterFromHistory() {
-    const existingKeys = new Set(geraiRoster.map(r => r.outlet + '|||' + r.gerai));
+    const existingKeys = new Set(geraiRoster.map(r => (r.outlet || '').trim() + '|||' + (r.gerai || '').trim()));
     const historicalKeys = new Set();
     allOutletData.forEach(d => {
-      const outlet = d.outlet || '(Tanpa Nama)';
-      const gerai = d.gerai || outlet;
+      const outlet = (d.outlet || '(Tanpa Nama)').trim();
+      const gerai = (d.gerai || outlet).trim();
       historicalKeys.add(outlet + '|||' + gerai);
     });
 
@@ -472,30 +474,49 @@
   }
 
   // Membersihkan duplikat gerai_roster yang SUDAH TERLANJUR ada di database (dari
-  // bug sebelumnya yang memakai ID acak). Untuk tiap kombinasi outlet+gerai yang
-  // punya lebih dari 1 dokumen, sisakan satu (yang paling lama dibuat), hapus
-  // sisanya. Berjalan otomatis sekali setiap sesi dibuka.
+  // bug sebelumnya yang memakai ID acak, ATAU dari perbedaan spasi tak kasat mata
+  // pada data lama). Untuk tiap kombinasi outlet+gerai (dibandingkan setelah
+  // di-trim) yang punya lebih dari 1 dokumen, sisakan satu (yang paling lama
+  // dibuat, dan datanya di-trim ulang), hapus sisanya. Dijalankan ulang setiap
+  // kali data roster berubah (BUKAN cuma sekali per sesi) - supaya kalau
+  // sebelumnya sempat "ketinggalan" duplikat karena data dari server datang
+  // bertahap, percobaan berikutnya tetap bisa menangkap dan membereskannya.
+  // dedupeRosterRunning cuma mencegah proses ini tumpang tindih dengan dirinya
+  // sendiri, bukan mengunci permanen.
   async function dedupeGeraiRoster() {
-    if (dedupeRosterDone) return;
+    if (dedupeRosterRunning) return;
     const groups = {};
     geraiRoster.forEach(r => {
-      const key = r.outlet + '|||' + r.gerai;
+      const key = (r.outlet || '').trim() + '|||' + (r.gerai || '').trim();
       if (!groups[key]) groups[key] = [];
       groups[key].push(r);
     });
 
     const toDelete = [];
+    const toFixWhitespace = []; // { id, outlet, gerai } - dokumen yang disimpan tapi datanya belum ter-trim
     Object.values(groups).forEach(list => {
-      if (list.length <= 1) return;
-      list.sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
-      // Simpan yang paling lama (index 0), hapus sisanya
-      for (let i = 1; i < list.length; i++) toDelete.push(list[i].id);
+      if (list.length > 1) {
+        list.sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
+        // Simpan yang paling lama (index 0), hapus sisanya
+        for (let i = 1; i < list.length; i++) toDelete.push(list[i].id);
+      }
+      const kept = list[0];
+      if (kept.outlet !== kept.outlet.trim() || kept.gerai !== kept.gerai.trim()) {
+        toFixWhitespace.push({ id: kept.id, outlet: kept.outlet.trim(), gerai: kept.gerai.trim() });
+      }
     });
 
-    if (toDelete.length === 0) { dedupeRosterDone = true; return; }
-    dedupeRosterDone = true;
-    for (const id of toDelete) {
-      try { await deleteDoc(doc(db, 'gerai_roster', id)); } catch (e) { console.error('Gagal menghapus duplikat roster:', e); }
+    if (toDelete.length === 0 && toFixWhitespace.length === 0) return;
+    dedupeRosterRunning = true;
+    try {
+      for (const id of toDelete) {
+        try { await deleteDoc(doc(db, 'gerai_roster', id)); } catch (e) { console.error('Gagal menghapus duplikat roster:', e); }
+      }
+      for (const fix of toFixWhitespace) {
+        try { await updateDoc(doc(db, 'gerai_roster', fix.id), { outlet: fix.outlet, gerai: fix.gerai }); } catch (e) { console.error('Gagal merapikan spasi roster:', e); }
+      }
+    } finally {
+      dedupeRosterRunning = false;
     }
   }
 
@@ -861,9 +882,16 @@
 
     if (isSingleDay) {
       const activeRoster = geraiRoster.filter(r => r.active !== false);
+      const claimedRecordIds = new Set(); // PERTAHANAN: 1 record profit tidak boleh "diklaim" lebih dari 1 baris roster,
+                                            // walau roster kebetulan masih ada duplikat untuk kombinasi outlet+gerai yang sama.
       activeRoster.forEach(r => {
         if (!groups[r.outlet]) { groups[r.outlet] = []; groupOrder.push(r.outlet); }
-        const record = filteredItems.find(d => d.outlet === r.outlet && (d.gerai || d.outlet) === r.gerai) || null;
+        const record = filteredItems.find(d =>
+          !claimedRecordIds.has(d.id) &&
+          (d.outlet || '').trim() === r.outlet.trim() &&
+          ((d.gerai || d.outlet || '').trim()) === r.gerai.trim()
+        ) || null;
+        if (record) claimedRecordIds.add(record.id);
         groups[r.outlet].push({ rosterId: r.id, gerai: r.gerai, record });
       });
       groupOrder.sort();
@@ -1174,8 +1202,8 @@
       if (isNaN(usdc)) return alert("Format nominal tidak valid! Gunakan angka, contoh: 822.35 atau 822,35");
 
       const usdcPreview = (usdc / 100).toLocaleString('id-ID', {maximumFractionDigits: 2});
-      const isNewGerai = !geraiRoster.find(r => r.outlet === outlet && r.gerai === gerai);
-      const existingProfitCheck = allOutletData.find(d => d.outlet === outlet && (d.gerai || d.outlet) === gerai && d.dateStr === dateToSave);
+      const isNewGerai = !geraiRoster.find(r => (r.outlet||'').trim() === outlet && (r.gerai||'').trim() === gerai);
+      const existingProfitCheck = allOutletData.find(d => (d.outlet||'').trim() === outlet && ((d.gerai || d.outlet || '').trim()) === gerai && d.dateStr === dateToSave);
       let statusNote;
       if (isNewGerai) {
         statusNote = 'Gerai BARU akan didaftarkan ke daftar tetap Outlet ini.';
@@ -1191,7 +1219,7 @@
       // lagi di hari-hari berikutnya tanpa perlu didaftarkan ulang. Kalau sebelumnya
       // sempat dinonaktifkan, aktifkan lagi secara otomatis di sini. setDoc dengan ID
       // deterministik dipakai supaya TIDAK MUNGKIN membuat entri roster duplikat.
-      const existingRoster = geraiRoster.find(r => r.outlet === outlet && r.gerai === gerai);
+      const existingRoster = geraiRoster.find(r => (r.outlet||'').trim() === outlet && (r.gerai||'').trim() === gerai);
       if (!existingRoster) {
         await setDoc(doc(db, 'gerai_roster', geraiRosterDocId(outlet, gerai)), { outlet, gerai, active: true, createdAt: serverTimestamp() });
       } else if (existingRoster.active === false) {
@@ -1200,7 +1228,7 @@
 
       // Upsert data profit untuk tanggal ini: kalau gerai ini sudah punya catatan di
       // tanggal yang sama, perbarui nilainya (bukan bikin duplikat).
-      const existingProfit = allOutletData.find(d => d.outlet === outlet && (d.gerai || d.outlet) === gerai && d.dateStr === dateToSave);
+      const existingProfit = allOutletData.find(d => (d.outlet||'').trim() === outlet && ((d.gerai || d.outlet || '').trim()) === gerai && d.dateStr === dateToSave);
       if (existingProfit) {
         await updateDoc(doc(db, 'outlet_profits', existingProfit.id), { usdc });
       } else {
