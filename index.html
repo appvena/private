@@ -87,7 +87,7 @@
       <div class="flex items-center gap-2 flex-wrap">
         <div class="bg-blue-900 text-white font-bold px-2.5 py-1 rounded text-[10px] sm:text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-sm sm:text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 31 Agustus 2026, 23:20 WIB">v2.5.0 (build 2026-08-31.2320)</span>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 31 Agustus 2026, 23:30 WIB">v2.6.0 (build 2026-08-31.2330)</span>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <span class="hidden sm:inline text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 5m)</span>
@@ -237,7 +237,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v2.5.0 (build 2026-08-31.2320)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v2.6.0 (build 2026-08-31.2330)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -408,26 +408,26 @@
     fetch('https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=idr').then(r => r.json()).then(d => {
       const price = d?.tether?.idr;
       if (!price || isNaN(price)) throw new Error('Data CoinGecko tidak valid');
-      currentKursUSD = price;
+      currentKursUSD = Math.round(price); // dibulatkan ke rupiah utuh - nilai ini yang dipakai baik untuk tampilan MAUPUN kalkulasi, supaya selalu konsisten
       const now = new Date().toLocaleString('id-ID', {hour:'2-digit', minute:'2-digit', second:'2-digit', day:'2-digit', month:'short'});
-      document.getElementById('kursRateText').textContent = `Rp ${currentKursUSD.toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
+      document.getElementById('kursRateText').textContent = `Rp ${currentKursUSD.toLocaleString('id-ID')}`;
       document.getElementById('kursUpdatedText').textContent = `Sumber: CoinGecko USDT/IDR (real-time) — dicek: ${now}`;
     }).catch(() => {
       // Fallback 1: Indodax
       fetch('https://indodax.com/api/ticker/usdt_idr').then(r => r.json()).then(d => {
         const last = parseFloat(d?.ticker?.last);
         if (!last || isNaN(last)) throw new Error('Data Indodax tidak valid');
-        currentKursUSD = last;
+        currentKursUSD = Math.round(last);
         const updatedAt = d.ticker.server_time ? new Date(d.ticker.server_time * 1000).toLocaleString('id-ID', {hour:'2-digit', minute:'2-digit', second:'2-digit', day:'2-digit', month:'short'}) : '';
-        document.getElementById('kursRateText').textContent = `Rp ${currentKursUSD.toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
+        document.getElementById('kursRateText').textContent = `Rp ${currentKursUSD.toLocaleString('id-ID')}`;
         document.getElementById('kursUpdatedText').textContent = updatedAt ? `Sumber cadangan: Indodax USDT/IDR (real-time) — update: ${updatedAt}` : 'Sumber cadangan: Indodax USDT/IDR (real-time)';
       }).catch(() => {
         // Fallback 2: forex harian
         fetch('https://open.er-api.com/v6/latest/USD').then(r=>r.json()).then(d => {
           if(d?.rates?.IDR) {
-              currentKursUSD = d.rates.IDR;
+              currentKursUSD = Math.round(d.rates.IDR);
               const updatedAt = d.time_last_update_utc ? new Date(d.time_last_update_utc).toLocaleString('id-ID', {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short'}) : '';
-              document.getElementById('kursRateText').textContent = `Rp ${currentKursUSD.toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
+              document.getElementById('kursRateText').textContent = `Rp ${currentKursUSD.toLocaleString('id-ID')}`;
               document.getElementById('kursUpdatedText').textContent = updatedAt ? `Sumber cadangan terakhir: forex harian, update ${updatedAt} (bukan real-time)` : '';
           }
         }).catch(() => {
