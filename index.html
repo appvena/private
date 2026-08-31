@@ -6,8 +6,8 @@
   <title>Sistem Administrasi & Kalkulator Outlet</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- SheetJS & html2pdf.js -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- ExcelJS (mendukung border & format angka) & html2pdf.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     body {
@@ -614,6 +614,7 @@
     container.innerHTML = '';
     let sumSen = 0; // akumulasi nilai KOTOR mentah (sen/cent) apa adanya dari DB
     let sumBersihUsdc = 0; // akumulasi nilai BERSIH (sudah dipotong % per outlet) dalam USDC
+    let geraiCounter = 0; // nomor urut gerai, berjalan terus lintas semua outlet
     lastRenderedItems = [];
 
     filteredItems.sort((a, b) => {
@@ -650,6 +651,8 @@
         // Fallback untuk data lama (sebelum ada field terpisah "gerai"):
         // gunakan nama outlet itu sendiri sebagai label gerai.
         const geraiLabel = d.gerai || outletKey;
+        geraiCounter++;
+        const geraiNomor = geraiCounter;
         const dateLabel = isSingleDay ? '' : `<span class="block text-xs text-slate-400 font-mono mt-0.5">${d.dateStr}</span>`;
         const senFormatted = rawSen.toLocaleString('id-ID');
         const usdcFormatted = actualUsdcKotor.toLocaleString('id-ID', {maximumFractionDigits: 2});
@@ -667,7 +670,7 @@
         rowsHtml += `
           <div class="flex justify-between items-center py-2.5 px-3.5 border-t border-slate-100 first:border-t-0">
             <div>
-              <span class="text-sm text-slate-700">${geraiLabel}</span>
+              <span class="text-sm text-slate-700"><span class="text-slate-400 font-mono">${geraiNomor}.</span> ${geraiLabel}</span>
               ${dateLabel}
             </div>
             <div class="text-right">
@@ -680,7 +683,7 @@
           </div>
         `;
 
-        lastRenderedItems.push({ outlet: outletKey, gerai: geraiLabel, dateStr: d.dateStr, sen: rawSen, usdcKotor: actualUsdcKotor, potonganPercent: potonganPercent, potonganUsdc: potonganUsdc, usdcBersih: actualUsdcBersih });
+        lastRenderedItems.push({ no: geraiNomor, outlet: outletKey, gerai: geraiLabel, dateStr: d.dateStr, sen: rawSen, usdcKotor: actualUsdcKotor, potonganPercent: potonganPercent, potonganUsdc: potonganUsdc, usdcBersih: actualUsdcBersih });
       });
 
       const outletSubtotalUsdcKotor = outletSubtotalSen / 100;
@@ -778,14 +781,55 @@
   window.exportToPDF = () => {
     const filenameStr = document.getElementById('printDateText').innerText.replace(/\s+/g, '_');
     html2pdf().from(document.getElementById('pdfExportArea')).set({
-      margin: 10, filename: `Laporan_${filenameStr}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      margin: 10,
+      filename: `Laporan_${filenameStr}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        onclone: (clonedDoc) => {
+          // html2canvas mengambil screenshot DOM apa adanya dan tidak menghormati
+          // CSS @media print, jadi elemen kontrol (input filter, tombol, dsb)
+          // disembunyikan manual di sini supaya tidak ikut masuk ke PDF.
+          clonedDoc.querySelectorAll('.no-print').forEach(el => { el.style.display = 'none'; });
+          clonedDoc.querySelectorAll('.print-only').forEach(el => { el.style.display = 'block'; });
+        }
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     }).save();
   };
 
-  window.exportToExcel = () => {
+  window.exportToExcel = async () => {
     if (lastRenderedItems.length === 0) return alert("Tidak ada data untuk diekspor.");
 
-    let excelData = [ ["Tanggal", "Nama Outlet", "Kode/Nama Gerai", "Kotor (Sen)", "Kotor (USDC)", "Potongan (%)", "Potongan (USDC)", "Potongan (IDR)", "Bersih (USDC)", "Bersih (IDR)"] ];
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Rekap Keuntungan');
+
+    const headers = ["No", "Tanggal", "Nama Outlet", "Kode/Nama Gerai", "Kotor (Sen)", "Kotor (USDC)", "Potongan (%)", "Potongan (USDC)", "Potongan (IDR)", "Bersih (USDC)", "Bersih (IDR)"];
+    sheet.columns = headers.map(h => ({ header: h, key: h, width: h === "Nama Outlet" || h === "Kode/Nama Gerai" ? 22 : 15 }));
+
+    const thinBorder = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+    const rupiahFmt = '"Rp" #,##0';
+    const usdcFmt = '#,##0.00';
+    const senFmt = '#,##0';
+
+    // Header row styling
+    sheet.getRow(1).eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+      cell.border = thinBorder;
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+
+    const styleDataRow = (row) => {
+      row.eachCell(cell => { cell.border = thinBorder; });
+      row.getCell(5).numFmt = senFmt;
+      row.getCell(6).numFmt = usdcFmt;
+      row.getCell(8).numFmt = usdcFmt;
+      row.getCell(9).numFmt = rupiahFmt;
+      row.getCell(10).numFmt = usdcFmt;
+      row.getCell(11).numFmt = rupiahFmt;
+    };
 
     // Kelompokkan ulang per outlet supaya bisa disisipkan baris subtotal
     const groupOrder = [];
@@ -798,10 +842,12 @@
     let grandTotalSen = 0;
     let grandTotalPotongan = 0;
     let grandTotalBersih = 0;
+
     groupOrder.forEach(outletKey => {
       let subtotalSen = 0;
       let subtotalPotongan = 0;
       let subtotalBersih = 0;
+
       groups[outletKey].forEach(d => {
         subtotalSen += d.sen;
         subtotalPotongan += d.potonganUsdc;
@@ -809,17 +855,52 @@
         grandTotalSen += d.sen;
         grandTotalPotongan += d.potonganUsdc;
         grandTotalBersih += d.usdcBersih;
-        excelData.push([d.dateStr, outletKey, d.gerai, d.sen, d.usdcKotor, d.potonganPercent, d.potonganUsdc, Math.round(d.potonganUsdc * currentKursUSD), d.usdcBersih, Math.round(d.usdcBersih * currentKursUSD)]);
+
+        const row = sheet.addRow([
+          d.no, d.dateStr, outletKey, d.gerai,
+          d.sen, d.usdcKotor, d.potonganPercent,
+          d.potonganUsdc, Math.round(d.potonganUsdc * currentKursUSD),
+          d.usdcBersih, Math.round(d.usdcBersih * currentKursUSD)
+        ]);
+        styleDataRow(row);
       });
-      excelData.push(["", `Subtotal ${outletKey}`, "", subtotalSen, subtotalSen / 100, "", subtotalPotongan, Math.round(subtotalPotongan * currentKursUSD), subtotalBersih, Math.round(subtotalBersih * currentKursUSD)]);
-      excelData.push([]);
+
+      const subRow = sheet.addRow([
+        "", "", `Subtotal ${outletKey}`, "",
+        subtotalSen, subtotalSen / 100, "",
+        subtotalPotongan, Math.round(subtotalPotongan * currentKursUSD),
+        subtotalBersih, Math.round(subtotalBersih * currentKursUSD)
+      ]);
+      styleDataRow(subRow);
+      subRow.eachCell(cell => {
+        cell.font = { bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
+      });
     });
 
-    excelData.push(["TOTAL KESELURUHAN", "", "", grandTotalSen, grandTotalSen / 100, "", grandTotalPotongan, Math.round(grandTotalPotongan * currentKursUSD), grandTotalBersih, Math.round(grandTotalBersih * currentKursUSD)]);
-    excelData.push(["Kurs Saat Ini", document.getElementById('kursRateText').innerText, "", "", "", "", "", "", "", ""]);
+    const totalRow = sheet.addRow([
+      "", "", "TOTAL KESELURUHAN", "",
+      grandTotalSen, grandTotalSen / 100, "",
+      grandTotalPotongan, Math.round(grandTotalPotongan * currentKursUSD),
+      grandTotalBersih, Math.round(grandTotalBersih * currentKursUSD)
+    ]);
+    styleDataRow(totalRow);
+    totalRow.eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF047857' } };
+    });
 
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelData), "Rekap Keuntungan");
-    XLSX.writeFile(wb, `Laporan_Keuntungan.xlsx`);
+    const kursRow = sheet.addRow(["", "", "Kurs Saat Ini", document.getElementById('kursRateText').innerText, "", "", "", "", "", "", ""]);
+    kursRow.eachCell(cell => { cell.border = thinBorder; });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'Laporan_Keuntungan.xlsx';
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
 </script>
