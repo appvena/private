@@ -74,7 +74,7 @@
       <div class="flex items-center gap-3">
         <div class="bg-blue-900 text-white font-bold px-3 py-1.5 rounded text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[10px] font-mono" title="Build: 31 Agustus 2026, 14:30 WIB">v1.8.0 (build 2026-08-31.1430)</span>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[10px] font-mono" title="Build: 31 Agustus 2026, 14:40 WIB">v1.9.0 (build 2026-08-31.1440)</span>
       </div>
       <div class="flex items-center gap-3">
         <span class="text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 5m)</span>
@@ -221,7 +221,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v1.8.0 (build 2026-08-31.1430)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v1.9.0 (build 2026-08-31.1440)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -348,7 +348,7 @@
 
   window.editOutletPotongan = async (outletKey) => {
     const currentPercent = outletSettings[outletDocId(outletKey)] || 0;
-    const input = prompt(`Atur potongan (%) untuk outlet "${outletKey}":\n(Contoh: 10 artinya dipotong 10% dari keuntungan kotor)`, currentPercent);
+    const input = prompt(`Atur potongan vendor (%) untuk outlet "${outletKey}":\n(Contoh: 10 artinya dipotong 10% dari keuntungan kotor)`, currentPercent);
     if (input === null) return;
     const percent = parseFloat(input.toString().replace(',', '.'));
     if (isNaN(percent) || percent < 0 || percent > 100) return alert("Persentase tidak valid! Harus angka 0-100.");
@@ -691,7 +691,6 @@
         const geraiLabel = d.gerai || outletKey;
         geraiCounter++;
         const geraiNomor = geraiCounter;
-        const dateLabel = isSingleDay ? '' : `<span class="block text-xs text-slate-400 font-mono mt-0.5">${d.dateStr}</span>`;
         const senFormatted = rawSen.toLocaleString('id-ID');
         const usdcFormatted = actualUsdcKotor.toLocaleString('id-ID', {maximumFractionDigits: 2});
         const bersihFormatted = actualUsdcBersih.toLocaleString('id-ID', {maximumFractionDigits: 2});
@@ -699,26 +698,26 @@
         const potonganSenFormatted = potonganSen.toLocaleString('id-ID', {maximumFractionDigits: 0});
         const potonganIdrFormatted = (potonganUsdc * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0});
 
-        const usdcDisplay = rawSen === 0
-          ? `<span class="text-amber-600 font-bold text-sm block">Belum ada input</span>`
-          : `<span class="text-blue-900 font-bold text-sm block font-mono">Kotor: ${senFormatted} sen (${usdcFormatted} USD)</span>
-             ${potonganPercent > 0 ? `<span class="inline-block text-red-600 text-xs font-mono border border-red-300 bg-red-50 rounded px-2 py-1 my-1">Potongan ${potonganPercent}%: -${potonganSenFormatted} sen (-${potonganUsdcFormatted} USD ≈ -Rp ${potonganIdrFormatted})</span>` : ''}
-             <span class="text-emerald-700 text-xs block font-mono">Bersih: ${bersihFormatted} USD</span>`;
+        const kotorCell = rawSen === 0
+          ? `<span class="text-amber-600 font-bold text-xs">Belum ada input</span>`
+          : `<span class="text-blue-900 font-bold font-mono text-xs">${senFormatted} sen<br>(${usdcFormatted} USD)</span>`;
+        const potonganCell = potonganPercent > 0
+          ? `<span class="inline-block text-red-600 font-mono text-xs border border-red-300 bg-red-50 rounded px-2 py-1">-${potonganSenFormatted} sen<br>(-${potonganUsdcFormatted} USD)<br>≈ -Rp ${potonganIdrFormatted}</span>`
+          : `<span class="text-slate-300 text-xs">–</span>`;
+        const bersihCell = rawSen === 0 ? '' : `<span class="text-emerald-700 font-bold font-mono text-xs">${bersihFormatted} USD</span>`;
 
         rowsHtml += `
-          <div class="flex justify-between items-center py-2.5 px-3.5 border-t border-slate-100 first:border-t-0">
-            <div>
-              <span class="text-sm text-slate-700"><span class="text-slate-400 font-mono">${geraiNomor}.</span> ${geraiLabel}</span>
-              ${dateLabel}
-            </div>
-            <div class="text-right">
-              ${usdcDisplay}
-              <div class="mt-1 no-print flex justify-end gap-3 text-xs">
-                <button onclick="updateOutletUSDC('${d.id}', ${d.usdc || 0})" class="text-blue-700 hover:underline font-semibold">Ubah Kotor</button>
-                <button onclick="deleteOutletRecord('${d.id}')" class="text-red-700 hover:underline font-semibold">Hapus</button>
-              </div>
-            </div>
-          </div>
+          <tr class="hover:bg-slate-50">
+            <td class="border border-slate-300 px-2 py-2 text-slate-400 font-mono text-xs align-top">${geraiNomor}</td>
+            <td class="border border-slate-300 px-2 py-2 text-slate-700 font-mono text-xs align-top">${geraiLabel}${!isSingleDay ? `<br><span class="text-slate-400 text-[10px]">${d.dateStr}</span>` : ''}</td>
+            <td class="border border-slate-300 px-2 py-2 text-right align-top">${kotorCell}</td>
+            <td class="border border-slate-300 px-2 py-2 text-right align-top">${potonganCell}</td>
+            <td class="border border-slate-300 px-2 py-2 text-right align-top">${bersihCell}</td>
+            <td class="border border-slate-300 px-2 py-2 text-center align-top no-print text-xs whitespace-nowrap">
+              <button onclick="updateOutletUSDC('${d.id}', ${d.usdc || 0})" class="text-blue-700 hover:underline font-semibold">Ubah</button>
+              <button onclick="deleteOutletRecord('${d.id}')" class="text-red-700 hover:underline font-semibold ml-2">Hapus</button>
+            </td>
+          </tr>
         `;
 
         lastRenderedItems.push({ no: geraiNomor, outlet: outletKey, gerai: geraiLabel, dateStr: d.dateStr, sen: rawSen, usdcKotor: actualUsdcKotor, potonganPercent: potonganPercent, potonganUsdc: potonganUsdc, usdcBersih: actualUsdcBersih });
@@ -732,15 +731,29 @@
           <div class="flex flex-wrap justify-between items-center gap-2 bg-slate-100 px-3.5 py-2.5 border-b border-slate-300">
             <div class="flex items-center gap-2">
               <span class="font-bold text-slate-800 text-sm">🏬 ${outletKey}</span>
-              <button onclick="editOutletPotongan('${outletKey.replace(/'/g, "\\'")}')" class="no-print text-slate-500 hover:text-blue-700 text-xs border border-slate-300 rounded px-1.5 py-0.5 bg-white" title="Atur potongan %">⚙ ${potonganPercent}%</button>
+              <button onclick="editOutletPotongan('${outletKey.replace(/'/g, "\\'")}')" class="no-print text-slate-500 hover:text-blue-700 text-xs border border-slate-300 rounded px-1.5 py-0.5 bg-white" title="Atur potongan vendor %">⚙ ${potonganPercent}%</button>
             </div>
             <div class="text-right">
               <div class="text-blue-900 font-bold text-xs font-mono">Kotor: ${outletSubtotalSen.toLocaleString('id-ID')} sen (${outletSubtotalUsdcKotor.toLocaleString('id-ID', {maximumFractionDigits: 2})} USD)</div>
-              ${potonganPercent > 0 ? `<div class="inline-block text-red-600 font-bold text-xs font-mono border border-red-300 bg-red-50 rounded px-2 py-1 my-1">Potongan ${potonganPercent}%: -${(outletSubtotalPotonganUsdc * 100).toLocaleString('id-ID', {maximumFractionDigits: 0})} sen (-${outletSubtotalPotonganUsdc.toLocaleString('id-ID', {maximumFractionDigits: 2})} USD ≈ -Rp ${(outletSubtotalPotonganUsdc * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})})</div>` : ''}
+              ${potonganPercent > 0 ? `<div class="inline-block text-red-600 font-bold text-xs font-mono border border-red-300 bg-red-50 rounded px-2 py-1 my-1">Potongan Vendor ${potonganPercent}%: -${(outletSubtotalPotonganUsdc * 100).toLocaleString('id-ID', {maximumFractionDigits: 0})} sen (-${outletSubtotalPotonganUsdc.toLocaleString('id-ID', {maximumFractionDigits: 2})} USD ≈ -Rp ${(outletSubtotalPotonganUsdc * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})})</div>` : ''}
               <div class="text-emerald-700 font-bold text-xs font-mono">Bersih: ${outletSubtotalUsdcBersih.toLocaleString('id-ID', {maximumFractionDigits: 2})} USD ≈ Rp ${(outletSubtotalUsdcBersih * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}</div>
             </div>
           </div>
-          <div>${rowsHtml}</div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 text-[10px] text-slate-500 uppercase tracking-wider">
+                  <th class="border border-slate-300 px-2 py-1.5">No</th>
+                  <th class="border border-slate-300 px-2 py-1.5">Kode Gerai</th>
+                  <th class="border border-slate-300 px-2 py-1.5 text-right">Kotor</th>
+                  <th class="border border-slate-300 px-2 py-1.5 text-right">Potongan Vendor</th>
+                  <th class="border border-slate-300 px-2 py-1.5 text-right">Bersih</th>
+                  <th class="border border-slate-300 px-2 py-1.5 text-center no-print">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>${rowsHtml}</tbody>
+            </table>
+          </div>
         </div>
       `;
     });
@@ -751,7 +764,7 @@
     document.getElementById('totalIdrDisplay').textContent = `Rp ${(sumUSDCKotor * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
     const totalPotonganEl = document.getElementById('totalPotonganText');
     if (sumPotonganUsdc > 0) {
-      totalPotonganEl.textContent = `Total Potongan: -${(sumPotonganUsdc * 100).toLocaleString('id-ID', {maximumFractionDigits: 0})} sen (-${sumPotonganUsdc.toLocaleString('id-ID', {maximumFractionDigits: 2})} USD ≈ -Rp ${(sumPotonganUsdc * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})})`;
+      totalPotonganEl.textContent = `Total Potongan Vendor: -${(sumPotonganUsdc * 100).toLocaleString('id-ID', {maximumFractionDigits: 0})} sen (-${sumPotonganUsdc.toLocaleString('id-ID', {maximumFractionDigits: 2})} USD ≈ -Rp ${(sumPotonganUsdc * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})})`;
       totalPotonganEl.classList.remove('hidden');
     } else {
       totalPotonganEl.textContent = '';
@@ -848,8 +861,8 @@
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Rekap Keuntungan');
 
-    const headers = ["No", "Tanggal", "Nama Outlet", "Kode/Nama Gerai", "Kotor (Sen)", "Kotor (USD)", "Potongan (%)", "Potongan (USD)", "Potongan (IDR)", "Bersih (USD)", "Bersih (IDR)"];
-    sheet.columns = headers.map(h => ({ header: h, key: h, width: h === "Nama Outlet" || h === "Kode/Nama Gerai" ? 22 : 15 }));
+    const headers = ["No", "Tanggal", "Nama Outlet", "Kode Gerai", "Kotor (Sen)", "Kotor (USD)", "Potongan Vendor (%)", "Potongan Vendor (USD)", "Potongan Vendor (IDR)", "Bersih (USD)", "Bersih (IDR)"];
+    sheet.columns = headers.map(h => ({ header: h, key: h, width: h === "Nama Outlet" || h === "Kode Gerai" ? 22 : 15 }));
 
     const thinBorder = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
     const rupiahFmt = '"Rp" #,##0';
