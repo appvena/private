@@ -87,7 +87,7 @@
       <div class="flex items-center gap-2 flex-wrap">
         <div class="bg-blue-900 text-white font-bold px-2.5 py-1 rounded text-[10px] sm:text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-sm sm:text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 31 Agustus 2026, 23:30 WIB">v2.6.0 (build 2026-08-31.2330)</span>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 1 September 2026, 00:20 WIB">v3.1.0 (build 2026-09-01.0020)</span>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <span class="hidden sm:inline text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 5m)</span>
@@ -99,6 +99,7 @@
     <!-- TAB NAVIGASI -->
     <div class="flex border-b border-slate-300 gap-4 sm:gap-6 no-print overflow-x-auto">
       <button id="btnTabCalc" onclick="switchTab('calc')" class="pb-2.5 border-b-2 border-blue-900 text-blue-900 font-bold text-xs sm:text-sm transition whitespace-nowrap">💰 Kalkulator Outlet</button>
+      <button id="btnTabInsight" onclick="switchTab('insight')" class="pb-2.5 text-slate-500 hover:text-slate-800 transition border-b-2 border-transparent text-xs sm:text-sm whitespace-nowrap">📈 Insight</button>
       <button id="btnTabStorage" onclick="switchTab('storage')" class="pb-2.5 text-slate-500 hover:text-slate-800 transition border-b-2 border-transparent text-xs sm:text-sm whitespace-nowrap">📁 Arsip Berkas</button>
     </div>
 
@@ -200,7 +201,62 @@
     </div>
 
     <!-- ============================================== -->
-    <!-- TAB 2: CYBERSTORAGE                            -->
+    <!-- TAB 2: INSIGHT                                 -->
+    <!-- ============================================== -->
+    <div id="tab-insight" class="space-y-6 hidden">
+      <div class="bg-white p-4 sm:p-6 rounded border border-slate-200 space-y-6">
+
+        <!-- Filter Cepat -->
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="setInsightRange('today')" class="insight-range-btn px-3 py-1.5 border border-slate-300 rounded text-xs font-semibold hover:bg-slate-100 transition" data-range="today">Hari Ini</button>
+          <button onclick="setInsightRange('week')" class="insight-range-btn px-3 py-1.5 border border-slate-300 rounded text-xs font-semibold hover:bg-slate-100 transition" data-range="week">7 Hari Terakhir</button>
+          <button onclick="setInsightRange('month')" class="insight-range-btn px-3 py-1.5 border border-slate-300 rounded text-xs font-semibold hover:bg-slate-100 transition" data-range="month">Bulan Ini</button>
+          <button onclick="setInsightRange('all')" class="insight-range-btn px-3 py-1.5 border border-slate-300 rounded text-xs font-semibold hover:bg-slate-100 transition" data-range="all">Semua Waktu</button>
+          <div class="flex items-center gap-2 ml-auto">
+            <input type="date" id="insightStart" onchange="renderInsight()" class="p-1.5 border border-slate-300 rounded text-xs">
+            <span class="text-slate-400 text-xs">s/d</span>
+            <input type="date" id="insightEnd" onchange="renderInsight()" class="p-1.5 border border-slate-300 rounded text-xs">
+          </div>
+        </div>
+        <p id="insightPeriodText" class="text-xs text-slate-400 -mt-4"></p>
+
+        <!-- Kartu Ringkasan -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="bg-slate-50 border border-slate-200 rounded p-3 text-center">
+            <div class="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Outlet Aktif</div>
+            <div id="insightTotalOutlet" class="text-xl font-extrabold text-slate-800">0</div>
+          </div>
+          <div class="bg-slate-50 border border-slate-200 rounded p-3 text-center">
+            <div class="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Gerai Aktif</div>
+            <div id="insightTotalGerai" class="text-xl font-extrabold text-slate-800">0</div>
+          </div>
+          <div class="bg-blue-50 border border-blue-200 rounded p-3 text-center">
+            <div class="text-[10px] text-blue-600 uppercase tracking-wider mb-1">Total Kotor</div>
+            <div id="insightTotalKotor" class="text-sm font-extrabold text-blue-900">Rp 0</div>
+          </div>
+          <div class="bg-emerald-50 border border-emerald-200 rounded p-3 text-center">
+            <div class="text-[10px] text-emerald-600 uppercase tracking-wider mb-1">Total Bersih</div>
+            <div id="insightTotalBersih" class="text-sm font-extrabold text-emerald-700">Rp 0</div>
+          </div>
+        </div>
+
+        <!-- Ranking Outlet -->
+        <div>
+          <h3 class="text-sm font-bold text-slate-800 mb-3">🏆 Ranking Outlet (berdasarkan Total Bersih)</h3>
+          <div id="insightOutletRanking" class="space-y-2"></div>
+        </div>
+
+        <!-- Ranking Gerai -->
+        <div>
+          <h3 class="text-sm font-bold text-slate-800 mb-3">🥇 Gerai Paling Profit (Top 10, berdasarkan Total Bersih)</h3>
+          <div id="insightGeraiRanking" class="space-y-2"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 3: CYBERSTORAGE                            -->
     <!-- ============================================== -->
     <div id="tab-storage" class="space-y-6 hidden">
       <div class="bg-white border border-slate-200 p-6 rounded text-center space-y-4">
@@ -237,7 +293,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v2.6.0 (build 2026-08-31.2330)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.1.0 (build 2026-09-01.0020)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -295,20 +351,18 @@
 
   // --- TAB MENU ---
   window.switchTab = function(tabName) {
-    const tabStorage = document.getElementById('tab-storage');
-    const tabCalc = document.getElementById('tab-calc');
-    const btnStorage = document.getElementById('btnTabStorage');
-    const btnCalc = document.getElementById('btnTabCalc');
+    const tabs = { calc: 'tab-calc', insight: 'tab-insight', storage: 'tab-storage' };
+    const btns = { calc: 'btnTabCalc', insight: 'btnTabInsight', storage: 'btnTabStorage' };
+    const activeClass = "pb-2.5 border-b-2 border-blue-900 text-blue-900 font-bold text-xs sm:text-sm transition whitespace-nowrap";
+    const inactiveClass = "pb-2.5 text-slate-500 hover:text-slate-800 transition border-b-2 border-transparent text-xs sm:text-sm whitespace-nowrap";
 
-    if (tabName === 'storage') {
-      tabStorage.classList.remove('hidden'); tabCalc.classList.add('hidden');
-      btnStorage.className = "pb-2.5 border-b-2 border-blue-900 text-blue-900 font-bold text-sm transition";
-      btnCalc.className = "pb-2.5 text-slate-500 hover:text-slate-800 transition border-b-2 border-transparent text-sm";
-    } else {
-      tabStorage.classList.add('hidden'); tabCalc.classList.remove('hidden');
-      btnCalc.className = "pb-2.5 border-b-2 border-blue-900 text-blue-900 font-bold text-sm transition";
-      btnStorage.className = "pb-2.5 text-slate-500 hover:text-slate-800 transition border-b-2 border-transparent text-sm";
-    }
+    Object.keys(tabs).forEach(key => {
+      const isActive = key === tabName;
+      document.getElementById(tabs[key]).classList.toggle('hidden', !isActive);
+      document.getElementById(btns[key]).className = isActive ? activeClass : inactiveClass;
+    });
+
+    if (tabName === 'insight') renderInsight();
   };
 
   // --- INPUT ANGKA USD (boleh titik atau koma sebagai desimal) ---
@@ -360,7 +414,19 @@
   document.getElementById('filterEnd').value = todayStrDb;
 
   let allOutletData = [];
+  let geraiRoster = []; // daftar tetap {id, outlet, gerai, active} - persisten lintas hari, tidak terikat tanggal tertentu
   let lastRenderedItems = []; // flat list {outlet, gerai, dateStr, usdc} hasil render terakhir, dipakai untuk ekspor Excel
+
+  function loadGeraiRoster() {
+    onSnapshot(collection(db, 'gerai_roster'), (snap) => {
+      geraiRoster = [];
+      snap.forEach(d => geraiRoster.push({ id: d.id, ...d.data() }));
+      applyDateFilter();
+      refreshInsightIfVisible();
+    }, (error) => {
+      console.error("Firestore gerai_roster error:", error);
+    });
+  }
   let outletSettings = {}; // { [sanitizedOutletId]: percentPotongan }
 
   // Firestore doc id tidak boleh mengandung '/', jadi nama outlet di-encode dulu.
@@ -373,9 +439,17 @@
       outletSettings = {};
       snap.forEach(d => { outletSettings[d.id] = d.data().percent || 0; });
       applyDateFilter();
+      refreshInsightIfVisible();
     }, (error) => {
       console.error("Firestore outlet_settings error:", error);
     });
+  }
+
+  function refreshInsightIfVisible() {
+    const tabInsight = document.getElementById('tab-insight');
+    if (tabInsight && !tabInsight.classList.contains('hidden') && typeof renderInsight === 'function') {
+      renderInsight();
+    }
   }
 
   window.editOutletPotongan = async (outletKey) => {
@@ -488,6 +562,7 @@
         loadFiles();
         initOutletListener();
         loadOutletSettings();
+        loadGeraiRoster();
       } else {
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('appScreen').style.display = 'none';
@@ -625,6 +700,7 @@
       document.getElementById('dbStatusText').textContent = `TERHUBUNG (Total Data: ${allOutletData.length})`;
       updateOutletDatalist();
       applyDateFilter();
+      refreshInsightIfVisible();
     } catch (err) {
       console.error("Gagal mengambil data awal:", err);
       document.getElementById('dbStatusText').textContent = `ERROR: ${err.message}`;
@@ -637,6 +713,7 @@
       document.getElementById('dbStatusText').textContent = `TERHUBUNG (Total Data: ${allOutletData.length})`;
       updateOutletDatalist();
       applyDateFilter();
+      refreshInsightIfVisible();
     }, (error) => {
       console.error("Firestore Error:", error);
     });
@@ -684,13 +761,42 @@
     const filteredItems = allOutletData.filter(d => d.dateStr >= start && d.dateStr <= end);
     const container = document.getElementById('todayOutletList');
 
-    // FIX: bangun ulang pesan "kosong" via innerHTML alih-alih mereferensikan
-    // elemen #emptyOutletMsg yang sudah terhapus oleh container.innerHTML = ''
-    // sebelumnya. Referensi ke elemen yang sudah tidak ada di DOM menghasilkan
-    // null dan melempar error diam-diam di console, sehingga daftar & total
-    // tidak pernah ter-render.
-    if (filteredItems.length === 0) {
-      container.innerHTML = `<div class="text-slate-400 text-center text-sm italic py-4" id="emptyOutletMsg">Belum ada data outlet pada tanggal ini. (Total data di DB: ${allOutletData.length})</div>`;
+    filteredItems.sort((a, b) => {
+      if(a.dateStr === b.dateStr) return (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0);
+      return a.dateStr > b.dateStr ? -1 : 1;
+    });
+
+    // Bangun grup outlet+gerai untuk ditampilkan.
+    // - Mode SATU HARI: dasar grup adalah daftar GERAI AKTIF (roster) - jadi gerai yang
+    //   sudah pernah didaftarkan tetap muncul terus tiap hari walau belum diisi profit
+    //   hari itu (tampil "Belum ada input"), tanpa perlu didaftarkan ulang.
+    // - Mode RENTANG TANGGAL: tetap pakai catatan yang benar-benar ada di rentang itu
+    //   (perilaku lama), karena menjumlahkan rentang tanggal untuk gerai yang belum
+    //   pernah dipakai tidak relevan untuk ditampilkan.
+    const groupOrder = [];
+    const groups = {}; // outletKey -> array of { rosterId, gerai, record }
+
+    if (isSingleDay) {
+      const activeRoster = geraiRoster.filter(r => r.active !== false);
+      activeRoster.forEach(r => {
+        if (!groups[r.outlet]) { groups[r.outlet] = []; groupOrder.push(r.outlet); }
+        const record = filteredItems.find(d => d.outlet === r.outlet && (d.gerai || d.outlet) === r.gerai) || null;
+        groups[r.outlet].push({ rosterId: r.id, gerai: r.gerai, record });
+      });
+      groupOrder.sort();
+    } else {
+      filteredItems.forEach(d => {
+        const outletKey = d.outlet || '(Tanpa Nama)';
+        if (!groups[outletKey]) { groups[outletKey] = []; groupOrder.push(outletKey); }
+        groups[outletKey].push({ rosterId: null, gerai: d.gerai || outletKey, record: d });
+      });
+    }
+
+    if (groupOrder.length === 0) {
+      const emptyMsg = isSingleDay
+        ? 'Belum ada gerai terdaftar. Tambahkan gerai pertama Anda lewat form di atas.'
+        : `Belum ada data outlet pada rentang tanggal ini. (Total data di DB: ${allOutletData.length})`;
+      container.innerHTML = `<div class="text-slate-400 text-center text-sm italic py-4" id="emptyOutletMsg">${emptyMsg}</div>`;
       document.getElementById('totalUsdcDisplay').textContent = "0 sen (0 USD)";
       document.getElementById('totalIdrDisplay').textContent = "Rp 0";
       document.getElementById('totalPotonganText').textContent = "";
@@ -706,20 +812,6 @@
     let geraiCounter = 0; // nomor urut gerai, berjalan terus lintas semua outlet
     lastRenderedItems = [];
 
-    filteredItems.sort((a, b) => {
-      if(a.dateStr === b.dateStr) return (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0);
-      return a.dateStr > b.dateStr ? -1 : 1;
-    });
-
-    // Kelompokkan per outlet, urutan grup mengikuti kemunculan pertama (data terbaru di atas)
-    const groupOrder = [];
-    const groups = {};
-    filteredItems.forEach(d => {
-      const outletKey = d.outlet || '(Tanpa Nama)';
-      if (!groups[outletKey]) { groups[outletKey] = []; groupOrder.push(outletKey); }
-      groups[outletKey].push(d);
-    });
-
     groupOrder.forEach(outletKey => {
       const items = groups[outletKey];
       const potonganPercent = outletSettings[outletDocId(outletKey)] || 0;
@@ -727,10 +819,11 @@
       let outletRowNumber = 0; // nomor urut khusus untuk tabel outlet ini, reset tiap outlet
       let rowsHtml = '';
 
-      items.forEach(d => {
+      items.forEach(item => {
+        const d = item.record; // null berarti gerai ini belum diisi profit pada tanggal terpilih (mode roster)
         // Nilai di DB disimpan dalam SEN/cent (misal 230 = 2.30 USDC) - ini nilai KOTOR.
         // Ditampilkan APA ADANYA (230 sen), sekaligus konversinya (2,30 USDC).
-        const rawSen = d.usdc || 0;
+        const rawSen = d ? (d.usdc || 0) : 0;
         const actualUsdcKotor = rawSen / 100;
         outletSubtotalSen += rawSen;
         sumSen += rawSen;
@@ -738,9 +831,7 @@
         const potonganSen = rawSen * (potonganPercent / 100);
         const actualUsdcBersih = actualUsdcKotor - potonganUsdc;
         sumBersihUsdc += actualUsdcBersih;
-        // Fallback untuk data lama (sebelum ada field terpisah "gerai"):
-        // gunakan nama outlet itu sendiri sebagai label gerai.
-        const geraiLabel = d.gerai || outletKey;
+        const geraiLabel = item.gerai;
         outletRowNumber++;
         const geraiNomor = outletRowNumber; // nomor yang tampil di tabel: reset tiap outlet
         geraiCounter++; // nomor global, dipakai khusus untuk data gabungan/ekspor Excel
@@ -754,26 +845,38 @@
         const kotorCell = rawSen === 0
           ? `<span class="text-amber-600 font-bold text-xs">Belum ada input</span>`
           : `<span class="text-blue-900 font-bold font-mono text-xs">${senFormatted} sen<br>(${usdcFormatted} USD)</span>`;
-        const potonganCell = potonganPercent > 0
+        const potonganCell = potonganPercent > 0 && rawSen > 0
           ? `<span class="inline-block text-red-600 font-mono text-xs border border-red-300 bg-red-50 rounded px-2 py-1">-${potonganSenFormatted} sen<br>(-${potonganUsdcFormatted} USD)<br>≈ -Rp ${potonganIdrFormatted}</span>`
           : `<span class="text-slate-300 text-xs">–</span>`;
         const bersihCell = rawSen === 0 ? '' : `<span class="text-emerald-700 font-bold font-mono text-xs">${bersihFormatted} USD</span>`;
 
+        let aksiHtml;
+        if (d) {
+          aksiHtml = `<button onclick="updateOutletUSDC('${d.id}', ${d.usdc || 0})" class="text-blue-700 hover:underline font-semibold">Ubah</button>
+              <button onclick="deleteOutletRecord('${d.id}')" class="text-red-700 hover:underline font-semibold ml-2">Hapus</button>`;
+        } else if (isSingleDay) {
+          aksiHtml = `<button onclick="addProfitForRosterGerai('${outletKey.replace(/'/g, "\\'")}', '${geraiLabel.replace(/'/g, "\\'")}')" class="text-blue-700 hover:underline font-semibold">Isi Profit</button>`;
+        } else {
+          aksiHtml = '';
+        }
+        if (item.rosterId) {
+          aksiHtml += ` <button onclick="deactivateGerai('${item.rosterId}', '${geraiLabel.replace(/'/g, "\\'")}')" class="text-slate-500 hover:underline font-semibold ml-2" title="Sembunyikan gerai ini dari daftar harian ke depannya">Nonaktifkan</button>`;
+        }
+
         rowsHtml += `
           <tr class="hover:bg-slate-50">
             <td class="border border-slate-300 px-2 py-2 text-slate-400 font-mono text-xs align-top">${geraiNomor}</td>
-            <td class="border border-slate-300 px-2 py-2 text-slate-700 font-mono text-xs align-top">${geraiLabel}${!isSingleDay ? `<br><span class="text-slate-400 text-[10px]">${d.dateStr}</span>` : ''}</td>
+            <td class="border border-slate-300 px-2 py-2 text-slate-700 font-mono text-xs align-top">${geraiLabel}${(!isSingleDay && d) ? `<br><span class="text-slate-400 text-[10px]">${d.dateStr}</span>` : ''}</td>
             <td class="border border-slate-300 px-2 py-2 text-right align-top">${kotorCell}</td>
             <td class="border border-slate-300 px-2 py-2 text-right align-top">${potonganCell}</td>
             <td class="border border-slate-300 px-2 py-2 text-right align-top">${bersihCell}</td>
             <td class="border border-slate-300 px-2 py-2 text-center align-top no-print text-xs whitespace-nowrap">
-              <button onclick="updateOutletUSDC('${d.id}', ${d.usdc || 0})" class="text-blue-700 hover:underline font-semibold">Ubah</button>
-              <button onclick="deleteOutletRecord('${d.id}')" class="text-red-700 hover:underline font-semibold ml-2">Hapus</button>
+              ${aksiHtml}
             </td>
           </tr>
         `;
 
-        lastRenderedItems.push({ no: geraiCounter, outlet: outletKey, gerai: geraiLabel, dateStr: d.dateStr, sen: rawSen, usdcKotor: actualUsdcKotor, potonganPercent: potonganPercent, potonganUsdc: potonganUsdc, usdcBersih: actualUsdcBersih });
+        lastRenderedItems.push({ no: geraiCounter, outlet: outletKey, gerai: geraiLabel, dateStr: d ? d.dateStr : start, sen: rawSen, usdcKotor: actualUsdcKotor, potonganPercent: potonganPercent, potonganUsdc: potonganUsdc, usdcBersih: actualUsdcBersih });
       });
 
       const outletSubtotalUsdcKotor = outletSubtotalSen / 100;
@@ -835,6 +938,143 @@
     document.getElementById('totalBersihIdrDisplay').textContent = `Rp ${(sumBersihUsdc * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
   };
 
+  // --- INSIGHT / DASHBOARD ---
+  window.setInsightRange = function(range) {
+    const now = new Date();
+    const toStr = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+    let start, end = toStr(now);
+
+    if (range === 'today') {
+      start = toStr(now);
+    } else if (range === 'week') {
+      const d = new Date(now); d.setDate(d.getDate() - 6);
+      start = toStr(d);
+    } else if (range === 'month') {
+      start = toStr(new Date(now.getFullYear(), now.getMonth(), 1));
+    } else { // all
+      start = '2000-01-01';
+    }
+
+    document.getElementById('insightStart').value = start;
+    document.getElementById('insightEnd').value = end;
+
+    document.querySelectorAll('.insight-range-btn').forEach(btn => {
+      const active = btn.dataset.range === range;
+      btn.className = active
+        ? "insight-range-btn px-3 py-1.5 border border-blue-700 bg-blue-700 text-white rounded text-xs font-semibold transition"
+        : "insight-range-btn px-3 py-1.5 border border-slate-300 rounded text-xs font-semibold hover:bg-slate-100 transition";
+    });
+
+    renderInsight();
+  };
+
+  window.renderInsight = function() {
+    const startEl = document.getElementById('insightStart');
+    const endEl = document.getElementById('insightEnd');
+    if (!startEl.value || !endEl.value) { window.setInsightRange('month'); return; }
+    const start = startEl.value;
+    const end = endEl.value;
+
+    const optionsId = { day: '2-digit', month: 'short', year: 'numeric' };
+    const startDate = new Date(start.split('-')[0], start.split('-')[1]-1, start.split('-')[2]);
+    const endDate = new Date(end.split('-')[0], end.split('-')[1]-1, end.split('-')[2]);
+    document.getElementById('insightPeriodText').textContent = `Periode: ${startDate.toLocaleDateString('id-ID', optionsId)} — ${endDate.toLocaleDateString('id-ID', optionsId)}`;
+
+    const items = allOutletData.filter(d => d.dateStr >= start && d.dateStr <= end);
+
+    // Hitung agregat per gerai (outlet+kode gerai) dan per outlet, sudah dikurangi potongan vendor
+    const geraiMap = {}; // key: outlet|||gerai -> { outlet, gerai, sen }
+    const outletMap = {}; // key: outlet -> { sen }
+
+    items.forEach(d => {
+      const outlet = d.outlet || '(Tanpa Nama)';
+      const gerai = d.gerai || outlet;
+      const key = outlet + '|||' + gerai;
+      if (!geraiMap[key]) geraiMap[key] = { outlet, gerai, sen: 0 };
+      geraiMap[key].sen += (d.usdc || 0);
+      if (!outletMap[outlet]) outletMap[outlet] = { outlet, sen: 0 };
+      outletMap[outlet].sen += (d.usdc || 0);
+    });
+
+    const activeRosterOutlets = new Set(geraiRoster.filter(r => r.active !== false).map(r => r.outlet));
+    const activeRosterCount = geraiRoster.filter(r => r.active !== false).length;
+
+    let totalKotorUsd = 0, totalBersihUsd = 0;
+
+    const outletList = Object.values(outletMap).map(o => {
+      const potonganPercent = outletSettings[outletDocId(o.outlet)] || 0;
+      const kotorUsd = o.sen / 100;
+      const bersihUsd = kotorUsd * (1 - potonganPercent / 100);
+      totalKotorUsd += kotorUsd;
+      totalBersihUsd += bersihUsd;
+      return { outlet: o.outlet, kotorUsd, bersihUsd, potonganPercent };
+    }).sort((a, b) => b.bersihUsd - a.bersihUsd);
+
+    const geraiList = Object.values(geraiMap).map(g => {
+      const potonganPercent = outletSettings[outletDocId(g.outlet)] || 0;
+      const kotorUsd = g.sen / 100;
+      const bersihUsd = kotorUsd * (1 - potonganPercent / 100);
+      return { outlet: g.outlet, gerai: g.gerai, kotorUsd, bersihUsd };
+    }).sort((a, b) => b.bersihUsd - a.bersihUsd).slice(0, 10);
+
+    document.getElementById('insightTotalOutlet').textContent = activeRosterOutlets.size;
+    document.getElementById('insightTotalGerai').textContent = activeRosterCount;
+    document.getElementById('insightTotalKotor').textContent = `Rp ${(totalKotorUsd * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
+    document.getElementById('insightTotalBersih').textContent = `Rp ${(totalBersihUsd * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
+
+    // Ranking Outlet
+    const outletRankEl = document.getElementById('insightOutletRanking');
+    if (outletList.length === 0) {
+      outletRankEl.innerHTML = `<p class="text-sm text-slate-400 italic text-center py-4">Belum ada data pada periode ini.</p>`;
+    } else {
+      const maxOutletBersih = Math.max(...outletList.map(o => o.bersihUsd), 0.0001);
+      outletRankEl.innerHTML = outletList.map((o, i) => {
+        const widthPct = Math.max((o.bersihUsd / maxOutletBersih) * 100, 2);
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
+        return `
+          <div class="flex items-center gap-3">
+            <div class="w-6 text-center text-sm">${medal}</div>
+            <div class="flex-1">
+              <div class="flex justify-between text-xs mb-1">
+                <span class="font-semibold text-slate-700">${o.outlet}</span>
+                <span class="font-mono text-emerald-700 font-bold">Rp ${(o.bersihUsd * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}</span>
+              </div>
+              <div class="w-full bg-slate-100 rounded-full h-2.5">
+                <div class="bg-emerald-600 h-2.5 rounded-full" style="width:${widthPct}%"></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Ranking Gerai
+    const geraiRankEl = document.getElementById('insightGeraiRanking');
+    if (geraiList.length === 0) {
+      geraiRankEl.innerHTML = `<p class="text-sm text-slate-400 italic text-center py-4">Belum ada data pada periode ini.</p>`;
+    } else {
+      const maxGeraiBersih = Math.max(...geraiList.map(g => g.bersihUsd), 0.0001);
+      geraiRankEl.innerHTML = geraiList.map((g, i) => {
+        const widthPct = Math.max((g.bersihUsd / maxGeraiBersih) * 100, 2);
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
+        return `
+          <div class="flex items-center gap-3">
+            <div class="w-6 text-center text-sm">${medal}</div>
+            <div class="flex-1">
+              <div class="flex justify-between text-xs mb-1">
+                <span class="font-semibold text-slate-700">${g.gerai} <span class="text-slate-400 font-normal">(${g.outlet})</span></span>
+                <span class="font-mono text-blue-900 font-bold">Rp ${(g.bersihUsd * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}</span>
+              </div>
+              <div class="w-full bg-slate-100 rounded-full h-2.5">
+                <div class="bg-blue-700 h-2.5 rounded-full" style="width:${widthPct}%"></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  };
+
   window.saveOutletData = async () => {
     try {
       const outlet = document.getElementById('outletName').value.trim();
@@ -851,14 +1091,31 @@
       const usdcPreview = (usdc / 100).toLocaleString('id-ID', {maximumFractionDigits: 2});
       const confirmMsg = `Simpan data berikut?\n\nOutlet: ${outlet}\nKode Gerai: ${gerai}\nTanggal: ${dateToSave}\nKeuntungan Kotor: ${usdc.toLocaleString('id-ID', {maximumFractionDigits: 2})} sen (${usdcPreview} USD)`;
       if (!confirm(confirmMsg)) return;
-      
-      await addDoc(collection(db, 'outlet_profits'), { 
-        dateStr: dateToSave, 
-        outlet: outlet, 
-        gerai: gerai,
-        usdc: usdc, 
-        createdAt: serverTimestamp() 
-      });
+
+      // Pastikan gerai ini terdaftar di roster (daftar tetap) - supaya otomatis muncul
+      // lagi di hari-hari berikutnya tanpa perlu didaftarkan ulang. Kalau sebelumnya
+      // sempat dinonaktifkan, aktifkan lagi secara otomatis di sini.
+      const existingRoster = geraiRoster.find(r => r.outlet === outlet && r.gerai === gerai);
+      if (!existingRoster) {
+        await addDoc(collection(db, 'gerai_roster'), { outlet, gerai, active: true, createdAt: serverTimestamp() });
+      } else if (existingRoster.active === false) {
+        await updateDoc(doc(db, 'gerai_roster', existingRoster.id), { active: true });
+      }
+
+      // Upsert data profit untuk tanggal ini: kalau gerai ini sudah punya catatan di
+      // tanggal yang sama, perbarui nilainya (bukan bikin duplikat).
+      const existingProfit = allOutletData.find(d => d.outlet === outlet && (d.gerai || d.outlet) === gerai && d.dateStr === dateToSave);
+      if (existingProfit) {
+        await updateDoc(doc(db, 'outlet_profits', existingProfit.id), { usdc });
+      } else {
+        await addDoc(collection(db, 'outlet_profits'), { 
+          dateStr: dateToSave, 
+          outlet: outlet, 
+          gerai: gerai,
+          usdc: usdc, 
+          createdAt: serverTimestamp() 
+        });
+      }
       
       document.getElementById('geraiName').value = ''; 
       document.getElementById('inputUSDC').value = '';
@@ -902,6 +1159,40 @@
       initOutletListener();
     } catch (e) {
       alert("Password salah atau gagal menghapus.");
+    }
+  };
+
+  // Mengisi profit untuk gerai yang sudah terdaftar di roster tapi belum ada
+  // catatannya di tanggal yang sedang dipilih ("Belum ada input").
+  window.addProfitForRosterGerai = async (outlet, gerai) => {
+    const dateToSave = document.getElementById('filterStart').value;
+    const newVal = prompt(`Isi profit untuk gerai "${gerai}" (Outlet: ${outlet})\nTanggal: ${dateToSave}\n\nMasukkan angka SEN persis dari platform (misal: 822.35):`, '');
+    if (newVal === null) return;
+    const parsed = parseSenInput(newVal);
+    if (isNaN(parsed)) return alert("Format nominal tidak valid! Gunakan angka, contoh: 822.35 atau 822,35");
+
+    const usdPreview = (parsed / 100).toLocaleString('id-ID', {maximumFractionDigits: 2});
+    const confirmMsg = `Simpan data berikut?\n\nOutlet: ${outlet}\nKode Gerai: ${gerai}\nTanggal: ${dateToSave}\nKeuntungan Kotor: ${parsed.toLocaleString('id-ID', {maximumFractionDigits: 2})} sen (${usdPreview} USD)`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      await addDoc(collection(db, 'outlet_profits'), { dateStr: dateToSave, outlet, gerai, usdc: parsed, createdAt: serverTimestamp() });
+      initOutletListener();
+      alert("Data berhasil disimpan!");
+    } catch (e) {
+      alert("Gagal menyimpan data: " + e.message);
+    }
+  };
+
+  // Menonaktifkan gerai dari roster - gerai tidak akan muncul lagi di daftar harian
+  // ke depannya, tapi seluruh catatan profit yang sudah ada tetap tersimpan utuh
+  // dan tetap bisa dilihat lewat filter tanggal lama atau Total Gabungan.
+  window.deactivateGerai = async (rosterId, geraiLabel) => {
+    if (!confirm(`Nonaktifkan gerai "${geraiLabel}"?\n\nGerai ini tidak akan muncul lagi di daftar harian mulai sekarang, tapi seluruh data keuntungan yang sudah tercatat sebelumnya tetap aman tersimpan.`)) return;
+    try {
+      await updateDoc(doc(db, 'gerai_roster', rosterId), { active: false });
+    } catch (e) {
+      alert("Gagal menonaktifkan gerai: " + e.message);
     }
   };
 
