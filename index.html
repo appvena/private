@@ -16,6 +16,10 @@
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       min-height: 100vh;
     }
+    body.auth-bg {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 45%, #1e40af 75%, #1d4ed8 100%);
+      background-attachment: fixed;
+    }
     .corporate-card {
       background: #ffffff;
       border: 1px solid #cbd5e1;
@@ -30,15 +34,24 @@
     }
   </style>
 </head>
-<body class="p-4 sm:p-6">
+<body class="p-2 sm:p-6">
 
 <div class="max-w-5xl mx-auto space-y-6">
 
+  <!-- LAYAR LOADING (tampil default, disembunyikan setelah status login diketahui) -->
+  <div id="loadingScreen" class="flex flex-col items-center justify-center mt-32 gap-4">
+    <div class="w-12 h-12 border-4 border-blue-200 border-t-blue-900 rounded-full animate-spin"></div>
+    <p class="text-slate-500 text-sm font-mono">Memuat sistem...</p>
+  </div>
+
   <!-- LAYAR LOGIN -->
-  <div id="loginScreen" class="corporate-card p-8 rounded-lg max-w-md mx-auto mt-20 shadow-lg hidden">
-    <h2 class="text-2xl font-bold tracking-wide mb-1 text-slate-800 border-b pb-2">Login Administrasi</h2>
-    <p class="text-slate-500 text-xs mb-6">Masukkan kredensial akun Anda untuk mengakses sistem.</p>
-    <div class="space-y-4">
+  <div id="loginScreen" class="bg-white rounded-2xl max-w-md mx-auto mt-20 shadow-2xl hidden overflow-hidden">
+    <div class="bg-gradient-to-r from-blue-900 to-blue-700 px-8 pt-8 pb-6 text-center">
+      <div class="w-14 h-14 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center mx-auto mb-3 text-2xl">🏢</div>
+      <h2 class="text-xl font-bold tracking-wide text-white">Login Administrasi</h2>
+      <p class="text-blue-200 text-xs mt-1">Masukkan kredensial akun Anda untuk mengakses sistem.</p>
+    </div>
+    <div class="p-8 space-y-4">
       <div>
         <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Email Address</label>
         <input type="email" id="loginEmail" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm focus:border-blue-600 outline-none" placeholder="admin@domain.com">
@@ -47,7 +60,7 @@
         <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Password</label>
         <input type="password" id="loginPass" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm focus:border-blue-600 outline-none" placeholder="••••••••">
       </div>
-      <button onclick="login()" class="w-full py-2.5 bg-blue-900 text-white font-semibold rounded hover:bg-blue-800 transition text-sm shadow">Masuk Sistem</button>
+      <button id="loginBtn" onclick="login()" class="w-full py-2.5 bg-blue-900 text-white font-semibold rounded hover:bg-blue-800 transition text-sm shadow disabled:opacity-60">Masuk Sistem</button>
       <div id="loginStatus" class="text-xs text-red-600 font-mono text-center"></div>
     </div>
   </div>
@@ -67,33 +80,33 @@
   </div>
 
   <!-- DASHBOARD UTAMA -->
-  <div id="appScreen" class="corporate-card p-6 sm:p-8 rounded-lg shadow-md hidden space-y-6">
+  <div id="appScreen" class="corporate-card p-3 sm:p-8 rounded-lg shadow-md hidden space-y-6">
     
     <!-- HEADER & LOGOUT -->
-    <div class="flex flex-wrap justify-between items-center border-b border-slate-200 pb-4 no-print">
-      <div class="flex items-center gap-3">
-        <div class="bg-blue-900 text-white font-bold px-3 py-1.5 rounded text-xs tracking-wider">OFFICE SYSTEM</div>
-        <h1 class="text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[10px] font-mono" title="Build: 31 Agustus 2026, 15:35 WIB">v2.0.0 (build 2026-08-31.1535)</span>
+    <div class="flex flex-wrap justify-between items-center gap-y-2 border-b border-slate-200 pb-3 sm:pb-4 no-print">
+      <div class="flex items-center gap-2 flex-wrap">
+        <div class="bg-blue-900 text-white font-bold px-2.5 py-1 rounded text-[10px] sm:text-xs tracking-wider">OFFICE SYSTEM</div>
+        <h1 class="text-sm sm:text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 31 Agustus 2026, 16:10 WIB">v2.1.0 (build 2026-08-31.1610)</span>
       </div>
-      <div class="flex items-center gap-3">
-        <span class="text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 5m)</span>
-        <button onclick="resetSupabaseKeys()" class="px-3 py-1.5 bg-slate-100 text-slate-700 border border-slate-300 text-xs rounded hover:bg-slate-200 transition">Konfigurasi</button>
-        <button onclick="logout()" class="px-3 py-1.5 bg-red-700 text-white text-xs rounded hover:bg-red-800 transition">Keluar</button>
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="hidden sm:inline text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 5m)</span>
+        <button onclick="resetSupabaseKeys()" class="px-2.5 py-1.5 bg-slate-100 text-slate-700 border border-slate-300 text-xs rounded hover:bg-slate-200 transition">Konfigurasi</button>
+        <button onclick="logout()" class="px-2.5 py-1.5 bg-red-700 text-white text-xs rounded hover:bg-red-800 transition">Keluar</button>
       </div>
     </div>
 
     <!-- TAB NAVIGASI -->
-    <div class="flex border-b border-slate-300 gap-6 no-print">
-      <button id="btnTabCalc" onclick="switchTab('calc')" class="pb-2.5 border-b-2 border-blue-900 text-blue-900 font-bold text-sm transition">💰 Kalkulator Outlet</button>
-      <button id="btnTabStorage" onclick="switchTab('storage')" class="pb-2.5 text-slate-500 hover:text-slate-800 transition border-b-2 border-transparent text-sm">📁 Arsip Berkas</button>
+    <div class="flex border-b border-slate-300 gap-4 sm:gap-6 no-print overflow-x-auto">
+      <button id="btnTabCalc" onclick="switchTab('calc')" class="pb-2.5 border-b-2 border-blue-900 text-blue-900 font-bold text-xs sm:text-sm transition whitespace-nowrap">💰 Kalkulator Outlet</button>
+      <button id="btnTabStorage" onclick="switchTab('storage')" class="pb-2.5 text-slate-500 hover:text-slate-800 transition border-b-2 border-transparent text-xs sm:text-sm whitespace-nowrap">📁 Arsip Berkas</button>
     </div>
 
     <!-- ============================================== -->
     <!-- TAB 1: KALKULATOR OUTLET                       -->
     <!-- ============================================== -->
     <div id="tab-calc" class="space-y-6">
-      <div id="pdfExportArea" class="bg-white p-6 rounded border border-slate-200 relative space-y-4">
+      <div id="pdfExportArea" class="bg-white p-3 sm:p-6 rounded border border-slate-200 relative space-y-4">
         
         <!-- LIVE CLOCK & STATUS BANNER -->
         <div class="bg-slate-50 border border-slate-300 p-2.5 rounded flex justify-between items-center text-xs font-mono text-slate-700">
@@ -224,7 +237,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v2.0.0 (build 2026-08-31.1535)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v2.1.0 (build 2026-08-31.1610)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -412,18 +425,32 @@
   setInterval(fetchKurs, 60 * 1000); // polling tiap 1 menit karena sumbernya real-time
 
   onAuthStateChanged(auth, async (user) => { 
+    document.getElementById('loadingScreen').style.display = 'none';
     if(user) {
       document.getElementById('loginScreen').style.display = 'none';
+      document.body.classList.remove('auth-bg');
       checkSupabaseSettings(user.uid);
       resetInactivityTimer();
     } else {
       document.getElementById('appScreen').style.display = 'none';
       document.getElementById('setupScreen').style.display = 'none';
       document.getElementById('loginScreen').style.display = 'block';
+      document.body.classList.add('auth-bg');
     }
   });
 
-  window.login = () => signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, document.getElementById('loginPass').value).catch(e => document.getElementById('loginStatus').textContent = "> " + e.message);
+  window.login = () => {
+    const btn = document.getElementById('loginBtn');
+    btn.disabled = true;
+    btn.textContent = 'Memproses...';
+    document.getElementById('loginStatus').textContent = '';
+    signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, document.getElementById('loginPass').value)
+      .catch(e => {
+        document.getElementById('loginStatus').textContent = "> " + e.message;
+        btn.disabled = false;
+        btn.textContent = 'Masuk Sistem';
+      });
+  };
   window.logout = () => {
     if (confirm("Anda yakin ingin keluar dari sistem?")) {
       signOut(auth);
@@ -431,14 +458,17 @@
   };
 
   async function checkSupabaseSettings(uid) {
+    document.getElementById('loadingScreen').style.display = 'flex';
     try {
       const snap = await getDoc(doc(db, 'settings', 'supabase_' + uid));
+      document.getElementById('loadingScreen').style.display = 'none';
       if (snap.exists()) {
         supaClient = createClient(snap.data().url, snap.data().key);
         supaBucketName = snap.data().bucket;
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('setupScreen').style.display = 'none';
         document.getElementById('appScreen').style.display = 'block';
+        document.body.classList.remove('auth-bg');
         loadFiles();
         initOutletListener();
         loadOutletSettings();
@@ -446,8 +476,10 @@
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('appScreen').style.display = 'none';
         document.getElementById('setupScreen').style.display = 'block';
+        document.body.classList.add('auth-bg');
       }
     } catch(e) { 
+      document.getElementById('loadingScreen').style.display = 'none';
       document.getElementById('setupScreen').style.display = 'block'; 
     }
   }
@@ -676,6 +708,7 @@
       const items = groups[outletKey];
       const potonganPercent = outletSettings[outletDocId(outletKey)] || 0;
       let outletSubtotalSen = 0;
+      let outletRowNumber = 0; // nomor urut khusus untuk tabel outlet ini, reset tiap outlet
       let rowsHtml = '';
 
       items.forEach(d => {
@@ -692,8 +725,9 @@
         // Fallback untuk data lama (sebelum ada field terpisah "gerai"):
         // gunakan nama outlet itu sendiri sebagai label gerai.
         const geraiLabel = d.gerai || outletKey;
-        geraiCounter++;
-        const geraiNomor = geraiCounter;
+        outletRowNumber++;
+        const geraiNomor = outletRowNumber; // nomor yang tampil di tabel: reset tiap outlet
+        geraiCounter++; // nomor global, dipakai khusus untuk data gabungan/ekspor Excel
         const senFormatted = rawSen.toLocaleString('id-ID');
         const usdcFormatted = actualUsdcKotor.toLocaleString('id-ID', {maximumFractionDigits: 2});
         const bersihFormatted = actualUsdcBersih.toLocaleString('id-ID', {maximumFractionDigits: 2});
@@ -723,7 +757,7 @@
           </tr>
         `;
 
-        lastRenderedItems.push({ no: geraiNomor, outlet: outletKey, gerai: geraiLabel, dateStr: d.dateStr, sen: rawSen, usdcKotor: actualUsdcKotor, potonganPercent: potonganPercent, potonganUsdc: potonganUsdc, usdcBersih: actualUsdcBersih });
+        lastRenderedItems.push({ no: geraiCounter, outlet: outletKey, gerai: geraiLabel, dateStr: d.dateStr, sen: rawSen, usdcKotor: actualUsdcKotor, potonganPercent: potonganPercent, potonganUsdc: potonganUsdc, usdcBersih: actualUsdcBersih });
       });
 
       const outletSubtotalUsdcKotor = outletSubtotalSen / 100;
@@ -736,7 +770,7 @@
             <button onclick="editOutletPotongan('${outletKey.replace(/'/g, "\\'")}')" class="no-print text-slate-500 hover:text-blue-700 text-xs border border-slate-300 rounded px-1.5 py-0.5 bg-white" title="Atur potongan vendor %">⚙ ${potonganPercent}%</button>
           </div>
           <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
+            <table class="w-full text-left border-collapse min-w-[560px]">
               <thead>
                 <tr class="bg-slate-50 text-[10px] text-slate-500 uppercase tracking-wider">
                   <th class="border border-slate-300 px-2 py-1.5">No</th>
