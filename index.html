@@ -87,7 +87,7 @@
       <div class="flex items-center gap-2 flex-wrap">
         <div class="bg-blue-900 text-white font-bold px-2.5 py-1 rounded text-[10px] sm:text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-sm sm:text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 31 Agustus 2026, 16:10 WIB">v2.1.0 (build 2026-08-31.1610)</span>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 31 Agustus 2026, 23:20 WIB">v2.5.0 (build 2026-08-31.2320)</span>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <span class="hidden sm:inline text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 5m)</span>
@@ -164,7 +164,7 @@
             <input type="text" id="geraiName" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm focus:border-blue-600 outline-none" placeholder="Kode/Nama Gerai (Misal: 2115288)">
           </div>
           <div>
-            <input type="text" id="inputUSDC" oninput="formatInputCurrency(this)" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm focus:border-blue-600 outline-none" placeholder="Keuntungan Kotor dalam SEN">
+            <input type="text" id="inputUSDC" oninput="formatInputCurrency(this)" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm focus:border-blue-600 outline-none" placeholder="Angka SEN persis dari platform (misal: 822.35)">
           </div>
           <div>
             <button onclick="saveOutletData()" class="w-full h-full py-2.5 bg-blue-900 hover:bg-blue-800 text-white font-semibold text-sm rounded transition shadow">Tambah Gerai</button>
@@ -237,7 +237,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v2.1.0 (build 2026-08-31.1610)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v2.5.0 (build 2026-08-31.2320)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -311,16 +311,32 @@
     }
   };
 
-  // --- FORMAT RIBUAN ---
+  // --- INPUT ANGKA USD (boleh titik atau koma sebagai desimal) ---
+  // Hanya menyaring karakter selain digit/titik/koma, dan membatasi maksimal
+  // SATU tanda desimal (kalau user ketik lebih dari satu, sisanya dibuang).
+  // Tidak melakukan auto-format ribuan supaya posisi tanda desimal tidak
+  // membingungkan (ini akar masalah sebelumnya).
   window.formatInputCurrency = function(input) {
-    let cleanVal = input.value.replace(/\D/g, ''); 
-    if (!cleanVal) { input.value = ''; return; }
-    input.value = Number(cleanVal).toLocaleString('id-ID');
+    let val = input.value.replace(/[^0-9.,]/g, '');
+    const sepIndex = val.search(/[.,]/);
+    if (sepIndex !== -1) {
+      const before = val.slice(0, sepIndex + 1);
+      const after = val.slice(sepIndex + 1).replace(/[.,]/g, '');
+      val = before + after;
+    }
+    input.value = val;
   };
-  
-  const parseCurrency = (str) => {
-    if(!str) return 0;
-    return parseFloat(str.toString().replace(/\./g, '').replace(',', '.')) || 0;
+
+  // Input di sini adalah angka SEN persis seperti yang ditampilkan platform trading
+  // (akun cent, kode "...c" seperti XAUUSDc) - misal "822.35" berarti 822.35 sen
+  // = 8,2235 USD. Nilai ini disimpan APA ADANYA ke database (tanpa dikali 100),
+  // dan baru dibagi 100 saat ditampilkan sebagai USD di layar/laporan.
+  const parseSenInput = (str) => {
+    if (!str) return 0;
+    const normalized = str.toString().trim().replace(',', '.');
+    const val = parseFloat(normalized);
+    if (isNaN(val)) return NaN;
+    return val;
   };
 
   // --- FIREBASE SETUP ---
@@ -728,11 +744,11 @@
         outletRowNumber++;
         const geraiNomor = outletRowNumber; // nomor yang tampil di tabel: reset tiap outlet
         geraiCounter++; // nomor global, dipakai khusus untuk data gabungan/ekspor Excel
-        const senFormatted = rawSen.toLocaleString('id-ID');
+        const senFormatted = rawSen.toLocaleString('id-ID', {maximumFractionDigits: 2});
         const usdcFormatted = actualUsdcKotor.toLocaleString('id-ID', {maximumFractionDigits: 2});
         const bersihFormatted = actualUsdcBersih.toLocaleString('id-ID', {maximumFractionDigits: 2});
         const potonganUsdcFormatted = potonganUsdc.toLocaleString('id-ID', {maximumFractionDigits: 2});
-        const potonganSenFormatted = potonganSen.toLocaleString('id-ID', {maximumFractionDigits: 0});
+        const potonganSenFormatted = potonganSen.toLocaleString('id-ID', {maximumFractionDigits: 2});
         const potonganIdrFormatted = (potonganUsdc * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0});
 
         const kotorCell = rawSen === 0
@@ -786,12 +802,12 @@
           </div>
           <div class="border-t border-slate-200 bg-slate-50 px-4 py-3 flex flex-col items-end gap-1">
             <div class="text-sm font-bold text-slate-700">
-              Total Kotor: <span class="text-blue-900 ml-2 font-mono">${outletSubtotalSen.toLocaleString('id-ID')} sen (${outletSubtotalUsdcKotor.toLocaleString('id-ID', {maximumFractionDigits: 2})} USD)</span>
+              Total Kotor: <span class="text-blue-900 ml-2 font-mono">${outletSubtotalSen.toLocaleString('id-ID', {maximumFractionDigits: 2})} sen (${outletSubtotalUsdcKotor.toLocaleString('id-ID', {maximumFractionDigits: 2})} USD)</span>
             </div>
             <div class="text-sm text-slate-500">
               (Rp Kotor: <span class="font-mono">Rp ${(outletSubtotalUsdcKotor * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}</span>)
             </div>
-            ${potonganPercent > 0 ? `<p class="text-xs text-red-600 font-mono border border-red-300 bg-red-50 rounded px-3 py-1.5">Total Potongan Vendor: -${(outletSubtotalPotonganUsdc * 100).toLocaleString('id-ID', {maximumFractionDigits: 0})} sen (-${outletSubtotalPotonganUsdc.toLocaleString('id-ID', {maximumFractionDigits: 2})} USD ≈ -Rp ${(outletSubtotalPotonganUsdc * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})})</p>` : ''}
+            ${potonganPercent > 0 ? `<p class="text-xs text-red-600 font-mono border border-red-300 bg-red-50 rounded px-3 py-1.5">Total Potongan Vendor: -${(outletSubtotalPotonganUsdc * 100).toLocaleString('id-ID', {maximumFractionDigits: 2})} sen (-${outletSubtotalPotonganUsdc.toLocaleString('id-ID', {maximumFractionDigits: 2})} USD ≈ -Rp ${(outletSubtotalPotonganUsdc * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})})</p>` : ''}
             <div class="text-sm font-bold text-emerald-700 mt-1">
               Total Bersih (setelah potongan): <span class="ml-2 font-mono">${outletSubtotalUsdcBersih.toLocaleString('id-ID', {maximumFractionDigits: 2})} USD</span>
             </div>
@@ -805,11 +821,11 @@
 
     const sumUSDCKotor = sumSen / 100;
     const sumPotonganUsdc = sumUSDCKotor - sumBersihUsdc;
-    document.getElementById('totalUsdcDisplay').textContent = `${sumSen.toLocaleString('id-ID')} sen (${sumUSDCKotor.toLocaleString('id-ID', {maximumFractionDigits: 2})} USD)`;
+    document.getElementById('totalUsdcDisplay').textContent = `${sumSen.toLocaleString('id-ID', {maximumFractionDigits: 2})} sen (${sumUSDCKotor.toLocaleString('id-ID', {maximumFractionDigits: 2})} USD)`;
     document.getElementById('totalIdrDisplay').textContent = `Rp ${(sumUSDCKotor * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
     const totalPotonganEl = document.getElementById('totalPotonganText');
     if (sumPotonganUsdc > 0) {
-      totalPotonganEl.textContent = `Total Potongan Vendor: -${(sumPotonganUsdc * 100).toLocaleString('id-ID', {maximumFractionDigits: 0})} sen (-${sumPotonganUsdc.toLocaleString('id-ID', {maximumFractionDigits: 2})} USD ≈ -Rp ${(sumPotonganUsdc * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})})`;
+      totalPotonganEl.textContent = `Total Potongan Vendor: -${(sumPotonganUsdc * 100).toLocaleString('id-ID', {maximumFractionDigits: 2})} sen (-${sumPotonganUsdc.toLocaleString('id-ID', {maximumFractionDigits: 2})} USD ≈ -Rp ${(sumPotonganUsdc * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})})`;
       totalPotonganEl.classList.remove('hidden');
     } else {
       totalPotonganEl.textContent = '';
@@ -829,8 +845,12 @@
       if (!outlet) return alert("Harap isi Nama Outlet terlebih dahulu!");
       if (!gerai) return alert("Harap isi Kode/Nama Gerai terlebih dahulu!");
       
-      let usdc = parseCurrency(usdcInput);
-      if (isNaN(usdc)) usdc = 0; 
+      let usdc = parseSenInput(usdcInput);
+      if (isNaN(usdc)) return alert("Format nominal tidak valid! Gunakan angka, contoh: 822.35 atau 822,35");
+
+      const usdcPreview = (usdc / 100).toLocaleString('id-ID', {maximumFractionDigits: 2});
+      const confirmMsg = `Simpan data berikut?\n\nOutlet: ${outlet}\nKode Gerai: ${gerai}\nTanggal: ${dateToSave}\nKeuntungan Kotor: ${usdc.toLocaleString('id-ID', {maximumFractionDigits: 2})} sen (${usdcPreview} USD)`;
+      if (!confirm(confirmMsg)) return;
       
       await addDoc(collection(db, 'outlet_profits'), { 
         dateStr: dateToSave, 
@@ -843,21 +863,28 @@
       document.getElementById('geraiName').value = ''; 
       document.getElementById('inputUSDC').value = '';
       initOutletListener();
+      alert("Data berhasil disimpan!");
     } catch (error) {
       alert("Gagal menyimpan data: " + error.message);
     }
   };
 
   window.updateOutletUSDC = async (id, currentVal) => {
-    let formatVal = currentVal === 0 ? '' : currentVal.toLocaleString('id-ID');
-    const newVal = prompt("Masukkan keuntungan KOTOR baru (dalam SEN, misal 230 = 2,30 USD):", formatVal);
+    let formatVal = currentVal === 0 ? '' : currentVal.toLocaleString('id-ID', {maximumFractionDigits: 2});
+    const newVal = prompt("Masukkan angka SEN baru persis dari platform (misal: 822.35):", formatVal);
     if (newVal === null) return; 
-    const parsed = parseCurrency(newVal);
-    if (isNaN(parsed)) return alert("Format nominal tidak valid!");
+    const parsed = parseSenInput(newVal);
+    if (isNaN(parsed)) return alert("Format nominal tidak valid! Gunakan angka, contoh: 822.35 atau 822,35");
+
+    const oldUsd = (currentVal / 100).toLocaleString('id-ID', {maximumFractionDigits: 2});
+    const newUsd = (parsed / 100).toLocaleString('id-ID', {maximumFractionDigits: 2});
+    const confirmMsg = `Simpan perubahan ini?\n\nNilai lama: ${currentVal.toLocaleString('id-ID', {maximumFractionDigits: 2})} sen (${oldUsd} USD)\nNilai baru: ${parsed.toLocaleString('id-ID', {maximumFractionDigits: 2})} sen (${newUsd} USD)`;
+    if (!confirm(confirmMsg)) return;
     
     try { 
       await updateDoc(doc(db, 'outlet_profits', id), { usdc: parsed }); 
       initOutletListener();
+      alert("Perubahan berhasil disimpan!");
     } 
     catch (e) { alert("Gagal merubah data: " + e.message); }
   };
@@ -912,7 +939,7 @@
     const thinBorder = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
     const rupiahFmt = '"Rp" #,##0';
     const usdcFmt = '#,##0.00';
-    const senFmt = '#,##0';
+    const senFmt = '#,##0.00';
 
     // Header row styling
     sheet.getRow(1).eachCell(cell => {
