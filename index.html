@@ -87,7 +87,7 @@
       <div class="flex items-center gap-2 flex-wrap">
         <div class="bg-blue-900 text-white font-bold px-2.5 py-1 rounded text-[10px] sm:text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-sm sm:text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 1 September 2026, 00:20 WIB">v3.1.0 (build 2026-09-01.0020)</span>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 1 September 2026, 00:30 WIB">v3.1.1 (build 2026-09-01.0030)</span>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <span class="hidden sm:inline text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 5m)</span>
@@ -293,7 +293,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.1.0 (build 2026-09-01.0020)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.1.1 (build 2026-09-01.0030)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -415,6 +415,34 @@
 
   let allOutletData = [];
   let geraiRoster = []; // daftar tetap {id, outlet, gerai, active} - persisten lintas hari, tidak terikat tanggal tertentu
+  const syncedRosterKeys = new Set(); // guard supaya tidak addDoc duplikat dalam sesi yang sama
+
+  // Migrasi otomatis: data outlet_profits yang dibuat SEBELUM fitur roster ada
+  // (sebelum v3.0.0) belum punya entri di gerai_roster, jadi tidak akan muncul di
+  // tampilan mode-roster harian. Fungsi ini mendaftarkan otomatis kombinasi
+  // outlet+gerai dari riwayat data yang belum ada di roster, sekali saja per
+  // kombinasi (idempotent - aman dipanggil berkali-kali).
+  async function syncRosterFromHistory() {
+    const existingKeys = new Set(geraiRoster.map(r => r.outlet + '|||' + r.gerai));
+    const historicalKeys = new Set();
+    allOutletData.forEach(d => {
+      const outlet = d.outlet || '(Tanpa Nama)';
+      const gerai = d.gerai || outlet;
+      historicalKeys.add(outlet + '|||' + gerai);
+    });
+
+    for (const key of historicalKeys) {
+      if (existingKeys.has(key) || syncedRosterKeys.has(key)) continue;
+      syncedRosterKeys.add(key);
+      const [outlet, gerai] = key.split('|||');
+      try {
+        await addDoc(collection(db, 'gerai_roster'), { outlet, gerai, active: true, createdAt: serverTimestamp() });
+      } catch (e) {
+        console.error('Gagal sinkronisasi roster untuk ' + key + ':', e);
+        syncedRosterKeys.delete(key); // biar dicoba lagi di kesempatan berikutnya kalau gagal
+      }
+    }
+  }
   let lastRenderedItems = []; // flat list {outlet, gerai, dateStr, usdc} hasil render terakhir, dipakai untuk ekspor Excel
 
   function loadGeraiRoster() {
@@ -423,6 +451,7 @@
       snap.forEach(d => geraiRoster.push({ id: d.id, ...d.data() }));
       applyDateFilter();
       refreshInsightIfVisible();
+      syncRosterFromHistory();
     }, (error) => {
       console.error("Firestore gerai_roster error:", error);
     });
@@ -701,6 +730,7 @@
       updateOutletDatalist();
       applyDateFilter();
       refreshInsightIfVisible();
+      syncRosterFromHistory();
     } catch (err) {
       console.error("Gagal mengambil data awal:", err);
       document.getElementById('dbStatusText').textContent = `ERROR: ${err.message}`;
@@ -714,6 +744,7 @@
       updateOutletDatalist();
       applyDateFilter();
       refreshInsightIfVisible();
+      syncRosterFromHistory();
     }, (error) => {
       console.error("Firestore Error:", error);
     });
