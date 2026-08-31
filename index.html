@@ -87,7 +87,7 @@
       <div class="flex items-center gap-2 flex-wrap">
         <div class="bg-blue-900 text-white font-bold px-2.5 py-1 rounded text-[10px] sm:text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-sm sm:text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 1 September 2026, 00:30 WIB">v3.1.1 (build 2026-09-01.0030)</span>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 1 September 2026, 01:00 WIB">v3.3.0 (build 2026-09-01.0100)</span>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <span class="hidden sm:inline text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 5m)</span>
@@ -208,48 +208,60 @@
 
         <!-- Filter Cepat -->
         <div class="flex flex-wrap items-center gap-2">
-          <button onclick="setInsightRange('today')" class="insight-range-btn px-3 py-1.5 border border-slate-300 rounded text-xs font-semibold hover:bg-slate-100 transition" data-range="today">Hari Ini</button>
-          <button onclick="setInsightRange('week')" class="insight-range-btn px-3 py-1.5 border border-slate-300 rounded text-xs font-semibold hover:bg-slate-100 transition" data-range="week">7 Hari Terakhir</button>
-          <button onclick="setInsightRange('month')" class="insight-range-btn px-3 py-1.5 border border-slate-300 rounded text-xs font-semibold hover:bg-slate-100 transition" data-range="month">Bulan Ini</button>
-          <button onclick="setInsightRange('all')" class="insight-range-btn px-3 py-1.5 border border-slate-300 rounded text-xs font-semibold hover:bg-slate-100 transition" data-range="all">Semua Waktu</button>
-          <div class="flex items-center gap-2 ml-auto">
-            <input type="date" id="insightStart" onchange="renderInsight()" class="p-1.5 border border-slate-300 rounded text-xs">
-            <span class="text-slate-400 text-xs">s/d</span>
-            <input type="date" id="insightEnd" onchange="renderInsight()" class="p-1.5 border border-slate-300 rounded text-xs">
-          </div>
+          <button onclick="setInsightRange('today')" class="insight-range-btn px-3 py-1.5 rounded-full text-xs font-semibold transition" data-range="today">Hari Ini</button>
+          <button onclick="setInsightRange('week')" class="insight-range-btn px-3 py-1.5 rounded-full text-xs font-semibold transition" data-range="week">7 Hari</button>
+          <button onclick="setInsightRange('month')" class="insight-range-btn px-3 py-1.5 rounded-full text-xs font-semibold transition" data-range="month">Bulan Ini</button>
+          <button onclick="setInsightRange('all')" class="insight-range-btn px-3 py-1.5 rounded-full text-xs font-semibold transition" data-range="all">Semua</button>
+          <details class="ml-auto">
+            <summary class="cursor-pointer text-xs text-blue-700 font-semibold select-none px-2 py-1.5">📅 Custom</summary>
+            <div class="flex items-center gap-2 mt-2 bg-slate-50 border border-slate-200 rounded p-2">
+              <input type="date" id="insightStart" onchange="renderInsight()" class="p-1.5 border border-slate-300 rounded text-xs">
+              <span class="text-slate-400 text-xs">s/d</span>
+              <input type="date" id="insightEnd" onchange="renderInsight()" class="p-1.5 border border-slate-300 rounded text-xs">
+            </div>
+          </details>
         </div>
-        <p id="insightPeriodText" class="text-xs text-slate-400 -mt-4"></p>
+        <p id="insightPeriodText" class="text-xs text-slate-400"></p>
 
         <!-- Kartu Ringkasan -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div class="bg-slate-50 border border-slate-200 rounded p-3 text-center">
-            <div class="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Outlet Aktif</div>
-            <div id="insightTotalOutlet" class="text-xl font-extrabold text-slate-800">0</div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div class="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-3 flex items-center gap-2.5">
+            <span class="text-xl">🏬</span>
+            <div>
+              <div class="text-[9px] text-slate-500 uppercase tracking-wide leading-tight">Outlet Aktif</div>
+              <div id="insightTotalOutlet" class="text-lg font-extrabold text-slate-800 leading-tight">0</div>
+            </div>
           </div>
-          <div class="bg-slate-50 border border-slate-200 rounded p-3 text-center">
-            <div class="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Gerai Aktif</div>
-            <div id="insightTotalGerai" class="text-xl font-extrabold text-slate-800">0</div>
+          <div class="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-3 flex items-center gap-2.5">
+            <span class="text-xl">🏷️</span>
+            <div>
+              <div class="text-[9px] text-slate-500 uppercase tracking-wide leading-tight">Gerai Aktif</div>
+              <div id="insightTotalGerai" class="text-lg font-extrabold text-slate-800 leading-tight">0</div>
+            </div>
           </div>
-          <div class="bg-blue-50 border border-blue-200 rounded p-3 text-center">
-            <div class="text-[10px] text-blue-600 uppercase tracking-wider mb-1">Total Kotor</div>
-            <div id="insightTotalKotor" class="text-sm font-extrabold text-blue-900">Rp 0</div>
+          <div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-3 flex items-center gap-2.5">
+            <span class="text-xl">📊</span>
+            <div>
+              <div class="text-[9px] text-blue-600 uppercase tracking-wide leading-tight">Total Kotor</div>
+              <div id="insightTotalKotor" class="text-xs sm:text-sm font-extrabold text-blue-900 leading-tight">Rp 0</div>
+            </div>
           </div>
-          <div class="bg-emerald-50 border border-emerald-200 rounded p-3 text-center">
-            <div class="text-[10px] text-emerald-600 uppercase tracking-wider mb-1">Total Bersih</div>
-            <div id="insightTotalBersih" class="text-sm font-extrabold text-emerald-700">Rp 0</div>
+          <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-xl p-3 flex items-center gap-2.5">
+            <span class="text-xl">💰</span>
+            <div>
+              <div class="text-[9px] text-emerald-600 uppercase tracking-wide leading-tight">Total Bersih</div>
+              <div id="insightTotalBersih" class="text-xs sm:text-sm font-extrabold text-emerald-700 leading-tight">Rp 0</div>
+            </div>
           </div>
         </div>
 
-        <!-- Ranking Outlet -->
+        <!-- Panel Ranking (sub-tab, hemat tempat) -->
         <div>
-          <h3 class="text-sm font-bold text-slate-800 mb-3">🏆 Ranking Outlet (berdasarkan Total Bersih)</h3>
-          <div id="insightOutletRanking" class="space-y-2"></div>
-        </div>
-
-        <!-- Ranking Gerai -->
-        <div>
-          <h3 class="text-sm font-bold text-slate-800 mb-3">🥇 Gerai Paling Profit (Top 10, berdasarkan Total Bersih)</h3>
-          <div id="insightGeraiRanking" class="space-y-2"></div>
+          <div class="flex gap-2 mb-3">
+            <button id="btnInsightSubOutlet" onclick="switchInsightSubTab('outlet')" class="px-3 py-1.5 rounded-full text-xs font-semibold transition">🏆 Ranking Outlet</button>
+            <button id="btnInsightSubGerai" onclick="switchInsightSubTab('gerai')" class="px-3 py-1.5 rounded-full text-xs font-semibold transition">🥇 Ranking Gerai</button>
+          </div>
+          <div id="insightRankingContainer" class="space-y-2.5"></div>
         </div>
 
       </div>
@@ -293,7 +305,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.1.1 (build 2026-09-01.0030)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.3.0 (build 2026-09-01.0100)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -415,13 +427,28 @@
 
   let allOutletData = [];
   let geraiRoster = []; // daftar tetap {id, outlet, gerai, active} - persisten lintas hari, tidak terikat tanggal tertentu
-  const syncedRosterKeys = new Set(); // guard supaya tidak addDoc duplikat dalam sesi yang sama
+  const syncedRosterKeys = new Set(); // guard supaya tidak menulis berulang dalam sesi yang sama
+  let dedupeRosterDone = false; // guard supaya proses bersih-bersih duplikat lama cuma jalan sekali per sesi
+
+  // Firestore doc id tidak boleh mengandung '/', jadi nama outlet/gerai di-encode dulu.
+  function outletDocId(outletName) {
+    return encodeURIComponent(outletName);
+  }
+
+  // ID dokumen roster dibuat DETERMINISTIK dari kombinasi outlet+gerai (bukan ID
+  // acak). Dengan ini, menulis ke gerai_roster memakai setDoc (bukan addDoc) tidak
+  // akan PERNAH bisa membuat duplikat - dipanggil sekali atau seratus kali
+  // bersamaan, hasilnya tetap 1 dokumen yang sama (menimpa, bukan menambah baru).
+  function geraiRosterDocId(outlet, gerai) {
+    return outletDocId(outlet) + '__gerai__' + outletDocId(gerai);
+  }
 
   // Migrasi otomatis: data outlet_profits yang dibuat SEBELUM fitur roster ada
   // (sebelum v3.0.0) belum punya entri di gerai_roster, jadi tidak akan muncul di
   // tampilan mode-roster harian. Fungsi ini mendaftarkan otomatis kombinasi
   // outlet+gerai dari riwayat data yang belum ada di roster, sekali saja per
-  // kombinasi (idempotent - aman dipanggil berkali-kali).
+  // kombinasi (idempotent - aman dipanggil berkali-kali, tidak bisa duplikat
+  // karena pakai setDoc dengan ID deterministik).
   async function syncRosterFromHistory() {
     const existingKeys = new Set(geraiRoster.map(r => r.outlet + '|||' + r.gerai));
     const historicalKeys = new Set();
@@ -436,13 +463,42 @@
       syncedRosterKeys.add(key);
       const [outlet, gerai] = key.split('|||');
       try {
-        await addDoc(collection(db, 'gerai_roster'), { outlet, gerai, active: true, createdAt: serverTimestamp() });
+        await setDoc(doc(db, 'gerai_roster', geraiRosterDocId(outlet, gerai)), { outlet, gerai, active: true, createdAt: serverTimestamp() }, { merge: true });
       } catch (e) {
         console.error('Gagal sinkronisasi roster untuk ' + key + ':', e);
         syncedRosterKeys.delete(key); // biar dicoba lagi di kesempatan berikutnya kalau gagal
       }
     }
   }
+
+  // Membersihkan duplikat gerai_roster yang SUDAH TERLANJUR ada di database (dari
+  // bug sebelumnya yang memakai ID acak). Untuk tiap kombinasi outlet+gerai yang
+  // punya lebih dari 1 dokumen, sisakan satu (yang paling lama dibuat), hapus
+  // sisanya. Berjalan otomatis sekali setiap sesi dibuka.
+  async function dedupeGeraiRoster() {
+    if (dedupeRosterDone) return;
+    const groups = {};
+    geraiRoster.forEach(r => {
+      const key = r.outlet + '|||' + r.gerai;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(r);
+    });
+
+    const toDelete = [];
+    Object.values(groups).forEach(list => {
+      if (list.length <= 1) return;
+      list.sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
+      // Simpan yang paling lama (index 0), hapus sisanya
+      for (let i = 1; i < list.length; i++) toDelete.push(list[i].id);
+    });
+
+    if (toDelete.length === 0) { dedupeRosterDone = true; return; }
+    dedupeRosterDone = true;
+    for (const id of toDelete) {
+      try { await deleteDoc(doc(db, 'gerai_roster', id)); } catch (e) { console.error('Gagal menghapus duplikat roster:', e); }
+    }
+  }
+
   let lastRenderedItems = []; // flat list {outlet, gerai, dateStr, usdc} hasil render terakhir, dipakai untuk ekspor Excel
 
   function loadGeraiRoster() {
@@ -451,17 +507,13 @@
       snap.forEach(d => geraiRoster.push({ id: d.id, ...d.data() }));
       applyDateFilter();
       refreshInsightIfVisible();
+      dedupeGeraiRoster();
       syncRosterFromHistory();
     }, (error) => {
       console.error("Firestore gerai_roster error:", error);
     });
   }
   let outletSettings = {}; // { [sanitizedOutletId]: percentPotongan }
-
-  // Firestore doc id tidak boleh mengandung '/', jadi nama outlet di-encode dulu.
-  function outletDocId(outletName) {
-    return encodeURIComponent(outletName);
-  }
 
   function loadOutletSettings() {
     onSnapshot(collection(db, 'outlet_settings'), (snap) => {
@@ -970,6 +1022,9 @@
   };
 
   // --- INSIGHT / DASHBOARD ---
+  let insightSubTab = 'outlet'; // 'outlet' atau 'gerai' - panel ranking mana yang sedang ditampilkan
+  let insightLastLists = { outletList: [], geraiList: [] }; // cache hasil hitung terakhir, dipakai saat ganti sub-tab tanpa hitung ulang
+
   window.setInsightRange = function(range) {
     const now = new Date();
     const toStr = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
@@ -992,12 +1047,60 @@
     document.querySelectorAll('.insight-range-btn').forEach(btn => {
       const active = btn.dataset.range === range;
       btn.className = active
-        ? "insight-range-btn px-3 py-1.5 border border-blue-700 bg-blue-700 text-white rounded text-xs font-semibold transition"
-        : "insight-range-btn px-3 py-1.5 border border-slate-300 rounded text-xs font-semibold hover:bg-slate-100 transition";
+        ? "insight-range-btn px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-900 text-white transition"
+        : "insight-range-btn px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition";
     });
 
     renderInsight();
   };
+
+  window.switchInsightSubTab = function(tab) {
+    insightSubTab = tab;
+    renderInsightRankingPanel();
+  };
+
+  function renderInsightRankingPanel() {
+    const btnOutlet = document.getElementById('btnInsightSubOutlet');
+    const btnGerai = document.getElementById('btnInsightSubGerai');
+    const activeClass = "px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-900 text-white transition";
+    const inactiveClass = "px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition";
+    btnOutlet.className = insightSubTab === 'outlet' ? activeClass : inactiveClass;
+    btnGerai.className = insightSubTab === 'gerai' ? activeClass : inactiveClass;
+
+    const container = document.getElementById('insightRankingContainer');
+    const list = insightSubTab === 'outlet' ? insightLastLists.outletList : insightLastLists.geraiList;
+
+    if (list.length === 0) {
+      container.innerHTML = `<p class="text-sm text-slate-400 italic text-center py-6">Belum ada data pada periode ini.</p>`;
+      return;
+    }
+
+    const maxBersih = Math.max(...list.map(x => x.bersihUsd), 0.0001);
+    const barColor = insightSubTab === 'outlet' ? 'bg-emerald-600' : 'bg-blue-700';
+    const valueColor = insightSubTab === 'outlet' ? 'text-emerald-700' : 'text-blue-900';
+
+    container.innerHTML = list.map((x, i) => {
+      const widthPct = Math.max((x.bersihUsd / maxBersih) * 100, 2);
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}`;
+      const label = insightSubTab === 'outlet'
+        ? `<span class="font-semibold text-slate-700">${x.outlet}</span>`
+        : `<span class="font-semibold text-slate-700">${x.gerai}</span> <span class="text-slate-400 font-normal">(${x.outlet})</span>`;
+      return `
+        <div class="bg-slate-50 border border-slate-200 rounded-lg p-2.5 flex items-center gap-3">
+          <div class="w-6 text-center text-sm shrink-0">${medal}</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex justify-between items-baseline gap-2 text-xs mb-1">
+              <span class="truncate">${label}</span>
+              <span class="font-mono ${valueColor} font-bold shrink-0">Rp ${(x.bersihUsd * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}</span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-2">
+              <div class="${barColor} h-2 rounded-full" style="width:${widthPct}%"></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
 
   window.renderInsight = function() {
     const startEl = document.getElementById('insightStart');
@@ -1053,57 +1156,8 @@
     document.getElementById('insightTotalKotor').textContent = `Rp ${(totalKotorUsd * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
     document.getElementById('insightTotalBersih').textContent = `Rp ${(totalBersihUsd * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
 
-    // Ranking Outlet
-    const outletRankEl = document.getElementById('insightOutletRanking');
-    if (outletList.length === 0) {
-      outletRankEl.innerHTML = `<p class="text-sm text-slate-400 italic text-center py-4">Belum ada data pada periode ini.</p>`;
-    } else {
-      const maxOutletBersih = Math.max(...outletList.map(o => o.bersihUsd), 0.0001);
-      outletRankEl.innerHTML = outletList.map((o, i) => {
-        const widthPct = Math.max((o.bersihUsd / maxOutletBersih) * 100, 2);
-        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
-        return `
-          <div class="flex items-center gap-3">
-            <div class="w-6 text-center text-sm">${medal}</div>
-            <div class="flex-1">
-              <div class="flex justify-between text-xs mb-1">
-                <span class="font-semibold text-slate-700">${o.outlet}</span>
-                <span class="font-mono text-emerald-700 font-bold">Rp ${(o.bersihUsd * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}</span>
-              </div>
-              <div class="w-full bg-slate-100 rounded-full h-2.5">
-                <div class="bg-emerald-600 h-2.5 rounded-full" style="width:${widthPct}%"></div>
-              </div>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    // Ranking Gerai
-    const geraiRankEl = document.getElementById('insightGeraiRanking');
-    if (geraiList.length === 0) {
-      geraiRankEl.innerHTML = `<p class="text-sm text-slate-400 italic text-center py-4">Belum ada data pada periode ini.</p>`;
-    } else {
-      const maxGeraiBersih = Math.max(...geraiList.map(g => g.bersihUsd), 0.0001);
-      geraiRankEl.innerHTML = geraiList.map((g, i) => {
-        const widthPct = Math.max((g.bersihUsd / maxGeraiBersih) * 100, 2);
-        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
-        return `
-          <div class="flex items-center gap-3">
-            <div class="w-6 text-center text-sm">${medal}</div>
-            <div class="flex-1">
-              <div class="flex justify-between text-xs mb-1">
-                <span class="font-semibold text-slate-700">${g.gerai} <span class="text-slate-400 font-normal">(${g.outlet})</span></span>
-                <span class="font-mono text-blue-900 font-bold">Rp ${(g.bersihUsd * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}</span>
-              </div>
-              <div class="w-full bg-slate-100 rounded-full h-2.5">
-                <div class="bg-blue-700 h-2.5 rounded-full" style="width:${widthPct}%"></div>
-              </div>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
+    insightLastLists = { outletList, geraiList };
+    renderInsightRankingPanel();
   };
 
   window.saveOutletData = async () => {
@@ -1120,15 +1174,26 @@
       if (isNaN(usdc)) return alert("Format nominal tidak valid! Gunakan angka, contoh: 822.35 atau 822,35");
 
       const usdcPreview = (usdc / 100).toLocaleString('id-ID', {maximumFractionDigits: 2});
-      const confirmMsg = `Simpan data berikut?\n\nOutlet: ${outlet}\nKode Gerai: ${gerai}\nTanggal: ${dateToSave}\nKeuntungan Kotor: ${usdc.toLocaleString('id-ID', {maximumFractionDigits: 2})} sen (${usdcPreview} USD)`;
+      const isNewGerai = !geraiRoster.find(r => r.outlet === outlet && r.gerai === gerai);
+      const existingProfitCheck = allOutletData.find(d => d.outlet === outlet && (d.gerai || d.outlet) === gerai && d.dateStr === dateToSave);
+      let statusNote;
+      if (isNewGerai) {
+        statusNote = 'Gerai BARU akan didaftarkan ke daftar tetap Outlet ini.';
+      } else if (existingProfitCheck) {
+        statusNote = 'Gerai ini SUDAH terdaftar dan SUDAH ada input hari ini - nilainya akan DIPERBARUI (bukan duplikat).';
+      } else {
+        statusNote = 'Gerai ini sudah terdaftar sebelumnya, mengisi profit untuk hari ini.';
+      }
+      const confirmMsg = `${statusNote}\n\nSimpan data berikut?\n\nOutlet: ${outlet}\nKode Gerai: ${gerai}\nTanggal: ${dateToSave}\nKeuntungan Kotor: ${usdc.toLocaleString('id-ID', {maximumFractionDigits: 2})} sen (${usdcPreview} USD)`;
       if (!confirm(confirmMsg)) return;
 
       // Pastikan gerai ini terdaftar di roster (daftar tetap) - supaya otomatis muncul
       // lagi di hari-hari berikutnya tanpa perlu didaftarkan ulang. Kalau sebelumnya
-      // sempat dinonaktifkan, aktifkan lagi secara otomatis di sini.
+      // sempat dinonaktifkan, aktifkan lagi secara otomatis di sini. setDoc dengan ID
+      // deterministik dipakai supaya TIDAK MUNGKIN membuat entri roster duplikat.
       const existingRoster = geraiRoster.find(r => r.outlet === outlet && r.gerai === gerai);
       if (!existingRoster) {
-        await addDoc(collection(db, 'gerai_roster'), { outlet, gerai, active: true, createdAt: serverTimestamp() });
+        await setDoc(doc(db, 'gerai_roster', geraiRosterDocId(outlet, gerai)), { outlet, gerai, active: true, createdAt: serverTimestamp() });
       } else if (existingRoster.active === false) {
         await updateDoc(doc(db, 'gerai_roster', existingRoster.id), { active: true });
       }
