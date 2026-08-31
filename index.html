@@ -74,6 +74,7 @@
       <div class="flex items-center gap-3">
         <div class="bg-blue-900 text-white font-bold px-3 py-1.5 rounded text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[10px] font-mono">v1.0.0</span>
       </div>
       <div class="flex items-center gap-3">
         <span class="text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 5m)</span>
@@ -149,7 +150,7 @@
             <input type="text" id="geraiName" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm focus:border-blue-600 outline-none" placeholder="Kode/Nama Gerai (Misal: 2115288)">
           </div>
           <div>
-            <input type="text" id="inputUSDC" oninput="formatInputCurrency(this)" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm focus:border-blue-600 outline-none" placeholder="Netto USDC (Otomatis Titik)">
+            <input type="text" id="inputUSDC" oninput="formatInputCurrency(this)" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded text-slate-800 text-sm focus:border-blue-600 outline-none" placeholder="Netto dalam SEN (Otomatis Titik)">
           </div>
           <div>
             <button onclick="saveOutletData()" class="w-full h-full py-2.5 bg-blue-900 hover:bg-blue-800 text-white font-semibold text-sm rounded transition shadow">Tambah Gerai</button>
@@ -208,6 +209,12 @@
       </div>
     </div>
 
+  </div>
+
+  <!-- FOOTER COPYRIGHT -->
+  <div class="text-center text-xs text-slate-400 pt-2 pb-4">
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v1.0.0</span></p>
+    <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
 
@@ -545,13 +552,13 @@
     // tidak pernah ter-render.
     if (filteredItems.length === 0) {
       container.innerHTML = `<div class="text-slate-400 text-center text-sm italic py-4" id="emptyOutletMsg">Belum ada data outlet pada tanggal ini. (Total data di DB: ${allOutletData.length})</div>`;
-      document.getElementById('totalUsdcDisplay').textContent = "0 USDC";
+      document.getElementById('totalUsdcDisplay').textContent = "0 sen (0 USDC)";
       document.getElementById('totalIdrDisplay').textContent = "Rp 0";
       return;
     }
 
     container.innerHTML = '';
-    let sumUSDC = 0;
+    let sumSen = 0; // akumulasi nilai mentah (sen/cent) apa adanya dari DB
     lastRenderedItems = [];
 
     filteredItems.sort((a, b) => {
@@ -570,24 +577,26 @@
 
     groupOrder.forEach(outletKey => {
       const items = groups[outletKey];
-      let outletSubtotal = 0;
+      let outletSubtotalSen = 0;
       let rowsHtml = '';
 
       items.forEach(d => {
         // Nilai di DB disimpan dalam SEN/cent (misal 230 = 2.30 USDC).
-        // Dibagi 100 di sini untuk mendapatkan nilai USDC aktual.
-        const actualUsdc = (d.usdc || 0) / 100;
-        outletSubtotal += actualUsdc;
-        sumUSDC += actualUsdc;
+        // Ditampilkan APA ADANYA (230 sen), sekaligus konversinya (2,30 USDC).
+        const rawSen = d.usdc || 0;
+        const actualUsdc = rawSen / 100;
+        outletSubtotalSen += rawSen;
+        sumSen += rawSen;
         // Fallback untuk data lama (sebelum ada field terpisah "gerai"):
         // gunakan nama outlet itu sendiri sebagai label gerai.
         const geraiLabel = d.gerai || outletKey;
         const dateLabel = isSingleDay ? '' : `<span class="block text-xs text-slate-400 font-mono mt-0.5">${d.dateStr}</span>`;
+        const senFormatted = rawSen.toLocaleString('id-ID');
         const usdcFormatted = actualUsdc.toLocaleString('id-ID', {maximumFractionDigits: 2});
 
-        const usdcDisplay = actualUsdc === 0
+        const usdcDisplay = rawSen === 0
           ? `<span class="text-amber-600 font-bold text-sm block">Belum ada input</span>`
-          : `<span class="text-blue-900 font-bold text-sm block font-mono">Netto: ${usdcFormatted} USDC</span>`;
+          : `<span class="text-blue-900 font-bold text-sm block font-mono">Netto: ${senFormatted} sen (${usdcFormatted} USDC)</span>`;
 
         rowsHtml += `
           <div class="flex justify-between items-center py-2.5 px-3.5 border-t border-slate-100 first:border-t-0">
@@ -605,21 +614,23 @@
           </div>
         `;
 
-        lastRenderedItems.push({ outlet: outletKey, gerai: geraiLabel, dateStr: d.dateStr, usdc: actualUsdc });
+        lastRenderedItems.push({ outlet: outletKey, gerai: geraiLabel, dateStr: d.dateStr, sen: rawSen, usdc: actualUsdc });
       });
 
+      const outletSubtotalUsdc = outletSubtotalSen / 100;
       container.innerHTML += `
         <div class="bg-white border border-slate-300 rounded shadow-sm overflow-hidden">
           <div class="flex justify-between items-center bg-slate-100 px-3.5 py-2.5 border-b border-slate-300">
             <span class="font-bold text-slate-800 text-sm">🏬 ${outletKey}</span>
-            <span class="text-blue-900 font-bold text-xs font-mono">Subtotal: ${outletSubtotal.toLocaleString('id-ID', {maximumFractionDigits: 2})} USDC (Rp ${(outletSubtotal * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})})</span>
+            <span class="text-blue-900 font-bold text-xs font-mono">Subtotal: ${outletSubtotalSen.toLocaleString('id-ID')} sen (${outletSubtotalUsdc.toLocaleString('id-ID', {maximumFractionDigits: 2})} USDC ≈ Rp ${(outletSubtotalUsdc * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})})</span>
           </div>
           <div>${rowsHtml}</div>
         </div>
       `;
     });
 
-    document.getElementById('totalUsdcDisplay').textContent = `${sumUSDC.toLocaleString('id-ID', {maximumFractionDigits: 2})} USDC`;
+    const sumUSDC = sumSen / 100;
+    document.getElementById('totalUsdcDisplay').textContent = `${sumSen.toLocaleString('id-ID')} sen (${sumUSDC.toLocaleString('id-ID', {maximumFractionDigits: 2})} USDC)`;
     document.getElementById('totalIdrDisplay').textContent = `Rp ${(sumUSDC * currentKursUSD).toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
   };
 
@@ -654,7 +665,7 @@
 
   window.updateOutletUSDC = async (id, currentVal) => {
     let formatVal = currentVal === 0 ? '' : currentVal.toLocaleString('id-ID');
-    const newVal = prompt("Masukkan keuntungan Netto baru:", formatVal);
+    const newVal = prompt("Masukkan keuntungan Netto baru (dalam SEN, misal 230 = 2,30 USDC):", formatVal);
     if (newVal === null) return; 
     const parsed = parseCurrency(newVal);
     if (isNaN(parsed)) return alert("Format nominal tidak valid!");
@@ -684,7 +695,7 @@
   window.exportToExcel = () => {
     if (lastRenderedItems.length === 0) return alert("Tidak ada data untuk diekspor.");
 
-    let excelData = [ ["Tanggal", "Nama Outlet", "Kode/Nama Gerai", "Netto (USDC)", "Netto (IDR)"] ];
+    let excelData = [ ["Tanggal", "Nama Outlet", "Kode/Nama Gerai", "Netto (Sen)", "Netto (USDC)", "Netto (IDR)"] ];
 
     // Kelompokkan ulang per outlet supaya bisa disisipkan baris subtotal
     const groupOrder = [];
@@ -694,20 +705,20 @@
       groups[d.outlet].push(d);
     });
 
-    let grandTotal = 0;
+    let grandTotalSen = 0;
     groupOrder.forEach(outletKey => {
-      let subtotal = 0;
+      let subtotalSen = 0;
       groups[outletKey].forEach(d => {
-        subtotal += d.usdc;
-        grandTotal += d.usdc;
-        excelData.push([d.dateStr, outletKey, d.gerai, d.usdc, Math.round(d.usdc * currentKursUSD)]);
+        subtotalSen += d.sen;
+        grandTotalSen += d.sen;
+        excelData.push([d.dateStr, outletKey, d.gerai, d.sen, d.usdc, Math.round(d.usdc * currentKursUSD)]);
       });
-      excelData.push(["", `Subtotal ${outletKey}`, "", subtotal, Math.round(subtotal * currentKursUSD)]);
+      excelData.push(["", `Subtotal ${outletKey}`, "", subtotalSen, subtotalSen / 100, Math.round((subtotalSen / 100) * currentKursUSD)]);
       excelData.push([]);
     });
 
-    excelData.push(["TOTAL KESELURUHAN", "", "", grandTotal, Math.round(grandTotal * currentKursUSD)]);
-    excelData.push(["Kurs Saat Ini", document.getElementById('kursRateText').innerText, "", "", ""]);
+    excelData.push(["TOTAL KESELURUHAN", "", "", grandTotalSen, grandTotalSen / 100, Math.round((grandTotalSen / 100) * currentKursUSD)]);
+    excelData.push(["Kurs Saat Ini", document.getElementById('kursRateText').innerText, "", "", "", ""]);
 
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelData), "Rekap Keuntungan");
     XLSX.writeFile(wb, `Laporan_Keuntungan.xlsx`);
