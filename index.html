@@ -74,7 +74,7 @@
       <div class="flex items-center gap-3">
         <div class="bg-blue-900 text-white font-bold px-3 py-1.5 rounded text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[10px] font-mono" title="Build: 31 Agustus 2026, 14:05 WIB">v1.5.0 (build 2026-08-31.1405)</span>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[10px] font-mono" title="Build: 31 Agustus 2026, 14:15 WIB">v1.6.0 (build 2026-08-31.1415)</span>
       </div>
       <div class="flex items-center gap-3">
         <span class="text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 5m)</span>
@@ -221,7 +221,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v1.5.0 (build 2026-08-31.1405)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v1.6.0 (build 2026-08-31.1415)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -365,32 +365,43 @@
     datalist.innerHTML = uniqueOutlets.map(o => `<option value="${o}"></option>`).join('');
   }
 
-  // Sumber utama: Indodax (exchange kripto RI) - harga pasar USDT/IDR yang berjalan
-  // saat itu juga (real-time, mengikuti transaksi terkini di market), gratis, tanpa
-  // API key. Ini lebih relevan untuk aplikasi ini karena satuan yang dipakai adalah
-  // USD/stablecoin, bukan forex bank biasa.
-  // Fallback: open.er-api.com (forex USD/IDR, update sekali per 24 jam) jika
-  // Indodax sedang tidak bisa diakses.
+  // Rantai sumber kurs, dicoba berurutan:
+  // 1) CoinGecko - agregat harga USDT/IDR dari banyak exchange, real-time, dan API
+  //    publiknya memang didesain bisa diakses langsung dari browser (CORS terbuka).
+  // 2) Indodax - harga pasar USDT/IDR real-time dari exchange RI, dipakai kalau
+  //    CoinGecko gagal/limit.
+  // 3) open.er-api.com - forex USD/IDR harian (bukan real-time), jaring pengaman
+  //    terakhir kalau kedua sumber di atas sama-sama tidak bisa diakses.
   function fetchKurs() {
-    fetch('https://indodax.com/api/ticker/usdt_idr').then(r => r.json()).then(d => {
-      const last = parseFloat(d?.ticker?.last);
-      if (!last || isNaN(last)) throw new Error('Data Indodax tidak valid');
-      currentKursUSD = last;
-      const updatedAt = d.ticker.server_time ? new Date(d.ticker.server_time * 1000).toLocaleString('id-ID', {hour:'2-digit', minute:'2-digit', second:'2-digit', day:'2-digit', month:'short'}) : '';
+    fetch('https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=idr').then(r => r.json()).then(d => {
+      const price = d?.tether?.idr;
+      if (!price || isNaN(price)) throw new Error('Data CoinGecko tidak valid');
+      currentKursUSD = price;
+      const now = new Date().toLocaleString('id-ID', {hour:'2-digit', minute:'2-digit', second:'2-digit', day:'2-digit', month:'short'});
       document.getElementById('kursRateText').textContent = `Rp ${currentKursUSD.toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
-      document.getElementById('kursUpdatedText').textContent = updatedAt ? `Sumber: Indodax USDT/IDR (real-time) — update: ${updatedAt}` : 'Sumber: Indodax USDT/IDR (real-time)';
+      document.getElementById('kursUpdatedText').textContent = `Sumber: CoinGecko USDT/IDR (real-time) — dicek: ${now}`;
     }).catch(() => {
-      // Fallback ke API forex harian kalau Indodax gagal diakses
-      fetch('https://open.er-api.com/v6/latest/USD').then(r=>r.json()).then(d => {
-        if(d?.rates?.IDR) {
-            currentKursUSD = d.rates.IDR;
-            const updatedAt = d.time_last_update_utc ? new Date(d.time_last_update_utc).toLocaleString('id-ID', {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short'}) : '';
-            document.getElementById('kursRateText').textContent = `Rp ${currentKursUSD.toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
-            document.getElementById('kursUpdatedText').textContent = updatedAt ? `Sumber cadangan: forex harian, update ${updatedAt} (bukan real-time)` : '';
-        }
+      // Fallback 1: Indodax
+      fetch('https://indodax.com/api/ticker/usdt_idr').then(r => r.json()).then(d => {
+        const last = parseFloat(d?.ticker?.last);
+        if (!last || isNaN(last)) throw new Error('Data Indodax tidak valid');
+        currentKursUSD = last;
+        const updatedAt = d.ticker.server_time ? new Date(d.ticker.server_time * 1000).toLocaleString('id-ID', {hour:'2-digit', minute:'2-digit', second:'2-digit', day:'2-digit', month:'short'}) : '';
+        document.getElementById('kursRateText').textContent = `Rp ${currentKursUSD.toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
+        document.getElementById('kursUpdatedText').textContent = updatedAt ? `Sumber cadangan: Indodax USDT/IDR (real-time) — update: ${updatedAt}` : 'Sumber cadangan: Indodax USDT/IDR (real-time)';
       }).catch(() => {
-        document.getElementById('kursRateText').textContent = `Rp ${currentKursUSD.toLocaleString('id-ID')} (Fallback)`;
-        document.getElementById('kursUpdatedText').textContent = 'Gagal memuat kurs terbaru, menampilkan nilai cadangan.';
+        // Fallback 2: forex harian
+        fetch('https://open.er-api.com/v6/latest/USD').then(r=>r.json()).then(d => {
+          if(d?.rates?.IDR) {
+              currentKursUSD = d.rates.IDR;
+              const updatedAt = d.time_last_update_utc ? new Date(d.time_last_update_utc).toLocaleString('id-ID', {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short'}) : '';
+              document.getElementById('kursRateText').textContent = `Rp ${currentKursUSD.toLocaleString('id-ID', {maximumFractionDigits: 0})}`;
+              document.getElementById('kursUpdatedText').textContent = updatedAt ? `Sumber cadangan terakhir: forex harian, update ${updatedAt} (bukan real-time)` : '';
+          }
+        }).catch(() => {
+          document.getElementById('kursRateText').textContent = `Rp ${currentKursUSD.toLocaleString('id-ID')} (Fallback)`;
+          document.getElementById('kursUpdatedText').textContent = 'Gagal memuat kurs terbaru, menampilkan nilai cadangan.';
+        });
       });
     });
   }
