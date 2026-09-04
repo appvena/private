@@ -91,7 +91,7 @@
       <div class="flex items-center gap-2 flex-wrap">
         <div class="bg-blue-900 text-white font-bold px-2.5 py-1 rounded text-[10px] sm:text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-sm sm:text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 4 September 2026, 08:15 WIB">v3.8.0 (build 2026-09-04.0815)</span>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 4 September 2026, 09:50 WIB">v3.9.0 (build 2026-09-04.0950)</span>
       </div>
       <div class="flex items-center gap-2 flex-wrap relative">
         <span class="hidden sm:inline text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 20m)</span>
@@ -316,7 +316,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.8.0 (build 2026-09-04.0815)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.9.0 (build 2026-09-04.0950)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -381,6 +381,16 @@
       <div id="mt4AccountList" class="space-y-2">
         <p class="text-sm text-slate-400 italic text-center py-4">Memuat...</p>
       </div>
+    </div>
+
+    <div class="border-t border-slate-200 pt-4 space-y-2">
+      <h4 class="text-xs font-bold text-slate-600 uppercase tracking-wider">Tes Sinkronisasi</h4>
+      <div class="flex gap-2">
+        <input type="text" id="mt4WorkerUrl" class="flex-1 p-2 border border-slate-300 rounded text-xs font-mono" placeholder="https://myfxbook.xxx.workers.dev">
+        <button onclick="saveMt4WorkerUrl()" class="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded shrink-0">Simpan URL</button>
+      </div>
+      <button onclick="testMt4Sync()" id="mt4TestBtn" class="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold rounded">🧪 Tes Sinkronisasi Sekarang</button>
+      <div id="mt4TestResult" class="hidden bg-slate-50 border border-slate-200 rounded p-3 text-xs font-mono whitespace-pre-wrap max-h-60 overflow-y-auto"></div>
     </div>
   </div>
 </div>
@@ -718,9 +728,62 @@
     isiPilihanGeraiMt4();
     document.getElementById('mt4Modal').style.display = 'flex';
     renderMt4AccountList();
+    loadMt4WorkerUrl();
   };
   window.closeMt4Modal = () => {
     document.getElementById('mt4Modal').style.display = 'none';
+  };
+
+  // URL Worker Cloudflare disimpan sekali di Firestore (settings/mt4_worker),
+  // supaya tombol Tes bisa langsung dipakai tanpa perlu isi ulang tiap buka panel.
+  async function loadMt4WorkerUrl() {
+    try {
+      const snap = await getDoc(doc(db, 'app_config', 'mt4_worker'));
+      if (snap.exists() && snap.data().url) {
+        document.getElementById('mt4WorkerUrl').value = snap.data().url;
+      }
+    } catch (e) { /* diamkan, cukup biarkan kolom kosong */ }
+  }
+
+  window.saveMt4WorkerUrl = async () => {
+    let url = document.getElementById('mt4WorkerUrl').value.trim();
+    if (!url) return alert("Isi URL Worker dulu.");
+    url = url.replace(/\/+$/, ''); // buang trailing slash biar konsisten
+    try {
+      await setDoc(doc(db, 'app_config', 'mt4_worker'), { url });
+      alert("URL Worker berhasil disimpan.");
+    } catch (e) {
+      alert("Gagal menyimpan URL: " + e.message);
+    }
+  };
+
+  window.testMt4Sync = async () => {
+    const url = document.getElementById('mt4WorkerUrl').value.trim();
+    if (!url) return alert("Isi & simpan URL Worker dulu sebelum tes.");
+
+    const btn = document.getElementById('mt4TestBtn');
+    const resultEl = document.getElementById('mt4TestResult');
+    btn.disabled = true;
+    btn.textContent = '⏳ Menjalankan tes...';
+    resultEl.classList.remove('hidden');
+    resultEl.textContent = 'Menghubungi Worker, mohon tunggu (bisa 10-30 detik)...';
+
+    try {
+      const res = await fetch(url.replace(/\/+$/, '') + '/?test=1');
+      const data = await res.json();
+      resultEl.textContent = JSON.stringify(data, null, 2);
+      if (data.success) {
+        alert("Tes berhasil! Lihat detail hasilnya di kotak bawah tombol.");
+      } else {
+        alert("Tes selesai, tapi ada masalah: " + (data.error || 'Lihat detail di kotak bawah tombol.'));
+      }
+    } catch (e) {
+      resultEl.textContent = 'Gagal menghubungi Worker: ' + e.message + '\n\nKemungkinan penyebab: URL salah, atau Worker belum mengizinkan akses dari browser (CORS).';
+      alert("Gagal menghubungi Worker. Lihat detail di kotak bawah tombol.");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🧪 Tes Sinkronisasi Sekarang';
+    }
   };
 
   // Isi dropdown dengan gerai yang SUDAH ADA di roster (yang sudah pernah diinput
