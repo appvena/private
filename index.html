@@ -26,6 +26,10 @@
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     }
     .print-only { display: none; }
+    .avoid-break {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
     @media print {
       .no-print { display: none !important; }
       .print-only { display: block; }
@@ -87,10 +91,11 @@
       <div class="flex items-center gap-2 flex-wrap">
         <div class="bg-blue-900 text-white font-bold px-2.5 py-1 rounded text-[10px] sm:text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-sm sm:text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 1 September 2026, 02:20 WIB">v3.4.0 (build 2026-09-01.0220)</span>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 3 September 2026, 01:55 WIB">v3.6.0 (build 2026-09-03.0155)</span>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <span class="hidden sm:inline text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 5m)</span>
+        <button onclick="openMt4Modal()" class="px-2.5 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-300 text-xs rounded hover:bg-indigo-100 transition">🔗 Integrasi MT4</button>
         <button onclick="resetSupabaseKeys()" class="px-2.5 py-1.5 bg-slate-100 text-slate-700 border border-slate-300 text-xs rounded hover:bg-slate-200 transition">Konfigurasi</button>
         <button onclick="logout()" class="px-2.5 py-1.5 bg-red-700 text-white text-xs rounded hover:bg-red-800 transition">Keluar</button>
       </div>
@@ -178,7 +183,7 @@
         </div>
 
         <!-- Total Gabungan Semua Outlet (opsional, tertutup secara default) -->
-        <details class="mt-6 pt-4 border-t border-slate-200">
+        <details class="avoid-break mt-6 pt-4 border-t border-slate-200">
           <summary class="cursor-pointer select-none text-sm font-semibold text-blue-800 hover:text-blue-900">📊 Lihat Total Gabungan Semua Outlet</summary>
           <div class="flex flex-col items-end gap-1 mt-3">
             <div class="text-sm font-bold text-slate-700">
@@ -305,7 +310,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.4.0 (build 2026-09-01.0220)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.6.0 (build 2026-09-03.0155)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -326,6 +331,33 @@
     <div class="flex justify-end gap-2 mt-2">
       <button onclick="closeNoteModal()" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded">Batal</button>
       <button onclick="saveFileNote()" class="px-3 py-1.5 bg-blue-900 hover:bg-blue-800 text-white text-xs font-semibold rounded">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL INTEGRASI MT4 (kelola daftar gerai yang disinkron otomatis dari MyFXBook) -->
+<div id="mt4Modal" class="fixed inset-0 bg-slate-900/70 z-50 hidden justify-center items-center p-4">
+  <div class="corporate-card p-5 sm:p-6 rounded max-w-lg w-full space-y-4 shadow-lg max-h-[85vh] overflow-y-auto">
+    <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+      <h3 class="text-base font-bold text-slate-800">🔗 Integrasi MT4 (via MyFXBook)</h3>
+      <button onclick="closeMt4Modal()" class="text-slate-400 hover:text-slate-700 text-xl leading-none">&times;</button>
+    </div>
+    <p class="text-xs text-slate-500">Daftar gerai yang profitnya disinkron OTOMATIS tiap hari dari MyFXBook. Tambah/hapus di sini akan langsung dipakai oleh Worker, tanpa perlu ubah kode apa pun.</p>
+
+    <div class="bg-slate-50 border border-slate-200 rounded p-3 space-y-2">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <input type="text" id="mt4Outlet" class="p-2 border border-slate-300 rounded text-sm" placeholder="Nama Outlet (misal: OUTLET REZA)">
+        <input type="text" id="mt4Gerai" class="p-2 border border-slate-300 rounded text-sm" placeholder="Kode Gerai (misal: 2115288)">
+        <input type="text" id="mt4AccountId" class="p-2 border border-slate-300 rounded text-sm" placeholder="MyFXBook Account ID">
+      </div>
+      <button onclick="addMt4Account()" class="w-full py-2 bg-indigo-700 hover:bg-indigo-800 text-white text-sm font-semibold rounded">+ Tambah Gerai ke Sinkronisasi Otomatis</button>
+    </div>
+
+    <div>
+      <h4 class="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Gerai Terdaftar</h4>
+      <div id="mt4AccountList" class="space-y-2">
+        <p class="text-sm text-slate-400 italic text-center py-4">Memuat...</p>
+      </div>
     </div>
   </div>
 </div>
@@ -554,6 +586,106 @@
     }
   }
 
+  // --- INTEGRASI MT4 (via MyFXBook) ---
+  // Daftar gerai yang disinkron otomatis disimpan di collection 'myfxbook_accounts'.
+  // Worker Cloudflare membaca collection ini langsung (bukan dari secret manual),
+  // jadi kelola gerai sepenuhnya lewat UI aplikasi ini.
+  let mt4Accounts = [];
+
+  function loadMt4Accounts() {
+    onSnapshot(collection(db, 'myfxbook_accounts'), (snap) => {
+      mt4Accounts = [];
+      snap.forEach(d => mt4Accounts.push({ id: d.id, ...d.data() }));
+      renderMt4AccountList();
+    }, (error) => {
+      console.error("Firestore myfxbook_accounts error:", error);
+    });
+  }
+
+  function renderMt4AccountList() {
+    const el = document.getElementById('mt4AccountList');
+    if (!el) return;
+    if (mt4Accounts.length === 0) {
+      el.innerHTML = `<p class="text-sm text-slate-400 italic text-center py-4">Belum ada gerai yang disinkron otomatis.</p>`;
+      return;
+    }
+    el.innerHTML = mt4Accounts.map(a => {
+      let statusBadge;
+      if (!a.lastSyncAt) {
+        statusBadge = `<span class="inline-flex items-center gap-1 text-slate-500 bg-slate-100 border border-slate-300 rounded px-2 py-0.5 text-[10px] font-semibold">⚪ Belum Pernah Sync</span>`;
+      } else {
+        const waktuSync = a.lastSyncAt.toDate ? a.lastSyncAt.toDate() : new Date(a.lastSyncAt);
+        const waktuText = waktuSync.toLocaleString('id-ID', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'});
+        if (a.lastSyncStatus === 'success') {
+          statusBadge = `<span class="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-300 rounded px-2 py-0.5 text-[10px] font-semibold">🟢 Terhubung <span class="font-normal text-emerald-600">(${waktuText})</span></span>`;
+        } else {
+          statusBadge = `<span class="inline-flex items-center gap-1 text-red-700 bg-red-50 border border-red-300 rounded px-2 py-0.5 text-[10px] font-semibold" title="${a.lastSyncError || ''}">🔴 Gagal <span class="font-normal text-red-600">(${waktuText})</span></span>`;
+        }
+      }
+      return `
+      <div class="bg-white border border-slate-200 rounded p-2.5 space-y-1.5">
+        <div class="flex justify-between items-start gap-2">
+          <div class="text-xs">
+            <span class="font-bold text-slate-800">${a.gerai}</span>
+            <span class="text-slate-400">(${a.outlet})</span>
+            <div class="text-slate-400 font-mono">MyFXBook ID: ${a.myfxbookAccountId}</div>
+          </div>
+          <button onclick="deleteMt4Account('${a.id}', '${(a.gerai || '').replace(/'/g, "\\'")}')" class="text-red-700 hover:underline text-xs font-semibold shrink-0">Hapus</button>
+        </div>
+        <div>${statusBadge}</div>
+        ${a.lastSyncStatus === 'error' && a.lastSyncError ? `<p class="text-[10px] text-red-500">${a.lastSyncError}</p>` : ''}
+      </div>
+      `;
+    }).join('');
+  }
+
+  window.openMt4Modal = async () => {
+    const password = prompt("Panel ini mengelola koneksi ke akun trading MT4 kamu.\nMasukkan password akun Anda untuk membuka:");
+    if (!password) return;
+    try {
+      await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(auth.currentUser.email, password));
+    } catch (e) {
+      return alert("Password salah, akses ditolak.");
+    }
+    document.getElementById('mt4Modal').style.display = 'flex';
+    renderMt4AccountList();
+  };
+  window.closeMt4Modal = () => {
+    document.getElementById('mt4Modal').style.display = 'none';
+  };
+
+  window.addMt4Account = async () => {
+    const outlet = document.getElementById('mt4Outlet').value.trim();
+    const gerai = document.getElementById('mt4Gerai').value.trim();
+    const accountId = document.getElementById('mt4AccountId').value.trim();
+
+    if (!outlet || !gerai || !accountId) return alert("Harap isi Nama Outlet, Kode Gerai, dan MyFXBook Account ID.");
+
+    const sudahAda = mt4Accounts.find(a => a.outlet === outlet && a.gerai === gerai);
+    if (sudahAda) return alert(`Gerai "${gerai}" di outlet "${outlet}" sudah terdaftar di sinkronisasi otomatis. Hapus dulu kalau mau ganti Account ID-nya.`);
+
+    try {
+      await addDoc(collection(db, 'myfxbook_accounts'), {
+        outlet, gerai, myfxbookAccountId: accountId, createdAt: serverTimestamp()
+      });
+      document.getElementById('mt4Outlet').value = '';
+      document.getElementById('mt4Gerai').value = '';
+      document.getElementById('mt4AccountId').value = '';
+      alert(`Gerai "${gerai}" berhasil ditambahkan ke sinkronisasi otomatis.`);
+    } catch (e) {
+      alert("Gagal menambahkan: " + e.message);
+    }
+  };
+
+  window.deleteMt4Account = async (id, geraiLabel) => {
+    if (!confirm(`Hapus "${geraiLabel}" dari sinkronisasi otomatis MT4?\n\n(Ini cuma menghentikan sinkronisasi otomatisnya - data profit yang sudah tercatat sebelumnya TIDAK terhapus.)`)) return;
+    try {
+      await deleteDoc(doc(db, 'myfxbook_accounts', id));
+    } catch (e) {
+      alert("Gagal menghapus: " + e.message);
+    }
+  };
+
   window.editOutletPotongan = async (outletKey) => {
     const currentPercent = outletSettings[outletDocId(outletKey)] || 0;
     const input = prompt(`Atur potongan vendor (%) untuk outlet "${outletKey}":\n(Contoh: 10 artinya dipotong 10% dari keuntungan kotor)`, currentPercent);
@@ -665,6 +797,7 @@
         initOutletListener();
         loadOutletSettings();
         loadGeraiRoster();
+        loadMt4Accounts();
       } else {
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('appScreen').style.display = 'none';
@@ -994,7 +1127,7 @@
       const outletSubtotalPotonganUsdc = outletSubtotalUsdcKotor * (potonganPercent / 100);
       const outletSubtotalUsdcBersih = outletSubtotalUsdcKotor - outletSubtotalPotonganUsdc;
       container.innerHTML += `
-        <div class="bg-white border border-slate-300 rounded shadow-sm overflow-hidden">
+        <div class="avoid-break bg-white border border-slate-300 rounded shadow-sm overflow-hidden">
           <div class="flex items-center gap-2 bg-slate-100 px-3.5 py-2.5 border-b border-slate-300">
             <span class="font-bold text-slate-800 text-sm">🏬 ${outletKey}</span>
             <button onclick="editOutletPotongan('${outletKey.replace(/'/g, "\\'")}')" class="no-print text-slate-500 hover:text-blue-700 text-xs border border-slate-300 rounded px-1.5 py-0.5 bg-white" title="Atur potongan vendor %">⚙ ${potonganPercent}%</button>
@@ -1336,9 +1469,16 @@
           // disembunyikan manual di sini supaya tidak ikut masuk ke PDF.
           clonedDoc.querySelectorAll('.no-print').forEach(el => { el.style.display = 'none'; });
           clonedDoc.querySelectorAll('.print-only').forEach(el => { el.style.display = 'block'; });
+          // PENTING: elemen <details> yang sedang tertutup (collapsed) TIDAK akan
+          // ter-render sama sekali oleh html2canvas jika dibiarkan tertutup - bukan
+          // cuma tersembunyi, tapi datanya benar-benar hilang dari hasil PDF. Paksa
+          // buka semua <details> di sini supaya "Total Gabungan Semua Outlet" ikut
+          // tercetak.
+          clonedDoc.querySelectorAll('details').forEach(el => { el.setAttribute('open', 'true'); });
         }
       },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'], avoid: ['.avoid-break', 'tr'] }
     }).save();
   };
 
