@@ -91,7 +91,7 @@
       <div class="flex items-center gap-2 flex-wrap">
         <div class="bg-blue-900 text-white font-bold px-2.5 py-1 rounded text-[10px] sm:text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-sm sm:text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 4 September 2026, 09:50 WIB">v3.9.0 (build 2026-09-04.0950)</span>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 4 September 2026, 10:20 WIB">v3.9.2 (build 2026-09-04.1020)</span>
       </div>
       <div class="flex items-center gap-2 flex-wrap relative">
         <span class="hidden sm:inline text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 20m)</span>
@@ -316,7 +316,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.9.0 (build 2026-09-04.0950)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.9.2 (build 2026-09-04.1020)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -758,8 +758,19 @@
   };
 
   window.testMt4Sync = async () => {
-    const url = document.getElementById('mt4WorkerUrl').value.trim();
-    if (!url) return alert("Isi & simpan URL Worker dulu sebelum tes.");
+    const rawUrl = document.getElementById('mt4WorkerUrl').value.trim();
+    if (!rawUrl) return alert("Isi & simpan URL Worker dulu sebelum tes.");
+
+    // Bersihkan URL: ambil cuma origin+path dasarnya, buang query string apa pun
+    // yang mungkin ikut ter-paste (misal orang paste URL yang sudah ada ?test=1) -
+    // supaya tidak menghasilkan URL ganda/rusak seperti "...?test=1/?test=1".
+    let baseUrl;
+    try {
+      const parsed = new URL(rawUrl);
+      baseUrl = parsed.origin + parsed.pathname.replace(/\/+$/, '');
+    } catch (e) {
+      return alert("Format URL tidak valid. Contoh yang benar: https://nama-worker.workers.dev");
+    }
 
     const btn = document.getElementById('mt4TestBtn');
     const resultEl = document.getElementById('mt4TestResult');
@@ -769,7 +780,7 @@
     resultEl.textContent = 'Menghubungi Worker, mohon tunggu (bisa 10-30 detik)...';
 
     try {
-      const res = await fetch(url.replace(/\/+$/, '') + '/?test=1');
+      const res = await fetch(baseUrl + '/?test=1');
       const data = await res.json();
       resultEl.textContent = JSON.stringify(data, null, 2);
       if (data.success) {
@@ -924,6 +935,12 @@
     signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, document.getElementById('loginPass').value)
       .catch(e => {
         document.getElementById('loginStatus').textContent = "> " + e.message;
+      })
+      .finally(() => {
+        // Reset tombol baik saat berhasil MAUPUN gagal - kalau cuma di-reset saat
+        // gagal, tombol akan "terkunci" selamanya begitu login berhasil sekali,
+        // sehingga saat logout lalu login ulang di sesi browser yang sama,
+        // tombolnya tidak bisa diklik lagi tanpa refresh halaman.
         btn.disabled = false;
         btn.textContent = 'Masuk Sistem';
       });
