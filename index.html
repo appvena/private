@@ -91,12 +91,18 @@
       <div class="flex items-center gap-2 flex-wrap">
         <div class="bg-blue-900 text-white font-bold px-2.5 py-1 rounded text-[10px] sm:text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-sm sm:text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 4 September 2026, 08:00 WIB">v3.7.0 (build 2026-09-04.0800)</span>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 4 September 2026, 08:15 WIB">v3.8.0 (build 2026-09-04.0815)</span>
       </div>
-      <div class="flex items-center gap-2 flex-wrap">
-        <span class="hidden sm:inline text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 5m)</span>
-        <button onclick="openMt4Modal()" class="px-2.5 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-300 text-xs rounded hover:bg-indigo-100 transition">🔗 Integrasi MT4</button>
-        <button onclick="resetSupabaseKeys()" class="px-2.5 py-1.5 bg-slate-100 text-slate-700 border border-slate-300 text-xs rounded hover:bg-slate-200 transition">Konfigurasi</button>
+      <div class="flex items-center gap-2 flex-wrap relative">
+        <span class="hidden sm:inline text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 20m)</span>
+        <div class="relative">
+          <button onclick="toggleSettingsMenu()" class="w-8 h-8 flex items-center justify-center bg-slate-100 text-slate-700 border border-slate-300 rounded hover:bg-slate-200 transition text-base" title="Pengaturan">⚙️</button>
+          <div id="settingsMenu" class="hidden absolute right-0 top-10 bg-white border border-slate-300 rounded shadow-lg py-1.5 w-48 z-40 text-sm">
+            <button onclick="closeSettingsMenu(); openMt4Modal();" class="w-full text-left px-3 py-2 hover:bg-slate-50 text-slate-700">🔗 Integrasi MT4</button>
+            <button onclick="closeSettingsMenu(); resetSupabaseKeys();" class="w-full text-left px-3 py-2 hover:bg-slate-50 text-slate-700">🗄️ Konfigurasi Storage</button>
+            <button onclick="closeSettingsMenu(); openChangePassword();" class="w-full text-left px-3 py-2 hover:bg-slate-50 text-slate-700">🔑 Ganti Password</button>
+          </div>
+        </div>
         <button onclick="logout()" class="px-2.5 py-1.5 bg-red-700 text-white text-xs rounded hover:bg-red-800 transition">Keluar</button>
       </div>
     </div>
@@ -310,7 +316,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.7.0 (build 2026-09-04.0800)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.8.0 (build 2026-09-04.0815)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -332,6 +338,22 @@
       <button onclick="closeNoteModal()" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded">Batal</button>
       <button onclick="saveFileNote()" class="px-3 py-1.5 bg-blue-900 hover:bg-blue-800 text-white text-xs font-semibold rounded">Simpan</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL GANTI PASSWORD -->
+<div id="changePasswordModal" class="fixed inset-0 bg-slate-900/70 z-50 hidden justify-center items-center p-4">
+  <div class="corporate-card p-6 rounded max-w-sm w-full space-y-4 shadow-lg">
+    <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+      <h3 class="text-base font-bold text-slate-800">🔑 Ganti Password</h3>
+      <button onclick="closeChangePassword()" class="text-slate-400 hover:text-slate-700 text-xl leading-none">&times;</button>
+    </div>
+    <div class="space-y-2">
+      <input type="password" id="cpOldPass" class="w-full p-2.5 border border-slate-300 rounded text-sm" placeholder="Password saat ini">
+      <input type="password" id="cpNewPass" class="w-full p-2.5 border border-slate-300 rounded text-sm" placeholder="Password baru (min. 6 karakter)">
+      <input type="password" id="cpNewPass2" class="w-full p-2.5 border border-slate-300 rounded text-sm" placeholder="Ulangi password baru">
+    </div>
+    <button onclick="submitChangePassword()" class="w-full py-2.5 bg-blue-900 hover:bg-blue-800 text-white font-semibold text-sm rounded">Simpan Password Baru</button>
   </div>
 </div>
 
@@ -366,7 +388,7 @@
 <!-- SCRIPTS -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
   import { getFirestore, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
   import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -377,9 +399,9 @@
     inactivityTimer = setTimeout(() => {
       if(auth.currentUser) {
         signOut(auth);
-        alert("Sesi Anda telah berakhir otomatis karena tidak ada aktivitas selama 5 menit.");
+        alert("Sesi Anda telah berakhir otomatis karena tidak ada aktivitas selama 20 menit.");
       }
-    }, 5 * 60 * 1000);
+    }, 20 * 60 * 1000);
   }
   ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(evt => {
     window.addEventListener(evt, resetInactivityTimer);
@@ -640,6 +662,51 @@
     }).join('');
   }
 
+  // --- MENU PENGATURAN (ikon gear) ---
+  window.toggleSettingsMenu = () => {
+    document.getElementById('settingsMenu').classList.toggle('hidden');
+  };
+  window.closeSettingsMenu = () => {
+    document.getElementById('settingsMenu').classList.add('hidden');
+  };
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('settingsMenu');
+    if (!menu || menu.classList.contains('hidden')) return;
+    if (!e.target.closest('#settingsMenu') && !e.target.closest('[onclick="toggleSettingsMenu()"]')) {
+      menu.classList.add('hidden');
+    }
+  });
+
+  // --- GANTI PASSWORD ---
+  window.openChangePassword = () => {
+    document.getElementById('cpOldPass').value = '';
+    document.getElementById('cpNewPass').value = '';
+    document.getElementById('cpNewPass2').value = '';
+    document.getElementById('changePasswordModal').style.display = 'flex';
+  };
+  window.closeChangePassword = () => {
+    document.getElementById('changePasswordModal').style.display = 'none';
+  };
+  window.submitChangePassword = async () => {
+    const oldPass = document.getElementById('cpOldPass').value;
+    const newPass = document.getElementById('cpNewPass').value;
+    const newPass2 = document.getElementById('cpNewPass2').value;
+
+    if (!oldPass || !newPass || !newPass2) return alert("Harap isi semua kolom.");
+    if (newPass.length < 6) return alert("Password baru minimal 6 karakter.");
+    if (newPass !== newPass2) return alert("Password baru dan pengulangannya tidak sama.");
+
+    try {
+      await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(auth.currentUser.email, oldPass));
+      await updatePassword(auth.currentUser, newPass);
+      closeChangePassword();
+      alert("Password berhasil diganti!");
+    } catch (e) {
+      alert("Gagal mengganti password: " + (e.code === 'auth/wrong-password' ? 'Password saat ini salah.' : e.message));
+    }
+  };
+
+
   window.openMt4Modal = async () => {
     const password = prompt("Panel ini mengelola koneksi ke akun trading MT4 kamu.\nMasukkan password akun Anda untuk membuka:");
     if (!password) return;
@@ -685,9 +752,13 @@
     if (sudahAda) return alert(`Gerai "${gerai}" di outlet "${outlet}" sudah terdaftar di sinkronisasi otomatis. Hapus dulu kalau mau ganti Account ID-nya.`);
 
     try {
-      await addDoc(collection(db, 'myfxbook_accounts'), {
+      const docRef = await addDoc(collection(db, 'myfxbook_accounts'), {
         outlet, gerai, myfxbookAccountId: accountId, createdAt: serverTimestamp()
       });
+      // Update tampilan LANGSUNG (optimistik), tidak perlu menunggu snapshot Firestore
+      // yang kadang butuh sepersekian detik untuk konfirmasi round-trip.
+      mt4Accounts.push({ id: docRef.id, outlet, gerai, myfxbookAccountId: accountId });
+      renderMt4AccountList();
       document.getElementById('mt4AccountId').value = '';
       isiPilihanGeraiMt4();
       alert(`Gerai "${gerai}" berhasil dihubungkan ke sinkronisasi otomatis.`);
