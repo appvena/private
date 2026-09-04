@@ -91,7 +91,7 @@
       <div class="flex items-center gap-2 flex-wrap">
         <div class="bg-blue-900 text-white font-bold px-2.5 py-1 rounded text-[10px] sm:text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-sm sm:text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 3 September 2026, 01:55 WIB">v3.6.0 (build 2026-09-03.0155)</span>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 4 September 2026, 08:00 WIB">v3.7.0 (build 2026-09-04.0800)</span>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <span class="hidden sm:inline text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 5m)</span>
@@ -310,7 +310,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.6.0 (build 2026-09-03.0155)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.7.0 (build 2026-09-04.0800)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -345,12 +345,13 @@
     <p class="text-xs text-slate-500">Daftar gerai yang profitnya disinkron OTOMATIS tiap hari dari MyFXBook. Tambah/hapus di sini akan langsung dipakai oleh Worker, tanpa perlu ubah kode apa pun.</p>
 
     <div class="bg-slate-50 border border-slate-200 rounded p-3 space-y-2">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <input type="text" id="mt4Outlet" class="p-2 border border-slate-300 rounded text-sm" placeholder="Nama Outlet (misal: OUTLET REZA)">
-        <input type="text" id="mt4Gerai" class="p-2 border border-slate-300 rounded text-sm" placeholder="Kode Gerai (misal: 2115288)">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <select id="mt4GeraiPicker" class="p-2 border border-slate-300 rounded text-sm bg-white">
+          <option value="">Pilih gerai yang sudah ada...</option>
+        </select>
         <input type="text" id="mt4AccountId" class="p-2 border border-slate-300 rounded text-sm" placeholder="MyFXBook Account ID">
       </div>
-      <button onclick="addMt4Account()" class="w-full py-2 bg-indigo-700 hover:bg-indigo-800 text-white text-sm font-semibold rounded">+ Tambah Gerai ke Sinkronisasi Otomatis</button>
+      <button onclick="addMt4Account()" class="w-full py-2 bg-indigo-700 hover:bg-indigo-800 text-white text-sm font-semibold rounded">+ Hubungkan Gerai Ini ke Sinkronisasi Otomatis</button>
     </div>
 
     <div>
@@ -647,6 +648,7 @@
     } catch (e) {
       return alert("Password salah, akses ditolak.");
     }
+    isiPilihanGeraiMt4();
     document.getElementById('mt4Modal').style.display = 'flex';
     renderMt4AccountList();
   };
@@ -654,12 +656,30 @@
     document.getElementById('mt4Modal').style.display = 'none';
   };
 
+  // Isi dropdown dengan gerai yang SUDAH ADA di roster (yang sudah pernah diinput
+  // manual), dikurangi yang sudah terhubung ke sinkronisasi otomatis - supaya
+  // pengguna tinggal PILIH, tidak perlu ketik ulang Nama Outlet/Kode Gerai.
+  function isiPilihanGeraiMt4() {
+    const picker = document.getElementById('mt4GeraiPicker');
+    const sudahTerhubung = new Set(mt4Accounts.map(a => a.outlet + '|||' + a.gerai));
+    const activeRoster = geraiRoster.filter(r => r.active !== false && !sudahTerhubung.has(r.outlet + '|||' + r.gerai));
+
+    if (activeRoster.length === 0) {
+      picker.innerHTML = `<option value="">Semua gerai sudah terhubung / belum ada gerai</option>`;
+      return;
+    }
+    picker.innerHTML = `<option value="">Pilih gerai yang sudah ada...</option>` +
+      activeRoster.map(r => `<option value="${r.outlet}|||${r.gerai}">${r.gerai} (${r.outlet})</option>`).join('');
+  }
+
   window.addMt4Account = async () => {
-    const outlet = document.getElementById('mt4Outlet').value.trim();
-    const gerai = document.getElementById('mt4Gerai').value.trim();
+    const picked = document.getElementById('mt4GeraiPicker').value;
     const accountId = document.getElementById('mt4AccountId').value.trim();
 
-    if (!outlet || !gerai || !accountId) return alert("Harap isi Nama Outlet, Kode Gerai, dan MyFXBook Account ID.");
+    if (!picked) return alert("Harap pilih gerai dari daftar dulu.");
+    if (!accountId) return alert("Harap isi MyFXBook Account ID.");
+
+    const [outlet, gerai] = picked.split('|||');
 
     const sudahAda = mt4Accounts.find(a => a.outlet === outlet && a.gerai === gerai);
     if (sudahAda) return alert(`Gerai "${gerai}" di outlet "${outlet}" sudah terdaftar di sinkronisasi otomatis. Hapus dulu kalau mau ganti Account ID-nya.`);
@@ -668,10 +688,9 @@
       await addDoc(collection(db, 'myfxbook_accounts'), {
         outlet, gerai, myfxbookAccountId: accountId, createdAt: serverTimestamp()
       });
-      document.getElementById('mt4Outlet').value = '';
-      document.getElementById('mt4Gerai').value = '';
       document.getElementById('mt4AccountId').value = '';
-      alert(`Gerai "${gerai}" berhasil ditambahkan ke sinkronisasi otomatis.`);
+      isiPilihanGeraiMt4();
+      alert(`Gerai "${gerai}" berhasil dihubungkan ke sinkronisasi otomatis.`);
     } catch (e) {
       alert("Gagal menambahkan: " + e.message);
     }
