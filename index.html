@@ -91,7 +91,7 @@
       <div class="flex items-center gap-2 flex-wrap">
         <div class="bg-blue-900 text-white font-bold px-2.5 py-1 rounded text-[10px] sm:text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-sm sm:text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 4 September 2026, 10:20 WIB">v3.9.2 (build 2026-09-04.1020)</span>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 4 September 2026, 10:35 WIB">v4.0.0 (build 2026-09-04.1035)</span>
       </div>
       <div class="flex items-center gap-2 flex-wrap relative">
         <span class="hidden sm:inline text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 20m)</span>
@@ -316,7 +316,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v3.9.2 (build 2026-09-04.1020)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v4.0.0 (build 2026-09-04.1035)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -1264,12 +1264,13 @@
           : `<span class="text-slate-300 text-xs">–</span>`;
         const bersihCell = rawSen === 0 ? '' : `<span class="text-emerald-700 font-bold font-mono text-xs">${bersihFormatted} USD</span>`;
 
+        const rowId = `gr${geraiCounter}`;
         let aksiHtml;
         if (d) {
-          aksiHtml = `<button onclick="updateOutletUSDC('${d.id}', ${d.usdc || 0})" class="text-blue-700 hover:underline font-semibold">Ubah</button>
+          aksiHtml = `<button onclick="toggleInlineEdit('${rowId}','update','${d.id}',${d.usdc || 0},'','')" class="text-blue-700 hover:underline font-semibold">Ubah</button>
               <button onclick="deleteOutletRecord('${d.id}')" class="text-red-700 hover:underline font-semibold ml-2">Hapus</button>`;
         } else if (isSingleDay) {
-          aksiHtml = `<button onclick="addProfitForRosterGerai('${outletKey.replace(/'/g, "\\'")}', '${geraiLabel.replace(/'/g, "\\'")}')" class="text-blue-700 hover:underline font-semibold">Isi Profit</button>`;
+          aksiHtml = `<button onclick="toggleInlineEdit('${rowId}','create',null,0,'${outletKey.replace(/'/g, "\\'")}','${geraiLabel.replace(/'/g, "\\'")}')" class="text-blue-700 hover:underline font-semibold">Isi Profit</button>`;
         } else {
           aksiHtml = '';
         }
@@ -1278,7 +1279,7 @@
         }
 
         rowsHtml += `
-          <tr class="hover:bg-slate-50">
+          <tr id="${rowId}" class="hover:bg-slate-50">
             <td class="border border-slate-300 px-2 py-2 text-slate-400 font-mono text-xs align-top">${geraiNomor}</td>
             <td class="border border-slate-300 px-2 py-2 text-slate-700 font-mono text-xs align-top">${geraiLabel}${(!isSingleDay && d) ? `<br><span class="text-slate-400 text-[10px]">${d.dateStr}</span>` : ''}</td>
             <td class="border border-slate-300 px-2 py-2 text-right align-top">${kotorCell}</td>
@@ -1286,6 +1287,16 @@
             <td class="border border-slate-300 px-2 py-2 text-right align-top">${bersihCell}</td>
             <td class="border border-slate-300 px-2 py-2 text-center align-top no-print text-xs whitespace-nowrap">
               ${aksiHtml}
+            </td>
+          </tr>
+          <tr id="edit_${rowId}" class="inline-edit-row hidden bg-blue-50">
+            <td colspan="6" class="border border-slate-300 px-3 py-2.5 no-print">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs text-slate-600 shrink-0 font-semibold">Nominal SEN (persis dari platform):</span>
+                <input type="text" class="flex-1 min-w-[140px] p-1.5 border border-slate-300 rounded text-xs" placeholder="misal: 822.35">
+                <button class="btn-simpan px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold rounded shrink-0">Simpan</button>
+                <button onclick="document.getElementById('edit_${rowId}').classList.add('hidden')" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded shrink-0">Batal</button>
+              </div>
             </td>
           </tr>
         `;
@@ -1552,6 +1563,47 @@
       alert("Gagal menyimpan data: " + error.message);
     }
   };
+
+  // --- FORM EDIT INLINE (menggantikan popup prompt) ---
+  // Buka/tutup baris form kecil TEPAT DI BAWAH baris gerainya, dipakai baik
+  // untuk "Ubah" (data sudah ada) maupun "Isi Profit" (data belum ada/roster).
+  window.toggleInlineEdit = (rowId, mode, recordId, currentSen, outlet, gerai) => {
+    const editRow = document.getElementById('edit_' + rowId);
+    if (!editRow) return;
+    const sedangTertutup = editRow.classList.contains('hidden');
+
+    // Tutup semua form edit lain yang mungkin masih terbuka, biar tidak dobel
+    document.querySelectorAll('.inline-edit-row').forEach(el => el.classList.add('hidden'));
+
+    if (sedangTertutup) {
+      editRow.classList.remove('hidden');
+      const input = editRow.querySelector('input');
+      input.value = currentSen > 0 ? currentSen.toLocaleString('id-ID', {maximumFractionDigits: 2}) : '';
+      input.focus();
+      const btnSimpan = editRow.querySelector('.btn-simpan');
+      btnSimpan.onclick = () => submitInlineEdit(rowId, mode, recordId, outlet, gerai);
+      input.onkeydown = (e) => { if (e.key === 'Enter') submitInlineEdit(rowId, mode, recordId, outlet, gerai); };
+    }
+  };
+
+  async function submitInlineEdit(rowId, mode, recordId, outlet, gerai) {
+    const editRow = document.getElementById('edit_' + rowId);
+    const input = editRow.querySelector('input');
+    const parsed = parseSenInput(input.value.trim());
+    if (isNaN(parsed)) return alert("Format nominal tidak valid! Gunakan angka, contoh: 822.35 atau 822,35");
+
+    try {
+      if (mode === 'update') {
+        await updateDoc(doc(db, 'outlet_profits', recordId), { usdc: parsed });
+      } else {
+        const dateToSave = document.getElementById('filterStart').value;
+        await addDoc(collection(db, 'outlet_profits'), { dateStr: dateToSave, outlet, gerai, usdc: parsed, createdAt: serverTimestamp() });
+      }
+      editRow.classList.add('hidden');
+    } catch (e) {
+      alert("Gagal menyimpan: " + e.message);
+    }
+  }
 
   window.updateOutletUSDC = async (id, currentVal) => {
     let formatVal = currentVal === 0 ? '' : currentVal.toLocaleString('id-ID', {maximumFractionDigits: 2});
