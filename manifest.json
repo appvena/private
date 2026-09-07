@@ -2,7 +2,7 @@
   "name": "Sistem Administrasi & Kalkulator Outlet",
   "short_name": "Kalkulator Outlet",
   "description": "Manajemen Operasional & Keuangan - Kalkulator Outlet Harian",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0f172a",

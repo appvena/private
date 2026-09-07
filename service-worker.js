@@ -1,36 +1,21 @@
-// Service Worker minimal - tujuan utamanya cuma supaya aplikasi ini
-// memenuhi syarat "installable" (bisa di-Add to Home Screen).
-// TIDAK melakukan caching agresif - aplikasi ini butuh data selalu
-// terbaru dari Firebase/Firestore, jadi kita SENGAJA tidak menyimpan
-// cache offline untuk data (supaya tidak pernah menampilkan data basi).
+// Service Worker MINIMAL - tujuan SATU-SATUNYA cuma supaya aplikasi ini
+// memenuhi syarat teknis "installable" (bisa di-Add to Home Screen / muncul
+// tombol Install), TIDAK melakukan apa pun terhadap request jaringan.
+//
+// Versi sebelumnya sempat mencoba fallback offline dengan meng-intercept
+// event 'fetch' untuk navigasi - ini ternyata JUSTRU menyebabkan PWA gagal
+// terbuka di Android (loading sebentar lalu "mental" keluar tanpa masuk ke
+// halaman). Karena aplikasi ini SELALU butuh koneksi internet (data live
+// dari Firebase/Firestore), fitur offline tidak krusial - jadi bagian
+// paling rawan itu sengaja DIHAPUS TOTAL di sini demi stabilitas.
 
-const CACHE_NAME = 'kalkulator-outlet-shell-v1';
-const SHELL_FILES = [
-  './index.html'
-];
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES))
-  );
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+  event.waitUntil(self.clients.claim());
 });
 
-// Strategi: network-first untuk index.html (selalu coba ambil versi terbaru
-// dari server dulu), baru jatuh ke cache kalau benar-benar offline.
-self.addEventListener('fetch', (event) => {
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match('./index.html'))
-    );
-  }
-});
+// SENGAJA TIDAK ADA event listener 'fetch' sama sekali - biarkan semua
+// request jaringan berjalan normal apa adanya, tanpa campur tangan.
