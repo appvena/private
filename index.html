@@ -98,7 +98,7 @@
       <div class="flex items-center gap-2 flex-wrap">
         <div class="bg-blue-900 text-white font-bold px-2.5 py-1 rounded text-[10px] sm:text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-sm sm:text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 8 September 2026, 22:25 WIB">v4.1.0 (build 2026-09-08.2225)</span>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 8 September 2026, 22:40 WIB">v4.2.0 (build 2026-09-08.2240)</span>
       </div>
       <div class="flex items-center gap-2 flex-wrap relative">
         <span class="hidden sm:inline text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 20m)</span>
@@ -158,7 +158,7 @@
             <p id="kursUpdatedText" class="text-[10px] text-slate-400 mb-2"></p>
             <div class="flex gap-2 no-print justify-end">
               <button onclick="exportToExcel()" class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded transition">Ekspor Excel</button>
-              <button onclick="exportToPDF()" class="px-3 py-1.5 bg-purple-800 hover:bg-purple-900 text-white text-xs font-semibold rounded transition">Ekspor PDF</button>
+              <button id="exportPdfBtn" onclick="exportToPDF()" class="px-3 py-1.5 bg-purple-800 hover:bg-purple-900 text-white text-xs font-semibold rounded transition">Ekspor PDF</button>
             </div>
           </div>
         </div>
@@ -323,7 +323,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v4.1.0 (build 2026-09-08.2225)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v4.2.0 (build 2026-09-08.2240)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -346,6 +346,18 @@
       <button onclick="saveFileNote()" class="px-3 py-1.5 bg-blue-900 hover:bg-blue-800 text-white text-xs font-semibold rounded">Simpan</button>
     </div>
   </div>
+</div>
+
+<!-- MODAL PREVIEW PDF (sebelum benar-benar diunduh) -->
+<div id="pdfPreviewModal" class="fixed inset-0 bg-slate-900/80 z-50 hidden flex-col p-3 sm:p-6">
+  <div class="flex justify-between items-center bg-white rounded-t-lg px-4 py-3 shadow">
+    <h3 class="text-sm font-bold text-slate-800">📄 Preview Laporan PDF</h3>
+    <div class="flex gap-2">
+      <button id="pdfDownloadBtn" class="px-4 py-2 bg-purple-800 hover:bg-purple-900 text-white text-xs font-semibold rounded">⬇️ Unduh PDF Ini</button>
+      <button onclick="closePdfPreview()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded">Tutup Tanpa Unduh</button>
+    </div>
+  </div>
+  <iframe id="pdfPreviewFrame" class="flex-1 w-full bg-white rounded-b-lg" src=""></iframe>
 </div>
 
 <!-- MODAL GANTI PASSWORD -->
@@ -1321,7 +1333,7 @@
       const outletSubtotalPotonganUsdc = outletSubtotalUsdcKotor * (potonganPercent / 100);
       const outletSubtotalUsdcBersih = outletSubtotalUsdcKotor - outletSubtotalPotonganUsdc;
       container.innerHTML += `
-        <div class="avoid-break bg-white border border-slate-300 rounded shadow-sm overflow-hidden">
+        <div class="bg-white border border-slate-300 rounded shadow-sm overflow-hidden">
           <div class="flex items-center gap-2 bg-slate-100 px-3.5 py-2.5 border-b border-slate-300">
             <span class="font-bold text-slate-800 text-sm">🏬 ${outletKey}</span>
             <button onclick="editOutletPotongan('${outletKey.replace(/'/g, "\\'")}')" class="no-print text-slate-500 hover:text-blue-700 text-xs border border-slate-300 rounded px-1.5 py-0.5 bg-white" title="Atur potongan vendor %">⚙ ${potonganPercent}%</button>
@@ -1691,9 +1703,15 @@
   // --- EKSPOR ---
   window.exportToPDF = () => {
     const filenameStr = document.getElementById('printDateText').innerText.replace(/\s+/g, '_');
+    const namaFile = `Laporan_${filenameStr}.pdf`;
+
+    const btn = document.getElementById('exportPdfBtn');
+    const teksAsli = btn ? btn.textContent : null;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Membuat PDF...'; }
+
     html2pdf().from(document.getElementById('pdfExportArea')).set({
       margin: 10,
-      filename: `Laporan_${filenameStr}.pdf`,
+      filename: namaFile,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: {
         scale: 2,
@@ -1714,7 +1732,24 @@
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['css', 'legacy'], avoid: ['.avoid-break', 'tr'] }
-    }).save();
+    }).outputPdf('bloburl').then((blobUrl) => {
+      if (btn) { btn.disabled = false; btn.textContent = teksAsli; }
+      document.getElementById('pdfPreviewFrame').src = blobUrl;
+      document.getElementById('pdfPreviewModal').style.display = 'flex';
+      document.getElementById('pdfDownloadBtn').onclick = () => {
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = namaFile;
+        a.click();
+      };
+    }).catch((err) => {
+      if (btn) { btn.disabled = false; btn.textContent = teksAsli; }
+      alert("Gagal membuat PDF: " + err.message);
+    });
+  };
+  window.closePdfPreview = () => {
+    document.getElementById('pdfPreviewModal').style.display = 'none';
+    document.getElementById('pdfPreviewFrame').src = '';
   };
 
   window.exportToExcel = async () => {
