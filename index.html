@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sistem Administrasi & Kalkulator Outlet</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Kalkulator Outlet">
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- ExcelJS (mendukung border & format angka) & html2pdf.js -->
@@ -91,7 +98,7 @@
       <div class="flex items-center gap-2 flex-wrap">
         <div class="bg-blue-900 text-white font-bold px-2.5 py-1 rounded text-[10px] sm:text-xs tracking-wider">OFFICE SYSTEM</div>
         <h1 class="text-sm sm:text-lg font-bold text-slate-800">Manajemen Operasional & Keuangan</h1>
-        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 4 September 2026, 10:35 WIB">v4.0.0 (build 2026-09-04.1035)</span>
+        <span class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono" title="Build: 8 September 2026, 22:25 WIB">v4.1.0 (build 2026-09-08.2225)</span>
       </div>
       <div class="flex items-center gap-2 flex-wrap relative">
         <span class="hidden sm:inline text-xs text-slate-500 font-mono" id="sessionTimerText">Sesi Aktif (Auto-logout 20m)</span>
@@ -316,7 +323,7 @@
 
   <!-- FOOTER COPYRIGHT -->
   <div class="text-center text-xs text-slate-400 pt-2 pb-4">
-    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v4.0.0 (build 2026-09-04.1035)</span></p>
+    <p>Sistem Administrasi & Kalkulator Outlet <span class="font-mono">v4.1.0 (build 2026-09-08.2225)</span></p>
     <p>&copy; SRISP 2026. All rights reserved.</p>
   </div>
 </div>
@@ -1183,7 +1190,7 @@
     const groupOrder = [];
     const groups = {}; // outletKey -> array of { rosterId, gerai, record }
 
-    if (isSingleDay) {
+    if (isSingleDay && !isWeekend) {
       const activeRoster = geraiRoster.filter(r => r.active !== false);
       const claimedRecordIds = new Set(); // PERTAHANAN: 1 record profit tidak boleh "diklaim" lebih dari 1 baris roster,
                                             // walau roster kebetulan masih ada duplikat untuk kombinasi outlet+gerai yang sama.
@@ -1198,6 +1205,10 @@
         groups[r.outlet].push({ rosterId: r.id, gerai: r.gerai, record });
       });
       groupOrder.sort();
+    } else if (isSingleDay && isWeekend) {
+      // Hari libur (Sabtu/Minggu): sengaja dikosongkan total, termasuk kalau ada
+      // data lama yang kebetulan pernah tersimpan di tanggal weekend - supaya
+      // konsisten dengan larangan input di hari libur.
     } else {
       filteredItems.forEach(d => {
         const outletKey = d.outlet || '(Tanpa Nama)';
@@ -1207,7 +1218,9 @@
     }
 
     if (groupOrder.length === 0) {
-      const emptyMsg = isSingleDay
+      const emptyMsg = isSingleDay && isWeekend
+        ? 'Hari libur (Sabtu/Minggu) - tidak ada input untuk tanggal ini.'
+        : isSingleDay
         ? 'Belum ada gerai terdaftar. Tambahkan gerai pertama Anda lewat form di atas.'
         : `Belum ada data outlet pada rentang tanggal ini. (Total data di DB: ${allOutletData.length})`;
       container.innerHTML = `<div class="text-slate-400 text-center text-sm italic py-4" id="emptyOutletMsg">${emptyMsg}</div>`;
@@ -1808,6 +1821,16 @@
     URL.revokeObjectURL(url);
   };
 
+</script>
+<script>
+  // Daftarkan Service Worker supaya aplikasi ini bisa di-install (PWA)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch((err) => {
+        console.error('Gagal daftar service worker:', err);
+      });
+    });
+  }
 </script>
 </body>
 </html>
