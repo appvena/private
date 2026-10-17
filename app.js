@@ -25,7 +25,7 @@ const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
 const FOLDER = 'application/vnd.google-apps.folder';
-const FIELDS = 'id,name,mimeType,size,modifiedTime,createdTime,thumbnailLink,starred,webViewLink,parents,shared,trashed,explicitlyTrashed,fileExtension';
+const FIELDS = 'id,name,mimeType,size,modifiedTime,createdTime,thumbnailLink,starred,webViewLink,parents,shared,trashed,explicitlyTrashed,fileExtension,appProperties';
 
 /* ---------------------------------------------------------------- state */
 const S = {
@@ -567,10 +567,10 @@ async function renderCrumbs() {
   el.innerHTML = root + `<button data-go="${S.rootId}">File saya</button>${sep}<span class="current">…</span>`;
   const chain = await folderChain(r.id);
   if (seq !== S.loadSeq) return;
-  let html = root + `<button data-go="${S.rootId}">File saya</button>`;
+  let html = root + `<button data-go="${S.rootId}" data-drop="${S.rootId}">File saya</button>`;
   chain.forEach((c, i) => {
     html += sep;
-    html += i === chain.length - 1 ? `<span class="current" title="${esc(c.name)}">${esc(c.name)}</span>` : `<button data-go="${c.id}" title="${esc(c.name)}">${esc(c.name)}</button>`;
+    html += i === chain.length - 1 ? `<span class="current" title="${esc(c.name)}">${esc(c.name)}</span>` : `<button data-go="${c.id}" data-drop="${c.id}" title="${esc(c.name)}">${esc(c.name)}</button>`;
   });
   el.innerHTML = html;
   el.scrollLeft = el.scrollWidth;
@@ -579,16 +579,61 @@ async function renderCrumbs() {
   expandTreeTo(chain.map(c => c.id));
 }
 
+/* ================================================================ IKON KHUSUS
+   Warna & simbol pilihan sendiri, disimpan di Drive (appProperties)
+   supaya sama di semua perangkat. */
+const ICON_COLORS = {
+  kuning: { label: 'Kuning', front: '#F2C35E', back: '#D99A2B', ink: '#7A4E00' },
+  oranye: { label: 'Oranye', front: '#F5A25D', back: '#D97A2E', ink: '#6E3300' },
+  merah:  { label: 'Merah',  front: '#EF7B70', back: '#CC4B40', ink: '#6E1209' },
+  pink:   { label: 'Pink',   front: '#F28DB8', back: '#D45F92', ink: '#6E1440' },
+  ungu:   { label: 'Ungu',   front: '#B49AF0', back: '#8D6FD6', ink: '#35207A' },
+  biru:   { label: 'Biru',   front: '#7DB4F5', back: '#4F8DDB', ink: '#0F3A78' },
+  toska:  { label: 'Toska',  front: '#5FCFC0', back: '#2FA698', ink: '#064A42' },
+  hijau:  { label: 'Hijau',  front: '#8BD07A', back: '#5FAE4C', ink: '#1A5210' },
+  abu:    { label: 'Abu-abu', front: '#B9C3C0', back: '#92A09B', ink: '#333D3A' },
+  gelap:  { label: 'Gelap',  front: '#5B6764', back: '#3E4946', ink: '#F1F5F3' },
+};
+const ICON_SYMBOLS = [
+  ['musik', 'Musik'], ['foto', 'Foto'], ['video', 'Video'], ['dokumen', 'Dokumen'], ['uang', 'Keuangan'],
+  ['kerja', 'Kerja'], ['buku', 'Buku'], ['sekolah', 'Sekolah'], ['hati', 'Favorit'], ['bintang', 'Penting'],
+  ['kunci', 'Rahasia'], ['rumah', 'Rumah'], ['jalan', 'Perjalanan'], ['kode', 'Kode'], ['game', 'Game'],
+  ['unduh', 'Unduhan'], ['arsip', 'Arsip'], ['orang', 'Pribadi'], ['keluarga', 'Keluarga'], ['mobil', 'Kendaraan'],
+  ['makan', 'Makanan'], ['awan', 'Cloud'], ['setel', 'Pengaturan'], ['kalender', 'Jadwal'], ['belanja', 'Belanja'],
+  ['sehat', 'Kesehatan'], ['hadiah', 'Hadiah'], ['toko', 'Toko'],
+];
+const iconPrefs = (f) => {
+  const ap = (f && f.appProperties) || {};
+  return { color: ICON_COLORS[ap.venaColor] ? ap.venaColor : '', sym: ICON_SYMBOLS.some(s => s[0] === ap.venaIcon) ? ap.venaIcon : '' };
+};
+const symUse = (sym, x, y, size, ink) => sym
+  ? `<use href="#s-${sym}" x="${x}" y="${y}" width="${size}" height="${size}" fill="none" stroke="${ink}" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>` : '';
+
 /* ================================================================ IKON */
 const KIND_LABEL = { image: 'Gambar', video: 'Video', audio: 'Audio', pdf: 'PDF', sheet: 'Lembar kerja', slides: 'Presentasi', doc: 'Dokumen', archive: 'Arsip', code: 'Teks / kode', file: 'File', folder: 'Folder' };
-function folderSvg(cls = 'big') {
+function folderSvg(cls = 'big', f) {
+  const pr = iconPrefs(f);
+  const c = pr.color ? ICON_COLORS[pr.color] : null;
+  const front = c ? c.front : 'var(--folder-front)', back = c ? c.back : 'var(--folder-back)';
+  const ink = c ? c.ink : '#7A4E00';
   return `<svg class="${cls}" viewBox="0 0 64 52" aria-hidden="true">
-    <path d="M4 6a4 4 0 0 1 4-4h15l6 6h27a4 4 0 0 1 4 4v4H4z" fill="var(--folder-back)"/>
-    <rect x="2" y="12" width="60" height="38" rx="5" fill="var(--folder-front)"/>
-    <rect x="2" y="12" width="60" height="5" rx="2.5" fill="#fff" opacity=".28"/></svg>`;
+    <path d="M4 6a4 4 0 0 1 4-4h15l6 6h27a4 4 0 0 1 4 4v4H4z" fill="${back}"/>
+    <rect x="2" y="12" width="60" height="38" rx="5" fill="${front}"/>
+    <rect x="2" y="12" width="60" height="5" rx="2.5" fill="#fff" opacity=".28"/>
+    ${symUse(pr.sym, 21, 20, 22, ink)}</svg>`;
 }
 function fileSvg(f, cls = 'big') {
   const k = kindOf(f);
+  const pr = iconPrefs(f);
+  if (pr.sym || pr.color) {
+    const c = ICON_COLORS[pr.color || 'biru'];
+    const ext = extOf(f).toUpperCase().slice(0, 4);
+    return `<svg class="${cls}" viewBox="0 0 52 64" aria-hidden="true">
+      <path d="M8 2h25l15 15v41a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z" fill="${c.front}"/>
+      <path d="M33 2v11a4 4 0 0 0 4 4h11" fill="${c.back}"/>
+      ${pr.sym ? symUse(pr.sym, 13, 16, 24, c.ink) : ''}
+      ${ext ? `<text x="26" y="54" text-anchor="middle" font-family="Atkinson Hyperlegible, system-ui, sans-serif" font-weight="700" font-size="9" fill="${c.ink}">${esc(ext)}</text>` : ''}</svg>`;
+  }
   let ext = extOf(f).toUpperCase().slice(0, 4);
   if (!ext) ext = { image: 'IMG', video: 'VID', audio: 'AUD', pdf: 'PDF', archive: 'ZIP' }[k] || '';
   const fs = ext.length > 3 ? 8 : 9.5;
@@ -599,7 +644,7 @@ function fileSvg(f, cls = 'big') {
     <text x="19" y="45.5" text-anchor="middle" font-family="Atkinson Hyperlegible, system-ui, sans-serif" font-weight="700" font-size="${fs}" fill="#fff">${esc(ext)}</text>`
     : `<path d="M13 30h22M13 37h22M13 44h14" stroke="var(--k-${k})" stroke-width="3" stroke-linecap="round"/>`}</svg>`;
 }
-const itemSvg = (f, cls) => isFolder(f) ? folderSvg(cls) : fileSvg(f, cls);
+const itemSvg = (f, cls) => isFolder(f) ? folderSvg(cls, f) : fileSvg(f, cls);
 const typeLabel = (f) => isFolder(f) ? 'Folder' : (KIND_LABEL[kindOf(f)] + (extOf(f) ? ' (.' + extOf(f) + ')' : ''));
 
 /* ================================================================ RENDER */
@@ -638,7 +683,7 @@ function itemHTML(f, trash) {
   const k = kindOf(f);
   const thumb = !isFolder(f) && f.thumbnailLink
     ? `<img data-thumb loading="lazy" referrerpolicy="no-referrer" alt="" src="${esc(f.thumbnailLink.replace(/=s\d+$/, '=s320'))}">` : '';
-  return `<div class="it${sel ? ' selected' : ''}" data-id="${f.id}" tabindex="0" role="option" aria-selected="${sel}" title="${esc(f.name)}">
+  return `<div class="it${sel ? ' selected' : ''}" data-id="${f.id}" tabindex="0" role="option" aria-selected="${sel}" title="${esc(f.name)}"${trash ? '' : ' draggable="true"'}>
     <div class="ic" data-kind="${k}">${thumb || itemSvg(f)}</div>
     <div class="nm"><span class="mini">${itemSvg(f, 'mini-svg')}</span><span class="label">${esc(f.name)}</span>${f.starred ? `<span class="star-badge" title="Berbintang">${icon('i-star')}</span>` : ''}</div>
     ${f.starred ? `<span class="star-badge grid-only" title="Berbintang">${icon('i-star')}</span>` : ''}
@@ -815,6 +860,7 @@ function renderDetails() {
       + btn('sel-rename', 'i-edit', 'Ganti nama')
       + btn('sel-move', 'i-move', 'Pindahkan')
       + btn('sel-star', 'i-star', f.starred ? 'Lepas bintang' : 'Bintangi')
+      + btn('sel-icon', 'i-palette', 'Ubah ikon')
       + btn('sel-trash', 'i-trash', 'Hapus', 'danger');
     el.innerHTML = `<div class="d-preview">${prev}</div>
       <h3>${esc(f.name)}</h3>
@@ -832,7 +878,7 @@ function renderDetails() {
     const size = sel.reduce((s, f) => s + (Number(f.size) || 0), 0);
     const nF = sel.filter(isFolder).length;
     const acts = trash ? btn('sel-restore', 'i-restore', 'Pulihkan', 'btn-primary') + btn('sel-delete', 'i-trash', 'Hapus permanen', 'danger')
-      : btn('sel-download', 'i-download', 'Unduh', 'btn-primary') + btn('sel-move', 'i-move', 'Pindahkan') + btn('sel-trash', 'i-trash', 'Hapus', 'danger');
+      : btn('sel-download', 'i-download', 'Unduh', 'btn-primary') + btn('sel-move', 'i-move', 'Pindahkan') + btn('sel-icon', 'i-palette', 'Ubah ikon') + btn('sel-trash', 'i-trash', 'Hapus', 'danger');
     el.innerHTML = `<div class="d-preview">${folderSvg()}</div>
       <h3>${sel.length} item dipilih</h3>
       <dl>
@@ -863,7 +909,7 @@ function fmtLong(iso) {
 const T = { nodes: new Map(), open: new Set(LS.get('vena.treeOpen') ? JSON.parse(LS.get('vena.treeOpen')) : []) };
 // nodes: id -> { name, children: [ids] | null }
 function syncTreeChildren(parentId, folders) {
-  const kids = sorted(folders).map(f => { T.nodes.set(f.id, Object.assign(T.nodes.get(f.id) || { children: null }, { name: f.name })); return f.id; });
+  const kids = sorted(folders).map(f => { T.nodes.set(f.id, Object.assign(T.nodes.get(f.id) || { children: null }, { name: f.name, appProperties: f.appProperties })); return f.id; });
   const p = T.nodes.get(parentId) || { name: '', children: null };
   p.children = kids;
   T.nodes.set(parentId, p);
@@ -873,7 +919,7 @@ async function loadTreeChildren(id) {
   try {
     const folders = await listAll(`'${qstr(id)}' in parents and mimeType='${FOLDER}' and trashed=false`, { orderBy: 'name' });
     for (const f of folders) S.meta.set(f.id, { name: f.name, parents: f.parents });
-    syncTreeChildren(id, folders);
+    syncTreeChildren(id, folders.filter(isFolder));
   } catch {}
 }
 function saveTreeOpen() { LS.set('vena.treeOpen', JSON.stringify([...T.open].slice(-200))); }
@@ -898,7 +944,7 @@ function renderTree() {
     return `<li role="treeitem" aria-expanded="${open}">
       <div class="row${cur === id ? ' active' : ''}">
         <button class="twisty${open ? ' open' : ''}${leaf ? ' leaf' : ''}" data-tree-toggle="${id}" aria-label="Buka/tutup">${icon('i-chevron-right')}</button>
-        <button class="tname" data-go="${id}" title="${esc(n.name)}">${folderSvg('')}<span>${esc(n.name)}</span></button>
+        <button class="tname" data-go="${id}" data-drop="${id}" title="${esc(n.name)}">${folderSvg('', n)}<span>${esc(n.name)}</span></button>
       </div>
       ${open && n.children ? `<ul role="group">${branch(n.children, depth + 1)}</ul>` : ''}
     </li>`;
@@ -985,6 +1031,7 @@ function openItemMenu(id, x, y, alignRight) {
     h += b('rename', 'i-edit', 'Ganti nama');
     h += b('move', 'i-move', 'Pindahkan');
     h += b('star', 'i-star', f.starred ? 'Hapus bintang' : 'Beri bintang');
+    h += b('icon', 'i-palette', 'Ubah ikon');
     if (S.route.type !== 'folder') h += b('reveal', 'i-folder', 'Tampilkan di folder');
     h += `<a role="menuitem" href="${esc(f.webViewLink || '#')}" target="_blank" rel="noopener">${icon('i-external')}Buka di Google Drive</a>`;
     h += '<hr>';
@@ -1000,6 +1047,7 @@ async function itemAction(act, id) {
   closeMenus();
   switch (act) {
     case 'select': return toggleSelect(f.id);
+    case 'icon': return openIconPicker(S.selected.has(f.id) && S.selected.size > 1 ? selectedItems() : [f]);
     case 'open': return openItem(f);
     case 'download': return downloadFiles([f]);
     case 'share': return openShare(f);
@@ -1253,21 +1301,126 @@ async function loadMoveList() {
   const inside = chain.some(c => moving.has(c.id));
   $('#moveOk').disabled = same || inside;
 }
-async function doMove() {
-  const target = MV.at, list = MV.items;
+function doMove() { return moveItemsTo(MV.items, MV.at); }
+
+/* ---------------------------------------------------------------- dialog ubah ikon */
+const IC = { items: [], color: '', sym: '' };
+function openIconPicker(list) {
+  if (!list.length) return;
+  IC.items = list;
+  const p = iconPrefs(list[0]);
+  IC.color = p.color; IC.sym = p.sym;
+  $('#iconWhat').textContent = list.length === 1 ? '“' + list[0].name + '”' : list.length + ' item';
+  $('#iconColors').innerHTML = `<button type="button" class="none" data-ic-color="" role="radio" title="Bawaan" aria-label="Warna bawaan"></button>` +
+    Object.entries(ICON_COLORS).map(([k, c]) => `<button type="button" data-ic-color="${k}" role="radio" title="${c.label}" aria-label="${c.label}" style="--c:${c.front}"></button>`).join('');
+  $('#iconGrid').innerHTML = `<button type="button" data-ic-sym="" role="radio"><svg viewBox="0 0 24 24"><path d="M5 5l14 14"/><circle cx="12" cy="12" r="9"/></svg>Tanpa</button>` +
+    ICON_SYMBOLS.map(([k, label]) => `<button type="button" data-ic-sym="${k}" role="radio"><svg viewBox="0 0 24 24"><use href="#s-${k}"/></svg>${label}</button>`).join('');
+  paintIconPicker();
+  const d = $('#dlgIcon');
+  d.returnValue = '';
+  d.onclose = () => { if (d.returnValue === 'ok') saveIcons(IC.items, IC.color, IC.sym); };
+  d.showModal();
+}
+function paintIconPicker() {
+  for (const b of $$('#iconColors button')) b.setAttribute('aria-checked', String(b.dataset.icColor === IC.color));
+  for (const b of $$('#iconGrid button')) b.setAttribute('aria-checked', String(b.dataset.icSym === IC.sym));
+  const f = IC.items[0];
+  const fake = Object.assign({}, f, { appProperties: { venaColor: IC.color, venaIcon: IC.sym } });
+  $('#iconPreview').innerHTML = itemSvg(fake, '');
+}
+async function saveIcons(list, color, sym) {
+  const props = { venaColor: color || null, venaIcon: sym || null };
+  try {
+    await runAll(list, f => api('/files/' + f.id, { method: 'PATCH', query: { fields: 'id,appProperties' }, body: { appProperties: props } }));
+    for (const f of list) {
+      const ap = Object.assign({}, f.appProperties);
+      if (color) ap.venaColor = color; else delete ap.venaColor;
+      if (sym) ap.venaIcon = sym; else delete ap.venaIcon;
+      f.appProperties = ap;
+      const n = T.nodes.get(f.id); if (n) n.appProperties = ap;
+    }
+    render(); renderTree();
+    toast(list.length === 1 ? 'Ikon diubah.' : `Ikon ${list.length} item diubah.`);
+  } catch (e) { fail(e, 'Gagal mengubah ikon'); }
+}
+
+/* ---------------------------------------------------------------- pindah (dipakai dialog & seret) */
+async function moveItemsTo(list, target) {
+  list = list.filter(f => f.id !== target && (f.parents || [])[0] !== target);
+  if (!list.length) return;
+  const ids = new Set(list.map(f => f.id));
+  if (target !== S.rootId) {
+    const chain = await folderChain(target);
+    if (chain.some(c => ids.has(c.id))) { toast('Folder tidak bisa dipindahkan ke dalam dirinya sendiri.', { error: true }); return; }
+  }
   try {
     await runAll(list, f => api('/files/' + f.id, { method: 'PATCH', query: {
       addParents: target, removeParents: (f.parents || []).join(','), fields: 'id,parents' } }));
     for (const f of list) { f.parents = [target]; if (isFolder(f)) S.meta.set(f.id, { name: f.name, parents: [target] }); }
     const name = target === S.rootId ? 'File saya' : (S.meta.get(target) || {}).name || 'folder';
-    toast(list.length === 1 ? `Dipindahkan ke “${name}”.` : `${list.length} item dipindahkan ke “${name}”.`, {
+    toast(list.length === 1 ? `“${list[0].name}” dipindahkan ke “${name}”.` : `${list.length} item dipindahkan ke “${name}”.`, {
       action: 'Buka', onAction: () => location.hash = folderHash(target) });
-    if (S.route.type === 'folder' && S.route.id !== target) {
-      const ids = new Set(list.map(f => f.id));
-      S.items = S.items.filter(f => !ids.has(f.id));
-    }
+    if (S.route.type === 'folder' && S.route.id !== target) S.items = S.items.filter(f => !ids.has(f.id));
     S.selected.clear(); render(); refreshTreeSoon();
   } catch (e) { fail(e, 'Gagal memindahkan'); }
+}
+
+/* ---------------------------------------------------------------- seret-pindah di dalam aplikasi */
+const DRAG = { ids: null };
+function dropTargetOf(el) {
+  if (!el || !el.closest) return null;
+  const it = el.closest('#items .it');
+  if (it) { const f = itemById(it.dataset.id); return f && isFolder(f) ? { el: it, id: f.id } : null; }
+  const d = el.closest('[data-drop]');
+  if (d) return { el: d, id: d.dataset.drop };
+  const nav = el.closest('.nav a[data-nav="home"], .nav a[data-nav="trash"]');
+  if (nav) return { el: nav, id: nav.dataset.nav === 'trash' ? '__trash' : S.rootId };
+  return null;
+}
+function bindDrag() {
+  let ghost = null, hover = null;
+  const clearHover = () => { if (hover) hover.classList.remove('drop-hover'); hover = null; };
+  document.addEventListener('dragstart', (e) => {
+    const it = e.target.closest && e.target.closest('#items .it');
+    if (!it || S.route.type === 'trash') { if (it) e.preventDefault(); return; }
+    if (!S.selected.has(it.dataset.id)) selectOnly(it.dataset.id);
+    DRAG.ids = [...S.selected];
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('application/x-vena', DRAG.ids.join(','));
+    e.dataTransfer.setData('text/plain', selectedItems().map(f => f.name).join('\n'));
+    if (DRAG.ids.length > 1) {
+      ghost = document.createElement('div');
+      ghost.className = 'drag-ghost';
+      ghost.textContent = `${DRAG.ids.length} item`;
+      document.body.appendChild(ghost);
+      e.dataTransfer.setDragImage(ghost, 20, 16);
+    }
+    for (const id of DRAG.ids) { const el = $(`#items .it[data-id="${CSS.escape(id)}"]`); if (el) el.classList.add('dragging'); }
+  });
+  document.addEventListener('dragend', () => {
+    DRAG.ids = null; clearHover();
+    if (ghost) { ghost.remove(); ghost = null; }
+    for (const el of $$('#items .it.dragging')) el.classList.remove('dragging');
+  });
+  document.addEventListener('dragover', (e) => {
+    if (!DRAG.ids) return;
+    const t = dropTargetOf(e.target);
+    if (!t || DRAG.ids.includes(t.id)) { clearHover(); e.dataTransfer.dropEffect = 'none'; return; }
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (hover !== t.el) { clearHover(); hover = t.el; hover.classList.add('drop-hover'); }
+  });
+  document.addEventListener('drop', (e) => {
+    if (!DRAG.ids) return;
+    const t = dropTargetOf(e.target);
+    e.preventDefault();
+    clearHover();
+    const list = S.items.filter(f => DRAG.ids.includes(f.id));
+    DRAG.ids = null;
+    if (!t || !list.length) return;
+    if (t.id === '__trash') trashItems(list);
+    else moveItemsTo(list, t.id);
+  });
 }
 
 /* ================================================================ PRATINJAU */
@@ -1699,6 +1852,8 @@ function bind() {
         case 'sel-share': { const f = selectedItems()[0]; if (f) openShare(f); return; }
         case 'sel-rename': { const f = selectedItems()[0]; if (f) renameItem(f); return; }
         case 'sel-star': { const f = selectedItems()[0]; if (f) toggleStar(f); return; }
+        case 'sel-icon': openIconPicker(selectedItems()); return;
+        case 'icon-reset': IC.color = ''; IC.sym = ''; paintIconPicker(); return;
         case 'nav-back': navStep(-1); return;
         case 'nav-fwd': navStep(1); return;
         case 'nav-up': navUp(); return;
@@ -1738,6 +1893,10 @@ function bind() {
     }
 
     // pohon folder: buka/tutup cabang
+    const icc = t.closest('[data-ic-color]');
+    if (icc) { IC.color = icc.dataset.icColor; paintIconPicker(); return; }
+    const ics = t.closest('[data-ic-sym]');
+    if (ics) { IC.sym = ics.dataset.icSym; if (!IC.color && IC.sym && !isFolder(IC.items[0])) IC.color = 'biru'; paintIconPicker(); return; }
     const tt = t.closest('[data-tree-toggle]');
     if (tt) { toggleTree(tt.dataset.treeToggle); return; }
     // judul kolom (tampilan detail) untuk mengurutkan
@@ -1822,7 +1981,9 @@ function bind() {
     if (e.key === '/') { e.preventDefault(); $('#searchInput').focus(); }
   });
 
-  /* seret & lepas */
+  bindDrag();
+
+  /* seret & lepas file dari komputer */
   let dragDepth = 0;
   const hasFiles = (e) => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
   window.addEventListener('dragenter', (e) => {
@@ -1840,7 +2001,9 @@ function bind() {
     e.preventDefault();
     dragDepth = 0; $('#dropZone').hidden = true;
     if ($('#screenApp').hidden) return;
-    const base = curFolderId();
+    const tile = e.target.closest && e.target.closest('#items .it');
+    const tf = tile && itemById(tile.dataset.id);
+    const base = tf && isFolder(tf) ? tf.id : curFolderId();
     const entries = await entriesFromDrop(e.dataTransfer);
     addUploads(entries, base);
   });
