@@ -92,124 +92,154 @@
   </div>
 </section>
 
-<!-- ============ APLIKASI ============ -->
-<div id="screenApp" class="app" hidden>
+<!-- ============ APLIKASI (jendela pengelola file) ============ -->
+<div id="screenApp" class="desk" hidden>
+ <div class="win" id="win">
 
-  <aside id="sidebar" class="sidebar" aria-label="Navigasi">
-    <div class="sidebar-head">
-      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name" data-appname>Vena</span></div>
-      <button class="icon-btn only-mobile" data-action="close-sidebar" aria-label="Tutup menu"><svg class="i"><use href="#i-x"/></svg></button>
-    </div>
-
-    <div class="new-wrap">
-      <button id="btnNew" class="btn btn-primary btn-new" data-action="open-new" aria-haspopup="menu">
-        <svg class="i"><use href="#i-plus"/></svg> Baru
+  <!-- bilah judul -->
+  <header class="titlebar">
+    <button class="icon-btn only-mobile" data-action="open-sidebar" aria-label="Buka panel folder"><svg class="i"><use href="#i-menu"/></svg></button>
+    <span class="brand-mark small" aria-hidden="true"></span>
+    <strong class="win-title" id="winTitle">File saya</strong>
+    <span class="grow"></span>
+    <button class="icon-btn" id="btnTheme" aria-label="Ganti tema"><svg class="i"><use href="#i-moon"/></svg></button>
+    <div class="account">
+      <button id="btnAccount" class="avatar-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Akun">
+        <img id="avatarImg" alt="" referrerpolicy="no-referrer" hidden><span id="avatarInitial">?</span>
       </button>
-
+      <div id="menuAccount" class="menu menu-right" role="menu" hidden>
+        <div class="menu-head">
+          <strong id="accName">—</strong>
+          <span id="accEmail" class="tiny muted">—</span>
+          <span id="accStorage" class="tiny muted" hidden></span>
+        </div>
+        <hr>
+        <button role="menuitem" data-action="theme" id="menuTheme"><svg class="i"><use href="#i-moon"/></svg><span id="menuThemeText">Tema gelap</span></button>
+        <button role="menuitem" data-action="logout"><svg class="i"><use href="#i-logout"/></svg>Keluar</button>
+      </div>
     </div>
+  </header>
 
-    <nav class="nav">
-      <a href="#/" data-nav="home"><svg class="i"><use href="#i-drawer"/></svg>File saya</a>
-      <a href="#/recent" data-nav="recent"><svg class="i"><use href="#i-clock"/></svg>Terbaru</a>
-      <a href="#/starred" data-nav="starred"><svg class="i"><use href="#i-star"/></svg>Berbintang</a>
-      <a href="#/shared" data-nav="shared"><svg class="i"><use href="#i-link"/></svg>Dibagikan</a>
-      <a href="#/trash" data-nav="trash"><svg class="i"><use href="#i-trash"/></svg>Sampah</a>
-    </nav>
-
-    <div class="quota" id="quota">
-      <strong class="quota-title">Kapasitas Google Drive</strong>
-      <div class="quota-bar"><span id="quotaFill"></span><span id="quotaAppFill" class="app-fill"></span></div>
-      <p id="quotaText" class="tiny">Menghitung ruang…</p>
-      <p class="tiny muted quota-legend"><span class="dot"></span><span id="quotaApp"></span></p>
-      <p id="quotaFree" class="tiny muted"></p>
-      <a id="quotaDrive" class="tiny" href="https://drive.google.com/" target="_blank" rel="noopener">Buka di Google Drive</a>
+  <!-- navigasi: kembali / maju / naik + alamat + cari -->
+  <div class="navbar">
+    <div class="nav-btns">
+      <button class="nb" data-action="nav-back" id="navBack" aria-label="Kembali" title="Kembali (Alt+←)"><svg class="i"><use href="#i-arrow-left"/></svg></button>
+      <button class="nb" data-action="nav-fwd" id="navFwd" aria-label="Maju" title="Maju (Alt+→)"><svg class="i"><use href="#i-arrow-right"/></svg></button>
+      <button class="nb" data-action="nav-up" id="navUp" aria-label="Naik satu folder" title="Naik satu folder"><svg class="i"><use href="#i-arrow-up"/></svg></button>
+      <button class="nb" data-action="refresh" aria-label="Muat ulang" title="Muat ulang (F5)"><svg class="i"><use href="#i-refresh"/></svg></button>
     </div>
-  </aside>
-  <div class="scrim" data-action="close-sidebar"></div>
+    <nav class="address" id="crumbs" aria-label="Lokasi"></nav>
+    <form class="search" id="searchForm" role="search">
+      <svg class="i" aria-hidden="true"><use href="#i-search"/></svg>
+      <input id="searchInput" type="search" placeholder="Cari di Vena" aria-label="Cari file dan folder" autocomplete="off">
+    </form>
+  </div>
 
-  <main class="main" id="main">
-    <header class="topbar">
-      <button class="icon-btn only-mobile" data-action="open-sidebar" aria-label="Buka menu"><svg class="i"><use href="#i-menu"/></svg></button>
-      <form class="search" id="searchForm" role="search">
-        <svg class="i" aria-hidden="true"><use href="#i-search"/></svg>
-        <input id="searchInput" type="search" placeholder="Cari file dan folder" aria-label="Cari file dan folder" autocomplete="off">
-      </form>
-      <button class="icon-btn" id="btnTheme" aria-label="Ganti tema"><svg class="i"><use href="#i-moon"/></svg></button>
-      <div class="account">
-        <button id="btnAccount" class="avatar-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Akun">
-          <img id="avatarImg" alt="" referrerpolicy="no-referrer" hidden><span id="avatarInitial">?</span>
-        </button>
-        <div id="menuAccount" class="menu menu-right" role="menu" hidden>
-          <div class="menu-head">
-            <strong id="accName">—</strong>
-            <span id="accEmail" class="tiny muted">—</span>
-            <span id="accStorage" class="tiny muted" hidden></span>
+  <!-- bilah perintah -->
+  <div class="cmdbar" id="cmdbar">
+    <button class="cmd cmd-primary" data-action="open-new" aria-haspopup="menu"><svg class="i"><use href="#i-plus"/></svg><span>Baru</span></button>
+    <button class="cmd" data-action="upload-files" data-hide-in="trash"><svg class="i"><use href="#i-upload"/></svg><span>Unggah</span></button>
+    <span class="cmd-sep" data-hide-in="trash"></span>
+    <button class="cmd" data-action="sel-open" data-need="one" data-hide-in="trash"><svg class="i"><use href="#i-eye"/></svg><span>Buka</span></button>
+    <button class="cmd" data-action="sel-download" data-need="files" data-hide-in="trash"><svg class="i"><use href="#i-download"/></svg><span>Unduh</span></button>
+    <button class="cmd" data-action="sel-share" data-need="one" data-hide-in="trash"><svg class="i"><use href="#i-link"/></svg><span>Bagikan</span></button>
+    <button class="cmd" data-action="sel-rename" data-need="one" data-hide-in="trash"><svg class="i"><use href="#i-edit"/></svg><span>Ganti nama</span></button>
+    <button class="cmd" data-action="sel-move" data-need="any" data-hide-in="trash"><svg class="i"><use href="#i-move"/></svg><span>Pindahkan</span></button>
+    <button class="cmd danger" data-action="sel-trash" data-need="any" data-hide-in="trash"><svg class="i"><use href="#i-trash"/></svg><span>Hapus</span></button>
+    <button class="cmd" data-action="sel-restore" data-need="any" data-show-in="trash"><svg class="i"><use href="#i-restore"/></svg><span>Pulihkan</span></button>
+    <button class="cmd danger" data-action="sel-delete" data-need="any" data-show-in="trash"><svg class="i"><use href="#i-trash"/></svg><span>Hapus permanen</span></button>
+    <button class="cmd" data-action="empty-trash" data-show-in="trash"><svg class="i"><use href="#i-x"/></svg><span>Kosongkan sampah</span></button>
+    <span class="grow"></span>
+    <label class="sort-wrap"><span class="sr">Urutkan</span>
+      <select id="sortSelect" class="select" aria-label="Urutkan">
+        <option value="name">Urut: Nama</option>
+        <option value="modified">Urut: Tanggal</option>
+        <option value="size">Urut: Ukuran</option>
+        <option value="type">Urut: Jenis</option>
+      </select>
+    </label>
+    <div class="seg" role="group" aria-label="Tampilan">
+      <button data-view="grid" aria-label="Ikon besar" title="Ikon besar"><svg class="i"><use href="#i-grid"/></svg></button>
+      <button data-view="list" aria-label="Detail" title="Detail"><svg class="i"><use href="#i-list"/></svg></button>
+    </div>
+    <button class="cmd cmd-icon" data-action="toggle-details" id="btnDetails" aria-pressed="true" title="Panel detail"><svg class="i"><use href="#i-panel"/></svg></button>
+  </div>
+
+  <div class="win-body">
+    <!-- panel kiri -->
+    <aside id="sidebar" class="navpane" aria-label="Navigasi">
+      <div class="np-head only-mobile">
+        <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name" data-appname>Vena</span></div>
+        <button class="icon-btn" data-action="close-sidebar" aria-label="Tutup"><svg class="i"><use href="#i-x"/></svg></button>
+      </div>
+      <p class="np-label">Akses cepat</p>
+      <nav class="nav">
+        <a href="#/" data-nav="home"><svg class="i"><use href="#i-drawer"/></svg>File saya</a>
+        <a href="#/recent" data-nav="recent"><svg class="i"><use href="#i-clock"/></svg>Terbaru</a>
+        <a href="#/starred" data-nav="starred"><svg class="i"><use href="#i-star"/></svg>Berbintang</a>
+        <a href="#/shared" data-nav="shared"><svg class="i"><use href="#i-link"/></svg>Dibagikan</a>
+        <a href="#/trash" data-nav="trash"><svg class="i"><use href="#i-trash"/></svg>Sampah</a>
+      </nav>
+      <p class="np-label">Folder</p>
+      <ul class="tree" id="tree" role="tree"></ul>
+
+      <div class="disk" id="quota">
+        <div class="disk-top">
+          <svg class="disk-ico" viewBox="0 0 40 28" aria-hidden="true"><rect x="1" y="4" width="38" height="20" rx="4" fill="currentColor" opacity=".18"/><rect x="1" y="4" width="38" height="20" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="32" cy="14" r="2.4" fill="currentColor"/><path d="M7 14h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <div>
+            <strong>Google Drive</strong>
+            <p id="quotaFree" class="tiny muted"></p>
           </div>
-          <hr>
-          <button role="menuitem" data-action="theme" id="menuTheme"><svg class="i"><use href="#i-moon"/></svg><span id="menuThemeText">Tema gelap</span></button>
-          <a role="menuitem" href="https://drive.google.com/" target="_blank" rel="noopener"><svg class="i"><use href="#i-external"/></svg>Buka Google Drive</a>
-          <button role="menuitem" data-action="logout"><svg class="i"><use href="#i-logout"/></svg>Keluar</button>
         </div>
+        <div class="quota-bar"><span id="quotaFill"></span><span id="quotaAppFill" class="app-fill"></span></div>
+        <p id="quotaText" class="tiny muted">Menghitung ruang…</p>
+        <p class="tiny muted quota-legend"><span class="dot"></span><span id="quotaApp"></span></p>
+        <a id="quotaDrive" class="tiny" href="https://drive.google.com/" target="_blank" rel="noopener" hidden>Buka di Google Drive</a>
       </div>
-    </header>
+    </aside>
+    <div class="scrim" data-action="close-sidebar"></div>
 
-    <div id="sessionBanner" class="banner" hidden>
-      <span>Sesi Google Anda sudah habis. Sambungkan lagi untuk melanjutkan.</span>
-      <button class="btn btn-small" data-action="reconnect">Sambungkan lagi</button>
-    </div>
-
-    <div class="toolbar">
-      <nav id="crumbs" class="crumbs" aria-label="Lokasi"></nav>
-      <div class="toolbar-right">
-        <select id="sortSelect" class="select" aria-label="Urutkan">
-          <option value="name">Nama</option>
-          <option value="modified">Terakhir diubah</option>
-          <option value="size">Ukuran</option>
-        </select>
-        <div class="seg" role="group" aria-label="Tampilan">
-          <button data-view="grid" aria-label="Tampilan petak"><svg class="i"><use href="#i-grid"/></svg></button>
-          <button data-view="list" aria-label="Tampilan daftar"><svg class="i"><use href="#i-list"/></svg></button>
-        </div>
+    <!-- isi folder -->
+    <main class="pane" id="main">
+      <div id="sessionBanner" class="banner" hidden>
+        <span>Sesi sudah habis. Sambungkan lagi untuk melanjutkan.</span>
+        <button class="btn btn-small" data-action="reconnect">Sambungkan lagi</button>
       </div>
-    </div>
-
-    <div id="selectionBar" class="selection-bar" hidden>
-      <button class="icon-btn" data-action="clear-selection" aria-label="Batalkan pilihan"><svg class="i"><use href="#i-x"/></svg></button>
-      <strong id="selCount">0 dipilih</strong>
-      <span class="grow"></span>
-      <button class="btn btn-ghost" data-action="sel-download" data-hide-in="trash"><svg class="i"><use href="#i-download"/></svg><span>Unduh</span></button>
-      <button class="btn btn-ghost" data-action="sel-move" data-hide-in="trash"><svg class="i"><use href="#i-move"/></svg><span>Pindahkan</span></button>
-      <button class="btn btn-ghost" data-action="sel-trash" data-hide-in="trash"><svg class="i"><use href="#i-trash"/></svg><span>Hapus</span></button>
-      <button class="btn btn-ghost" data-action="sel-restore" data-show-in="trash"><svg class="i"><use href="#i-restore"/></svg><span>Pulihkan</span></button>
-      <button class="btn btn-ghost danger" data-action="sel-delete" data-show-in="trash"><svg class="i"><use href="#i-trash"/></svg><span>Hapus permanen</span></button>
-    </div>
-
-    <div id="content" class="content" tabindex="-1">
       <div id="trashNote" class="note" hidden>
-        File di Sampah bisa dipulihkan. Google Drive menghapusnya permanen setelah 30 hari.
-        <button class="link-btn" data-action="empty-trash">Kosongkan sampah</button>
+        Item di Sampah bisa dipulihkan. Google Drive menghapusnya permanen setelah 30 hari.
       </div>
-      <section id="foldersSection" hidden>
-        <h2 class="section-title">Folder</h2>
-        <div id="folders" class="folders"></div>
-      </section>
-      <section id="filesSection" hidden>
-        <h2 class="section-title">File</h2>
-        <div id="files" class="files grid"></div>
-      </section>
-      <div id="emptyState" class="empty" hidden></div>
-      <div id="listLoading" class="list-loading" hidden><div class="spinner"></div></div>
-    </div>
-
-    <div id="dropZone" class="drop-zone" hidden>
-      <div class="drop-card">
-        <svg class="i i-xl"><use href="#i-upload"/></svg>
-        <p>Lepaskan untuk mengunggah ke <strong id="dropTarget">folder ini</strong></p>
+      <div id="content" class="content" tabindex="-1">
+        <div class="list-head" id="listHead">
+          <button data-sort="name">Nama</button>
+          <button data-sort="modified">Diubah</button>
+          <button data-sort="type">Jenis</button>
+          <button data-sort="size">Ukuran</button>
+        </div>
+        <div id="items" class="items grid" role="listbox" aria-multiselectable="true" aria-label="Isi folder"></div>
+        <div id="emptyState" class="empty" hidden></div>
+        <div id="listLoading" class="list-loading" hidden><div class="spinner"></div></div>
       </div>
-    </div>
+      <div id="dropZone" class="drop-zone" hidden>
+        <div class="drop-card">
+          <svg class="i i-xl"><use href="#i-upload"/></svg>
+          <p>Lepaskan untuk mengunggah ke <strong id="dropTarget">folder ini</strong></p>
+        </div>
+      </div>
+    </main>
 
-    <button class="fab only-mobile" data-action="open-new" aria-haspopup="menu" aria-label="Baru"><svg class="i"><use href="#i-plus"/></svg></button>
-  </main>
+    <!-- panel detail -->
+    <aside class="details" id="details" aria-label="Detail"></aside>
+  </div>
+
+  <!-- bilah status -->
+  <footer class="statusbar">
+    <span id="statusCount">0 item</span>
+    <span id="statusSel"></span>
+    <span class="grow"></span>
+    <span id="statusFree"></span>
+  </footer>
+ </div>
+ <button class="fab only-mobile" data-action="open-new" aria-haspopup="menu" aria-label="Baru"><svg class="i"><use href="#i-plus"/></svg></button>
 </div>
 
 <!-- ============ PANEL UNGGAHAN ============ -->
@@ -315,6 +345,11 @@
 <!-- ============ IKON ============ -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
   <defs>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5m0 0 6-6m-6 6 6 6"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14m0 0-6-6m6 6-6 6"/></symbol>
+    <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5m0 0-6 6m6-6 6 6"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4"/></symbol>
+    <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></symbol>

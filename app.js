@@ -305,6 +305,9 @@ async function afterLogin() {
   $('#sessionBanner').hidden = true;
   renderAccount();
   renderQuota();
+  const dp = LS.get('vena.details');
+  $('#win').classList.toggle('no-details', dp === '0');
+  $('#btnDetails').setAttribute('aria-pressed', String(dp !== '0'));
   show('screenApp');
   await ensureRoot();
   refreshAppUsage();
@@ -433,17 +436,55 @@ const curFolderId = () => S.route.type === 'folder' ? S.route.id : S.rootId;
 
 function onRoute(silent = false) {
   if (!S.rootId) return;
+  const prevKey = S.routeKey;
   S.route = parseHash();
-  S.selected.clear();
+  S.routeKey = location.hash || '#/';
+  trackHistory(S.routeKey);
+  if (prevKey !== S.routeKey) { S.selected.clear(); S.anchor = null; }
   closeMenus();
   const navKey = S.route.type === 'folder' ? (S.route.id === S.rootId ? 'home' : '') : S.route.type;
-  for (const a of $$('.nav a')) a.classList.toggle('active', a.dataset.nav === navKey || (navKey === '' && a.dataset.nav === 'home'));
-  if (S.route.type !== 'search') $('#searchInput').value = '';
-  else $('#searchInput').value = S.route.q;
+  for (const a of $$('.nav a')) a.classList.toggle('active', a.dataset.nav === navKey);
+  $('#searchInput').value = S.route.type === 'search' ? S.route.q : '';
   $('#screenApp').classList.remove('nav-open');
   $('#trashNote').hidden = S.route.type !== 'trash';
-  $('#sortSelect').hidden = S.route.type === 'recent';
+  const trash = S.route.type === 'trash';
+  for (const b of $$('#cmdbar [data-hide-in]')) b.hidden = trash;
+  for (const b of $$('#cmdbar [data-show-in]')) b.hidden = !trash;
+  $('#sortSelect').disabled = S.route.type === 'recent';
+  updateNavButtons();
+  renderTree();
   loadView(silent);
+}
+
+/* ---- riwayat kembali / maju ---- */
+const H = { stack: [], idx: -1, moving: false };
+function trackHistory(key) {
+  if (H.moving) { H.moving = false; return; }
+  if (H.stack[H.idx] === key) return;
+  H.stack = H.stack.slice(0, H.idx + 1);
+  H.stack.push(key);
+  H.idx = H.stack.length - 1;
+}
+function navStep(d) {
+  const i = H.idx + d;
+  if (i < 0 || i >= H.stack.length) return;
+  H.idx = i; H.moving = true;
+  location.hash = H.stack[i];
+}
+function parentOf(id) {
+  if (!id || id === S.rootId) return null;
+  const m = S.meta.get(id);
+  return (m && m.parents && m.parents[0]) || S.rootId;
+}
+function navUp() {
+  if (S.route.type !== 'folder') { location.hash = '#/'; return; }
+  const p = parentOf(S.route.id);
+  if (p) location.hash = folderHash(p);
+}
+function updateNavButtons() {
+  $('#navBack').disabled = H.idx <= 0;
+  $('#navFwd').disabled = H.idx >= H.stack.length - 1;
+  $('#navUp').disabled = S.route.type === 'folder' && S.route.id === S.rootId;
 }
 
 async function loadView(silent = false) {
@@ -451,8 +492,10 @@ async function loadView(silent = false) {
   const r = S.route;
   renderCrumbs();
   if (!silent) {
-    $('#foldersSection').hidden = $('#filesSection').hidden = $('#emptyState').hidden = true;
+    $('#items').innerHTML = '';
+    $('#emptyState').hidden = true;
     $('#listLoading').hidden = false;
+    renderStatus(); renderDetails();
   }
   try {
     let items;
@@ -474,11 +517,13 @@ async function loadView(silent = false) {
     items = items.filter(f => f.id !== S.rootId);
     S.items = items;
     for (const f of items) if (isFolder(f)) S.meta.set(f.id, { name: f.name, parents: f.parents });
+    for (const id of [...S.selected]) if (!items.some(f => f.id === id)) S.selected.delete(id);
     render();
   } catch (e) {
     if (seq !== S.loadSeq) return;
     $('#listLoading').hidden = true;
-    if (e.auth) { S.items = []; showEmpty('session'); return; }
+    S.items = []; render(true);
+    if (e.auth) { showEmpty('session'); return; }
     if (e.status === 404) { showEmpty('missing'); return; }
     fail(e, 'Gagal memuat');
     showEmpty('error');
@@ -487,7 +532,7 @@ async function loadView(silent = false) {
   }
 }
 
-/* ---------------------------------------------------------------- breadcrumb */
+/* ---------------------------------------------------------------- alamat */
 async function folderChain(id) {
   const chain = [];
   let cur = id, guard = 0;
@@ -505,26 +550,57 @@ async function folderChain(id) {
   }
   return chain;
 }
-
+const VIEW_TITLES = { recent: 'Terbaru', starred: 'Berbintang', shared: 'Dibagikan', trash: 'Sampah' };
+function setTitle(t) {
+  $('#winTitle').textContent = t;
+  document.title = t + ' — ' + CFG.APP_NAME;
+}
 async function renderCrumbs() {
   const el = $('#crumbs');
   const r = S.route;
-  const titles = { recent: 'Terbaru', starred: 'Berbintang', shared: 'Dibagikan dengan link', trash: 'Sampah' };
-  if (r.type === 'search') { el.innerHTML = `<span class="current">Hasil untuk “${esc(r.q)}”</span>`; return; }
-  if (r.type !== 'folder') { el.innerHTML = `<span class="current">${titles[r.type]}</span>`; return; }
-  if (r.id === S.rootId) { el.innerHTML = `<span class="current">File saya</span>`; return; }
+  const root = `<span class="root-ico">${icon('i-drawer')}</span>`;
+  const sep = `<span class="sep">${icon('i-chevron-right')}</span>`;
+  if (r.type === 'search') { el.innerHTML = root + `<button data-go="${S.rootId}">File saya</button>${sep}<span class="current">Hasil pencarian “${esc(r.q)}”</span>`; setTitle('Cari: ' + r.q); return; }
+  if (r.type !== 'folder') { el.innerHTML = root + `<span class="current">${VIEW_TITLES[r.type]}</span>`; setTitle(VIEW_TITLES[r.type]); return; }
+  if (r.id === S.rootId) { el.innerHTML = root + `<span class="current">File saya</span>`; setTitle('File saya'); return; }
   const seq = S.loadSeq;
-  el.innerHTML = `<button data-go="${S.rootId}">File saya</button><span class="sep">${icon('i-chevron-right')}</span><span class="current">…</span>`;
+  el.innerHTML = root + `<button data-go="${S.rootId}">File saya</button>${sep}<span class="current">…</span>`;
   const chain = await folderChain(r.id);
   if (seq !== S.loadSeq) return;
-  let html = `<button data-go="${S.rootId}">File saya</button>`;
+  let html = root + `<button data-go="${S.rootId}">File saya</button>`;
   chain.forEach((c, i) => {
-    html += `<span class="sep">${icon('i-chevron-right')}</span>`;
+    html += sep;
     html += i === chain.length - 1 ? `<span class="current" title="${esc(c.name)}">${esc(c.name)}</span>` : `<button data-go="${c.id}" title="${esc(c.name)}">${esc(c.name)}</button>`;
   });
   el.innerHTML = html;
-  document.title = (chain.length ? chain[chain.length - 1].name + ' — ' : '') + CFG.APP_NAME;
+  el.scrollLeft = el.scrollWidth;
+  setTitle(chain.length ? chain[chain.length - 1].name : 'File saya');
+  updateNavButtons();
+  expandTreeTo(chain.map(c => c.id));
 }
+
+/* ================================================================ IKON */
+const KIND_LABEL = { image: 'Gambar', video: 'Video', audio: 'Audio', pdf: 'PDF', sheet: 'Lembar kerja', slides: 'Presentasi', doc: 'Dokumen', archive: 'Arsip', code: 'Teks / kode', file: 'File', folder: 'Folder' };
+function folderSvg(cls = 'big') {
+  return `<svg class="${cls}" viewBox="0 0 64 52" aria-hidden="true">
+    <path d="M4 6a4 4 0 0 1 4-4h15l6 6h27a4 4 0 0 1 4 4v4H4z" fill="var(--folder-back)"/>
+    <rect x="2" y="12" width="60" height="38" rx="5" fill="var(--folder-front)"/>
+    <rect x="2" y="12" width="60" height="5" rx="2.5" fill="#fff" opacity=".28"/></svg>`;
+}
+function fileSvg(f, cls = 'big') {
+  const k = kindOf(f);
+  let ext = extOf(f).toUpperCase().slice(0, 4);
+  if (!ext) ext = { image: 'IMG', video: 'VID', audio: 'AUD', pdf: 'PDF', archive: 'ZIP' }[k] || '';
+  const fs = ext.length > 3 ? 8 : 9.5;
+  return `<svg class="${cls}" viewBox="0 0 52 64" aria-hidden="true">
+    <path d="M8 2h25l15 15v41a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z" fill="var(--paper)" stroke="var(--paper-line)" stroke-width="1.5"/>
+    <path d="M33 2v11a4 4 0 0 0 4 4h11" fill="var(--paper-fold)" stroke="var(--paper-line)" stroke-width="1.5" stroke-linejoin="round"/>
+    ${ext ? `<rect x="0" y="34" width="38" height="16" rx="4" fill="var(--k-${k})"/>
+    <text x="19" y="45.5" text-anchor="middle" font-family="Atkinson Hyperlegible, system-ui, sans-serif" font-weight="700" font-size="${fs}" fill="#fff">${esc(ext)}</text>`
+    : `<path d="M13 30h22M13 37h22M13 44h14" stroke="var(--k-${k})" stroke-width="3" stroke-linecap="round"/>`}</svg>`;
+}
+const itemSvg = (f, cls) => isFolder(f) ? folderSvg(cls) : fileSvg(f, cls);
+const typeLabel = (f) => isFolder(f) ? 'Folder' : (KIND_LABEL[kindOf(f)] + (extOf(f) ? ' (.' + extOf(f) + ')' : ''));
 
 /* ================================================================ RENDER */
 function sorted(list) {
@@ -533,56 +609,43 @@ function sorted(list) {
   const byName = (x, y) => x.name.localeCompare(y.name, 'id', { numeric: true, sensitivity: 'base' });
   if (S.sort === 'modified') a.sort((x, y) => (y.modifiedTime || '').localeCompare(x.modifiedTime || '') || byName(x, y));
   else if (S.sort === 'size') a.sort((x, y) => (Number(y.size) || 0) - (Number(x.size) || 0) || byName(x, y));
+  else if (S.sort === 'type') a.sort((x, y) => kindOf(x).localeCompare(kindOf(y)) || extOf(x).localeCompare(extOf(y)) || byName(x, y));
   else a.sort(byName);
-  return a;
+  // folder selalu di atas, seperti di komputer
+  return a.sort((x, y) => (isFolder(y) ? 1 : 0) - (isFolder(x) ? 1 : 0));
 }
-const visibleFolders = () => sorted(S.items.filter(isFolder));
-const visibleFiles = () => sorted(S.items.filter(f => !isFolder(f)));
+const visibleItems = () => sorted(S.items);
+const visibleFiles = () => visibleItems().filter(f => !isFolder(f));
 
-function render() {
-  const folders = visibleFolders(), files = visibleFiles();
+function render(silentEmpty) {
+  const list = visibleItems();
+  if (S.route.type === 'folder' && !silentEmpty) syncTreeChildren(S.route.id, S.items.filter(isFolder));
   const trash = S.route.type === 'trash';
-  $('#foldersSection').hidden = !folders.length;
-  $('#filesSection').hidden = !files.length;
-  $('#folders').innerHTML = folders.map(f => folderHTML(f)).join('');
-  const filesEl = $('#files');
-  filesEl.className = 'files ' + S.view;
-  filesEl.innerHTML = files.map(f => fileHTML(f, trash)).join('');
-  if (!folders.length && !files.length) showEmpty(S.route.type); else $('#emptyState').hidden = true;
+  const box = $('#items');
+  box.className = 'items ' + S.view;
+  $('#content').classList.toggle('listing', S.view === 'list' && list.length > 0);
+  box.innerHTML = list.map(f => itemHTML(f, trash)).join('');
+  if (!list.length && !silentEmpty) showEmpty(S.route.type); else $('#emptyState').hidden = true;
   hookThumbs();
-  renderSelection();
   for (const b of $$('.seg button')) b.classList.toggle('on', b.dataset.view === S.view);
+  for (const b of $$('#listHead button')) b.classList.toggle('on', b.dataset.sort === S.sort && S.route.type !== 'recent');
   $('#sortSelect').value = S.sort;
-  if (S.route.type !== 'folder' || S.route.id === S.rootId) document.title = CFG.APP_NAME + ' — Penyimpanan';
+  renderSelection();
 }
 
-function folderHTML(f) {
+function itemHTML(f, trash) {
   const sel = S.selected.has(f.id);
-  return `<div class="folder item${sel ? ' selected' : ''}" data-id="${f.id}" tabindex="0" role="button" aria-label="Folder ${esc(f.name)}">
-    <span class="fico">${icon('i-folder')}</span>
-    <button class="check" data-check aria-label="Pilih ${esc(f.name)}" aria-pressed="${sel}">${icon('i-check')}</button>
-    <span class="name" title="${esc(f.name)}">${esc(f.name)}</span>
-    ${f.starred ? `<span class="star-flag" title="Berbintang">${icon('i-star')}</span>` : ''}
-    <button class="icon-btn" data-more aria-label="Pilihan untuk ${esc(f.name)}">${icon('i-more')}</button>
-  </div>`;
-}
-
-function fileHTML(f, trash) {
-  const k = kindOf(f), sel = S.selected.has(f.id);
-  const thumb = f.thumbnailLink ? `<img data-thumb loading="lazy" referrerpolicy="no-referrer" alt="" src="${esc(f.thumbnailLink.replace(/=s\d+$/, '=s400'))}">` : '';
-  const when = trash ? 'Dihapus' : fmtDate(f.modifiedTime);
-  return `<div class="file item${sel ? ' selected' : ''}" data-id="${f.id}" tabindex="0" role="button" style="--kind: var(--k-${k === 'folder' ? 'file' : k})" aria-label="${esc(f.name)}">
-    <div class="thumb" data-kind="${k}">${thumb || icon(KIND_ICON[k])}</div>
-    <button class="check" data-check aria-label="Pilih ${esc(f.name)}" aria-pressed="${sel}">${icon('i-check')}</button>
-    ${f.starred ? `<span class="star-flag" title="Berbintang">${icon('i-star')}</span>` : ''}
-    <div class="meta">
-      <span class="kind-ico">${icon(KIND_ICON[k])}</span>
-      <div class="text">
-        <div class="name" title="${esc(f.name)}">${esc(f.name)}${f.starred ? `<span class="name-star" title="Berbintang">${icon('i-star')}</span>` : ''}</div>
-        <div class="sub"><span>${trash ? '' : esc(fmtDate(f.modifiedTime))}</span><span>${esc(fmtSize(f.size))}</span></div>
-      </div>
-      <button class="icon-btn" data-more aria-label="Pilihan untuk ${esc(f.name)}">${icon('i-more')}</button>
-    </div>
+  const k = kindOf(f);
+  const thumb = !isFolder(f) && f.thumbnailLink
+    ? `<img data-thumb loading="lazy" referrerpolicy="no-referrer" alt="" src="${esc(f.thumbnailLink.replace(/=s\d+$/, '=s320'))}">` : '';
+  return `<div class="it${sel ? ' selected' : ''}" data-id="${f.id}" tabindex="0" role="option" aria-selected="${sel}" title="${esc(f.name)}">
+    <div class="ic" data-kind="${k}">${thumb || itemSvg(f)}</div>
+    <div class="nm"><span class="mini">${itemSvg(f, 'mini-svg')}</span><span class="label">${esc(f.name)}</span>${f.starred ? `<span class="star-badge" title="Berbintang">${icon('i-star')}</span>` : ''}</div>
+    ${f.starred ? `<span class="star-badge grid-only" title="Berbintang">${icon('i-star')}</span>` : ''}
+    ${f.shared ? `<span class="shared-badge" title="Dibagikan dengan link">${icon('i-link')}</span>` : ''}
+    <span class="col c-date">${trash ? '' : esc(fmtDate(f.modifiedTime))}</span>
+    <span class="col c-type">${esc(isFolder(f) ? 'Folder' : KIND_LABEL[k])}</span>
+    <span class="col c-size">${isFolder(f) ? '' : esc(fmtSize(f.size))}</span>
   </div>`;
 }
 
@@ -596,27 +659,27 @@ function hookThumbs() {
       for (const en of entries) if (en.isIntersecting) { thumbObserver.unobserve(en.target); loadBlobThumb(en.target); }
     }, { rootMargin: '200px' });
   }
-  for (const img of $$('#files img[data-thumb]')) {
+  for (const img of $$('#items img[data-thumb]')) {
     img.onerror = () => {
       const box = img.parentElement;
-      const card = box.closest('.file');
-      const f = S.items.find(x => x.id === card.dataset.id);
-      box.innerHTML = icon(KIND_ICON[box.dataset.kind]);
-      if (f && box.dataset.kind === 'image' && Number(f.size) < 6e6) {
+      const f = itemById(box.closest('.it').dataset.id);
+      if (!f) return;
+      box.innerHTML = itemSvg(f);
+      if (box.dataset.kind === 'image' && Number(f.size) < 6e6) {
         if (thumbObserver) thumbObserver.observe(box); else loadBlobThumb(box);
       }
     };
   }
-  for (const box of $$('#files .thumb[data-kind="image"]')) {
+  for (const box of $$('#items .ic[data-kind="image"]')) {
     if (box.querySelector('img')) continue;
-    const id = box.closest('.file').dataset.id;
-    const f = S.items.find(x => x.id === id);
+    const id = box.closest('.it').dataset.id;
+    const f = itemById(id);
     if (blobThumbs.has(id)) { box.innerHTML = `<img alt="" src="${blobThumbs.get(id)}">`; continue; }
     if (f && Number(f.size) < 6e6 && thumbObserver) thumbObserver.observe(box);
   }
 }
 async function loadBlobThumb(box) {
-  const card = box.closest('.file'); if (!card) return;
+  const card = box.closest('.it'); if (!card) return;
   const id = card.dataset.id;
   try {
     let url = blobThumbs.get(id);
@@ -627,35 +690,33 @@ async function loadBlobThumb(box) {
     }
     if (box.isConnected) {
       box.innerHTML = `<img alt="" src="${url}">`;
-      box.firstChild.onerror = () => { box.innerHTML = icon('f-image'); };
+      box.firstChild.onerror = () => { const f = itemById(id); box.innerHTML = f ? itemSvg(f) : ''; };
     }
   } catch {}
 }
 
 function showEmpty(kind) {
-  $('#foldersSection').hidden = $('#filesSection').hidden = true;
   const el = $('#emptyState');
   const states = {
     folder: S.route.id === S.rootId
-      ? ['Laci Anda masih kosong', 'Seret file ke sini atau mulai dengan mengunggah. Semua file tersimpan di folder “' + CFG.ROOT_FOLDER_NAME + '” di Google Drive.', 'Unggah file']
-      : ['Folder ini kosong', 'Seret file ke sini, atau unggah dari perangkat Anda.', 'Unggah file'],
+      ? ['Belum ada file', 'Seret file ke jendela ini, atau klik Unggah. Semua file tersimpan di Google Drive Anda.', 'Unggah file']
+      : ['Folder ini kosong', 'Seret file ke jendela ini, atau klik Unggah.', 'Unggah file'],
     recent: ['Belum ada file', 'File yang baru diunggah atau diubah akan muncul di sini.', 'Unggah file'],
-    starred: ['Belum ada yang berbintang', 'Beri bintang pada file atau folder penting lewat menu ⋮ supaya mudah ditemukan.'],
+    starred: ['Belum ada yang berbintang', 'Klik kanan file atau folder, lalu pilih Beri bintang supaya mudah ditemukan.'],
     shared: ['Belum ada yang dibagikan', 'File dan folder yang Anda bagikan lewat link akan terkumpul di sini.'],
     trash: ['Sampah kosong', 'File yang Anda hapus bisa dipulihkan dari sini selama 30 hari.'],
     search: ['Tidak ada yang cocok', 'Coba kata lain, atau periksa ejaan nama file.'],
-    session: ['Sesi Google habis', 'Sambungkan lagi untuk melihat file Anda.', 'Sambungkan lagi', 'reconnect'],
+    session: ['Sesi sudah habis', 'Sambungkan lagi untuk melihat file Anda.', 'Sambungkan lagi', 'reconnect'],
     missing: ['Folder tidak ditemukan', 'Folder ini mungkin sudah dihapus atau dipindahkan.', 'Kembali ke File saya', 'home'],
     error: ['File tidak bisa dimuat', 'Periksa koneksi internet, lalu coba lagi.', 'Coba lagi', 'retry'],
   };
   const [t, d, cta, act = 'upload-files'] = states[kind] || states.folder;
-  el.innerHTML = `<div class="empty-art" aria-hidden="true"></div><h3>${esc(t)}</h3><p>${esc(d)}</p>${cta ? `<button class="btn btn-primary" data-action="${act}">${esc(cta)}</button>` : ''}`;
+  el.innerHTML = `<div class="empty-art" aria-hidden="true">${folderSvg('')}</div><h3>${esc(t)}</h3><p>${esc(d)}</p>${cta ? `<button class="btn btn-primary" data-action="${act}">${esc(cta)}</button>` : ''}`;
   el.hidden = false;
 }
 
 function renderAccount() {
-  const st = S.user;
-  const u = st;
+  const u = S.user;
   $('#accName').textContent = u.displayName || 'Akun Google';
   $('#accEmail').textContent = u.emailAddress;
   $('#accStorage').hidden = false;
@@ -667,7 +728,6 @@ function renderAccount() {
     img.onerror = () => { img.hidden = true; $('#avatarInitial').hidden = false; };
     img.src = u.photoLink;
   }
-  $('#quotaDrive').href = 'https://drive.google.com/drive/folders/' + (S.rootId || '') + '?authuser=' + encodeURIComponent(st.emailAddress);
 }
 function renderQuota() {
   const q = S.quota || {};
@@ -678,32 +738,203 @@ function renderQuota() {
   $('#quotaText').textContent = lim ? `${fmtSize(used)} dari ${fmtSize(lim)} terpakai` : `${fmtSize(used)} terpakai`;
   const au = S.appUsage;
   $('#quotaApp').textContent = au ? `${CFG.APP_NAME}: ${fmtSize(au.total)} (${au.count.toLocaleString('id-ID')} file)` : '';
-  $('#quotaFree').textContent = lim ? `Sisa ${fmtSize(Math.max(0, lim - used))}` : '';
+  const free = lim ? `${fmtSize(Math.max(0, lim - used))} tersedia` : '';
+  $('#quotaFree').textContent = free;
+  $('#statusFree').textContent = free ? 'Ruang kosong: ' + fmtSize(Math.max(0, lim - used)) : '';
   if (au && lim) $('#quotaAppFill').style.width = Math.min(100, au.total / lim * 100) + '%';
-  if (S.rootId && S.user) $('#quotaDrive').href = 'https://drive.google.com/drive/folders/' + S.rootId + '?authuser=' + encodeURIComponent(S.user.emailAddress);
 }
 
 /* ================================================================ PILIHAN */
-function toggleSelect(id) {
-  if (S.selected.has(id)) S.selected.delete(id); else S.selected.add(id);
-  const el = $(`.item[data-id="${CSS.escape(id)}"]`);
-  if (el) {
-    el.classList.toggle('selected', S.selected.has(id));
-    const c = el.querySelector('[data-check]'); if (c) c.setAttribute('aria-pressed', S.selected.has(id));
+function paintSelection() {
+  for (const el of $$('#items .it')) {
+    const on = S.selected.has(el.dataset.id);
+    el.classList.toggle('selected', on);
+    el.setAttribute('aria-selected', on);
   }
   renderSelection();
 }
-function clearSelection() { S.selected.clear(); render(); }
+function selectOnly(id) { S.selected = new Set([id]); S.anchor = id; paintSelection(); }
+function toggleSelect(id) {
+  if (S.selected.has(id)) S.selected.delete(id); else S.selected.add(id);
+  S.anchor = id; paintSelection();
+}
+function selectRange(id) {
+  const ids = visibleItems().map(f => f.id);
+  const a = ids.indexOf(S.anchor), b = ids.indexOf(id);
+  if (a < 0 || b < 0) return selectOnly(id);
+  S.selected = new Set(ids.slice(Math.min(a, b), Math.max(a, b) + 1));
+  paintSelection();
+}
+function selectAll() { S.selected = new Set(S.items.map(f => f.id)); paintSelection(); }
+function clearSelection() { if (!S.selected.size) return; S.selected.clear(); paintSelection(); }
 function renderSelection() {
-  const n = S.selected.size, trash = S.route.type === 'trash';
-  $('#selectionBar').hidden = !n;
+  const sel = selectedItems();
+  const n = sel.length, files = sel.filter(f => !isFolder(f)).length;
+  for (const b of $$('#cmdbar [data-need]')) {
+    const need = b.dataset.need;
+    b.disabled = need === 'one' ? n !== 1 : need === 'files' ? files === 0 : n === 0;
+  }
   $('#content').classList.toggle('selecting', n > 0);
-  $('#selCount').textContent = n + ' dipilih';
-  for (const b of $$('#selectionBar [data-hide-in]')) b.hidden = trash;
-  for (const b of $$('#selectionBar [data-show-in]')) b.hidden = !trash;
+  $('#screenApp').classList.toggle('has-sel', n > 0);
+  renderStatus();
+  renderDetails();
+}
+function renderStatus() {
+  const all = S.items, sel = selectedItems();
+  const nF = all.filter(isFolder).length, nFi = all.length - nF;
+  const parts = [];
+  if (nF) parts.push(`${nF} folder`);
+  if (nFi) parts.push(`${nFi} file`);
+  $('#statusCount').textContent = parts.length ? parts.join(', ') : 'Kosong';
+  if (sel.length) {
+    const size = sel.reduce((s, f) => s + (Number(f.size) || 0), 0);
+    $('#statusSel').textContent = `${sel.length} dipilih` + (size ? ` (${fmtSize(size)})` : '');
+  } else $('#statusSel').textContent = '';
 }
 const selectedItems = () => S.items.filter(f => S.selected.has(f.id));
 const itemById = (id) => S.items.find(f => f.id === id);
+
+/* ---------------------------------------------------------------- panel detail */
+function renderDetails() {
+  const el = $('#details');
+  if (!el || getComputedStyle(el).display === 'none') return;
+  const sel = selectedItems();
+  const trash = S.route.type === 'trash';
+  const btn = (act, ic, label, cls = '') => `<button class="btn ${cls}" data-action="${act}">${icon(ic)}${label}</button>`;
+  if (sel.length === 1) {
+    const f = sel[0], folder = isFolder(f);
+    const k = kindOf(f);
+    const prev = !folder && blobThumbs.has(f.id) ? `<img alt="" src="${blobThumbs.get(f.id)}">`
+      : !folder && f.thumbnailLink ? `<img alt="" referrerpolicy="no-referrer" src="${esc(f.thumbnailLink.replace(/=s\d+$/, '=s600'))}" onerror="this.replaceWith(document.createRange().createContextualFragment(this.dataset.fb))" data-fb="${esc(itemSvg(f))}">`
+      : itemSvg(f);
+    let acts = '';
+    if (trash) acts = btn('sel-restore', 'i-restore', 'Pulihkan', 'btn-primary') + btn('sel-delete', 'i-trash', 'Hapus permanen', 'danger');
+    else acts = btn('sel-open', folder ? 'i-folder' : 'i-eye', folder ? 'Buka folder' : 'Buka', 'btn-primary')
+      + (folder ? '' : btn('sel-download', 'i-download', 'Unduh'))
+      + btn('sel-share', 'i-link', f.shared ? 'Link aktif' : 'Bagikan')
+      + btn('sel-rename', 'i-edit', 'Ganti nama')
+      + btn('sel-move', 'i-move', 'Pindahkan')
+      + btn('sel-star', 'i-star', f.starred ? 'Lepas bintang' : 'Bintangi')
+      + btn('sel-trash', 'i-trash', 'Hapus', 'danger');
+    el.innerHTML = `<div class="d-preview">${prev}</div>
+      <h3>${esc(f.name)}</h3>
+      <dl>
+        <dt>Jenis</dt><dd>${esc(typeLabel(f))}</dd>
+        ${folder ? '' : `<dt>Ukuran</dt><dd>${esc(fmtSize(f.size))}</dd>`}
+        <dt>Diubah</dt><dd>${esc(fmtLong(f.modifiedTime))}</dd>
+        <dt>Dibuat</dt><dd>${esc(fmtLong(f.createdTime))}</dd>
+        <dt>Berbagi</dt><dd>${f.shared ? 'Siapa saja yang punya link' : 'Hanya Anda'}</dd>
+      </dl>
+      <div class="d-actions">${acts}</div>`;
+    return;
+  }
+  if (sel.length > 1) {
+    const size = sel.reduce((s, f) => s + (Number(f.size) || 0), 0);
+    const nF = sel.filter(isFolder).length;
+    const acts = trash ? btn('sel-restore', 'i-restore', 'Pulihkan', 'btn-primary') + btn('sel-delete', 'i-trash', 'Hapus permanen', 'danger')
+      : btn('sel-download', 'i-download', 'Unduh', 'btn-primary') + btn('sel-move', 'i-move', 'Pindahkan') + btn('sel-trash', 'i-trash', 'Hapus', 'danger');
+    el.innerHTML = `<div class="d-preview">${folderSvg()}</div>
+      <h3>${sel.length} item dipilih</h3>
+      <dl>
+        ${nF ? `<dt>Folder</dt><dd>${nF}</dd>` : ''}
+        <dt>File</dt><dd>${sel.length - nF}</dd>
+        <dt>Total</dt><dd>${esc(fmtSize(size))}</dd>
+      </dl>
+      <div class="d-actions">${acts}</div>`;
+    return;
+  }
+  const title = S.route.type === 'folder' ? ($('#winTitle').textContent || 'File saya') : (VIEW_TITLES[S.route.type] || 'Hasil pencarian');
+  const files = S.items.filter(f => !isFolder(f));
+  const size = files.reduce((s, f) => s + (Number(f.size) || 0), 0);
+  el.innerHTML = `<div class="d-preview">${folderSvg()}</div>
+    <h3>${esc(title)}</h3>
+    <dl>
+      <dt>Isi</dt><dd>${S.items.length - files.length} folder, ${files.length} file</dd>
+      <dt>Ukuran file</dt><dd>${esc(fmtSize(size))}</dd>
+    </dl>
+    <p class="d-hint">Klik sekali untuk memilih, klik dua kali untuk membuka. Tahan <kbd>Ctrl</kbd> untuk memilih beberapa, <kbd>Shift</kbd> untuk rentang. Klik kanan untuk pilihan lain.</p>`;
+}
+function fmtLong(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+/* ---------------------------------------------------------------- pohon folder */
+const T = { nodes: new Map(), open: new Set(LS.get('vena.treeOpen') ? JSON.parse(LS.get('vena.treeOpen')) : []) };
+// nodes: id -> { name, children: [ids] | null }
+function syncTreeChildren(parentId, folders) {
+  const kids = sorted(folders).map(f => { T.nodes.set(f.id, Object.assign(T.nodes.get(f.id) || { children: null }, { name: f.name })); return f.id; });
+  const p = T.nodes.get(parentId) || { name: '', children: null };
+  p.children = kids;
+  T.nodes.set(parentId, p);
+  renderTree();
+}
+async function loadTreeChildren(id) {
+  try {
+    const folders = await listAll(`'${qstr(id)}' in parents and mimeType='${FOLDER}' and trashed=false`, { orderBy: 'name' });
+    for (const f of folders) S.meta.set(f.id, { name: f.name, parents: f.parents });
+    syncTreeChildren(id, folders);
+  } catch {}
+}
+function saveTreeOpen() { LS.set('vena.treeOpen', JSON.stringify([...T.open].slice(-200))); }
+function toggleTree(id) {
+  if (T.open.has(id)) T.open.delete(id); else { T.open.add(id); const n = T.nodes.get(id); if (!n || !n.children) loadTreeChildren(id); }
+  saveTreeOpen(); renderTree();
+}
+function expandTreeTo(ids) {
+  let changed = false;
+  for (const id of ids.slice(0, -1)) if (!T.open.has(id)) { T.open.add(id); changed = true; const n = T.nodes.get(id); if (!n || !n.children) loadTreeChildren(id); }
+  if (changed) { saveTreeOpen(); renderTree(); }
+}
+function renderTree() {
+  const el = $('#tree'); if (!el || !S.rootId) return;
+  const root = T.nodes.get(S.rootId);
+  if (!root || !root.children) { el.innerHTML = '<li class="tree-empty">Memuat…</li>'; if (!T.loadingRoot) { T.loadingRoot = true; loadTreeChildren(S.rootId); } return; }
+  const cur = S.route.type === 'folder' ? S.route.id : null;
+  const branch = (ids, depth) => ids.map(id => {
+    const n = T.nodes.get(id); if (!n) return '';
+    const open = T.open.has(id) && depth < 12;
+    const leaf = n.children && n.children.length === 0;
+    return `<li role="treeitem" aria-expanded="${open}">
+      <div class="row${cur === id ? ' active' : ''}">
+        <button class="twisty${open ? ' open' : ''}${leaf ? ' leaf' : ''}" data-tree-toggle="${id}" aria-label="Buka/tutup">${icon('i-chevron-right')}</button>
+        <button class="tname" data-go="${id}" title="${esc(n.name)}">${folderSvg('')}<span>${esc(n.name)}</span></button>
+      </div>
+      ${open && n.children ? `<ul role="group">${branch(n.children, depth + 1)}</ul>` : ''}
+    </li>`;
+  }).join('');
+  el.innerHTML = root.children.length ? branch(root.children, 0) : '<li class="tree-empty">Belum ada folder</li>';
+}
+let treeTimer;
+function refreshTreeSoon() {
+  clearTimeout(treeTimer);
+  treeTimer = setTimeout(() => {
+    for (const id of new Set([S.rootId, ...T.open])) { const n = T.nodes.get(id); if (n && n.children) loadTreeChildren(id); }
+  }, 500);
+}
+function moveFocus(e) {
+  const els = $$('#items .it'); if (!els.length) return;
+  e.preventDefault();
+  const curEl = document.activeElement && document.activeElement.closest && document.activeElement.closest('#items .it');
+  let i = curEl ? els.indexOf(curEl) : -1;
+  let step = 1;
+  if (S.view === 'grid') { const top = els[0].offsetTop; step = els.filter(x => x.offsetTop === top).length || 1; }
+  const k = e.key;
+  if (i < 0) i = 0;
+  else if (k === 'ArrowRight') i = Math.min(els.length - 1, i + 1);
+  else if (k === 'ArrowLeft') i = Math.max(0, i - 1);
+  else if (k === 'ArrowDown') i = Math.min(els.length - 1, i + step);
+  else if (k === 'ArrowUp') i = Math.max(0, i - step);
+  else if (k === 'Home') i = 0;
+  else if (k === 'End') i = els.length - 1;
+  const el = els[i];
+  el.focus({ preventScroll: true }); el.scrollIntoView({ block: 'nearest' });
+  if (e.shiftKey && S.anchor) selectRange(el.dataset.id); else selectOnly(el.dataset.id);
+}
+function treeForget(ids) {
+  for (const n of T.nodes.values()) if (n.children) n.children = n.children.filter(c => !ids.has(c));
+  renderTree();
+}
 
 /* ================================================================ MENU */
 function closeMenus() {
@@ -822,7 +1053,8 @@ async function newFolder(parentId = curFolderId()) {
   try {
     const f = await api('/files', { method: 'POST', query: { fields: FIELDS }, body: { name, mimeType: FOLDER, parents: [parentId] } });
     S.meta.set(f.id, { name: f.name, parents: f.parents });
-    if (S.route.type === 'folder' && S.route.id === parentId) { S.items.push(f); render(); }
+    if (S.route.type === 'folder' && S.route.id === parentId) { S.items.push(f); render(); selectOnly(f.id); }
+    else refreshTreeSoon();
     toast(`Folder “${name}” dibuat.`);
     return f;
   } catch (e) { fail(e, 'Gagal membuat folder'); return null; }
@@ -834,8 +1066,8 @@ async function renameItem(f) {
   try {
     const r = await api('/files/' + f.id, { method: 'PATCH', query: { fields: FIELDS }, body: { name } });
     Object.assign(f, r);
-    if (isFolder(f)) S.meta.set(f.id, { name: f.name, parents: f.parents });
-    render();
+    if (isFolder(f)) { S.meta.set(f.id, { name: f.name, parents: f.parents }); const n = T.nodes.get(f.id); if (n) n.name = f.name; }
+    render(); renderTree();
     toast('Nama diganti.');
   } catch (e) { fail(e, 'Gagal mengganti nama'); }
 }
@@ -875,7 +1107,7 @@ async function trashItems(list) {
     toast(ok.length === 1 ? `“${ok[0].name}” dipindahkan ke Sampah.` : `${ok.length} item dipindahkan ke Sampah.` + (failed ? ` ${failed} gagal.` : ''), {
       action: 'Urungkan', onAction: async () => { await restoreItems(ok, true); onRoute(true); }, ms: 7000
     });
-    refreshQuotaSoon();
+    refreshQuotaSoon(); refreshTreeSoon();
   } catch (e) { fail(e, 'Gagal menghapus'); }
 }
 
@@ -887,6 +1119,7 @@ async function restoreItems(list, quiet) {
       S.items = S.items.filter(f => !ids.has(f.id)); S.selected.clear(); render();
     }
     if (!quiet) toast(list.length === 1 ? `“${list[0].name}” dipulihkan.` : `${list.length} item dipulihkan.`);
+    refreshTreeSoon();
   } catch (e) { fail(e, 'Gagal memulihkan'); }
 }
 
@@ -903,6 +1136,7 @@ async function deleteItems(list, skipConfirm) {
     const ids = new Set(list.map(f => f.id));
     S.items = S.items.filter(f => !ids.has(f.id)); S.selected.clear(); render();
     toast(list.length === 1 ? 'Dihapus permanen.' : `${list.length} item dihapus permanen.`);
+    refreshTreeSoon();
     refreshQuotaSoon();
   } catch (e) { fail(e, 'Gagal menghapus'); }
 }
@@ -1032,7 +1266,7 @@ async function doMove() {
       const ids = new Set(list.map(f => f.id));
       S.items = S.items.filter(f => !ids.has(f.id));
     }
-    S.selected.clear(); render();
+    S.selected.clear(); render(); refreshTreeSoon();
   } catch (e) { fail(e, 'Gagal memindahkan'); }
 }
 
@@ -1460,8 +1694,21 @@ function bind() {
         case 'reconnect': reconnect(); return;
         case 'home': location.hash = '#/'; return;
         case 'retry': loadView(); return;
-        case 'clear-selection': clearSelection(); return;
         case 'sel-download': downloadFiles(selectedItems()); return;
+        case 'sel-open': { const f = selectedItems()[0]; if (f) openItem(f); return; }
+        case 'sel-share': { const f = selectedItems()[0]; if (f) openShare(f); return; }
+        case 'sel-rename': { const f = selectedItems()[0]; if (f) renameItem(f); return; }
+        case 'sel-star': { const f = selectedItems()[0]; if (f) toggleStar(f); return; }
+        case 'nav-back': navStep(-1); return;
+        case 'nav-fwd': navStep(1); return;
+        case 'nav-up': navUp(); return;
+        case 'refresh': loadView(); refreshQuota(); return;
+        case 'toggle-details': {
+          const hidden = $('#win').classList.toggle('no-details');
+          LS.set('vena.details', hidden ? '0' : '1');
+          $('#btnDetails').setAttribute('aria-pressed', String(!hidden));
+          renderDetails(); return;
+        }
         case 'sel-move': openMove(selectedItems()); return;
         case 'sel-trash': trashItems(selectedItems()); return;
         case 'sel-restore': restoreItems(selectedItems()); return;
@@ -1490,31 +1737,58 @@ function bind() {
       }
     }
 
-    // item di daftar
-    const item = t.closest('#content .item');
+    // pohon folder: buka/tutup cabang
+    const tt = t.closest('[data-tree-toggle]');
+    if (tt) { toggleTree(tt.dataset.treeToggle); return; }
+    // judul kolom (tampilan detail) untuk mengurutkan
+    const hs = t.closest('#listHead [data-sort]');
+    if (hs) { S.sort = hs.dataset.sort; LS.set('vena.sort', S.sort); render(); return; }
+
+    // item di jendela
+    const item = t.closest('#items .it');
     if (item) {
       const id = item.dataset.id;
-      if (t.closest('[data-check]')) { e.stopPropagation(); toggleSelect(id); return; }
-      if (t.closest('[data-more]')) {
-        e.stopPropagation();
-        const r = t.closest('[data-more]').getBoundingClientRect();
-        openItemMenu(id, r.right, r.bottom + 4, true);
+      if (lastPointer === 'touch') {
+        // HP/tablet: ketuk = buka; kalau sedang memilih, ketuk = pilih
+        if (S.selected.size) toggleSelect(id); else { const f = itemById(id); if (f) openItem(f); }
         return;
       }
-      if (S.selected.size || e.ctrlKey || e.metaKey || e.shiftKey) { toggleSelect(id); return; }
-      const f = itemById(id); if (f) openItem(f);
+      if (e.ctrlKey || e.metaKey) toggleSelect(id);
+      else if (e.shiftKey && S.anchor) selectRange(id);
+      else selectOnly(id);
       return;
     }
+    // klik di area kosong jendela: batalkan pilihan
+    if (t.closest('#content') && !t.closest('button, a')) clearSelection();
 
     // klik di luar menu menutupnya
     if (!t.closest('.menu')) closeMenus();
   });
 
+  let lastPointer = 'mouse';
+  document.addEventListener('pointerdown', (e) => { lastPointer = e.pointerType || 'mouse'; }, true);
+
+  document.addEventListener('dblclick', (e) => {
+    const item = e.target.closest('#items .it');
+    if (!item || lastPointer === 'touch') return;
+    const f = itemById(item.dataset.id); if (f) openItem(f);
+  });
+
   document.addEventListener('contextmenu', (e) => {
-    const item = e.target.closest('#content .item');
-    if (!item) return;
-    e.preventDefault();
-    openItemMenu(item.dataset.id, e.clientX, e.clientY, false);
+    if ($('#screenApp').hidden) return;
+    const item = e.target.closest('#items .it');
+    if (item) {
+      e.preventDefault();
+      if (!S.selected.has(item.dataset.id) && lastPointer !== 'touch') selectOnly(item.dataset.id);
+      openItemMenu(item.dataset.id, e.clientX, e.clientY, false);
+      return;
+    }
+    if (e.target.closest('#content') && S.route.type !== 'trash') {
+      e.preventDefault();
+      clearSelection();
+      closeMenus();
+      placeMenu($('#menuNew'), e.clientX, e.clientY);
+    }
   });
 
   document.addEventListener('keydown', (e) => {
@@ -1527,17 +1801,24 @@ function bind() {
     }
     if (e.key === 'Escape') {
       if ([...$$('.menu')].some(m => !m.hidden)) { closeMenus(); return; }
-      if (S.selected.size) clearSelection();
+      clearSelection();
       $('#screenApp').classList.remove('nav-open');
       return;
     }
     if (typing || $('#screenApp').hidden || document.querySelector('dialog[open]')) return;
-    const item = document.activeElement.closest && document.activeElement.closest('#content .item');
-    if (e.key === 'Enter' && item) { const f = itemById(item.dataset.id); if (f) openItem(f); }
-    if (e.key === ' ' && item) { e.preventDefault(); toggleSelect(item.dataset.id); }
-    if (e.key === 'Delete' && S.selected.size) {
-      if (S.route.type === 'trash') deleteItems(selectedItems()); else trashItems(selectedItems());
+    const sel = selectedItems();
+    if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); navStep(-1); return; }
+    if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); navStep(1); return; }
+    if ((e.altKey && e.key === 'ArrowUp') || e.key === 'Backspace') { e.preventDefault(); navUp(); return; }
+    if (e.key === 'F5') { e.preventDefault(); loadView(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); selectAll(); return; }
+    if (e.key === 'F2' && sel.length === 1 && S.route.type !== 'trash') { e.preventDefault(); renameItem(sel[0]); return; }
+    if (e.key === 'Enter' && sel.length === 1) { openItem(sel[0]); return; }
+    if (e.key === 'Delete' && sel.length) {
+      if (S.route.type === 'trash') deleteItems(sel); else trashItems(sel);
+      return;
     }
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) { moveFocus(e); return; }
     if (e.key === '/') { e.preventDefault(); $('#searchInput').focus(); }
   });
 
