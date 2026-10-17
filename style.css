@@ -180,6 +180,14 @@ code { font-size: .88em; background: var(--surface-2); border: 1px solid var(--l
 }
 .btn-google:hover { border-color: var(--accent); }
 #loginHint { margin: 14px 0 0; }
+.pw-form { max-width: 380px; display: grid; gap: 4px; }
+.pw-wrap { position: relative; display: block; }
+.pw-wrap input { padding-right: 96px !important; font-size: 16px; }
+.pw-wrap .link-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
+.check-row { display: flex; align-items: center; gap: 10px; font-size: 14.5px; margin: 0 0 14px; cursor: pointer; }
+.check-row input { width: 18px; height: 18px; accent-color: var(--accent); }
+.pw-form .btn-block { padding: 12px 18px; font-size: 15.5px; }
+.pw-form p { margin: 12px 0 0; }
 #btnResetSetup { align-self: flex-start; margin-top: 18px; }
 
 /* ---------- tata letak aplikasi ---------- */

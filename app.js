@@ -8,7 +8,7 @@
 
 /* ---------------------------------------------------------------- konfigurasi */
 const CFG = Object.assign({
-  CLIENT_ID: '', ALLOWED_EMAIL: '', BROKER_URL: '', STORAGE_EMAIL: '', ROOT_FOLDER_NAME: 'Vena Drive', APP_NAME: 'Vena'
+  CLIENT_ID: '', ALLOWED_EMAIL: '', SERVER_URL: '', BROKER_URL: '', STORAGE_EMAIL: '', ROOT_FOLDER_NAME: 'Vena Drive', APP_NAME: 'Vena'
 }, window.VENA_CONFIG || {});
 const LS = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -17,9 +17,7 @@ const LS = {
 };
 const clientId = () => (CFG.CLIENT_ID || LS.get('vena.clientId') || '').trim();
 // Akun yang boleh login. Tanpa penjaga (BROKER_URL kosong), akun login = akun penyimpanan.
-const allowedEmail = () => ((CFG.BROKER_URL || '').trim()
-  ? (CFG.ALLOWED_EMAIL || '')
-  : (CFG.STORAGE_EMAIL || CFG.ALLOWED_EMAIL || LS.get('vena.allowedEmail') || '')).trim().toLowerCase();
+const allowedEmail = () => (CFG.STORAGE_EMAIL || CFG.ALLOWED_EMAIL || LS.get('vena.allowedEmail') || '').trim().toLowerCase();
 
 // Izin "drive.file": aplikasi HANYA bisa melihat & mengubah file yang dibuat
 // lewat aplikasi ini sendiri. File lain di Google Drive tidak terjangkau sama sekali.
@@ -31,7 +29,7 @@ const FIELDS = 'id,name,mimeType,size,modifiedTime,createdTime,thumbnailLink,sta
 
 /* ---------------------------------------------------------------- state */
 const S = {
-  token: null, exp: 0, bsession: null, admin: null, user: null, quota: null, rootId: null,
+  token: null, exp: 0, bsession: null, user: null, quota: null, rootId: null,
   route: { type: 'folder', id: null, q: '' },
   items: [], selected: new Set(),
   view: LS.get('vena.view') || 'grid',
@@ -126,20 +124,19 @@ function toggleTheme() {
 
 /* ---------------------------------------------------------------- layar */
 function show(id) {
-  for (const s of ['screenLoading', 'screenSetup', 'screenLogin', 'screenLink', 'screenApp']) $('#' + s).hidden = s !== id;
+  for (const s of ['screenLoading', 'screenSetup', 'screenLogin', 'screenApp']) $('#' + s).hidden = s !== id;
 }
 
 /* ================================================================ AUTENTIKASI
    Dua mode:
-   - Mode PENJAGA (BROKER_URL diisi): orang login dengan akun admin, lalu server
-     kecil (Google Apps Script) memeriksa akun itu dan memberi akses sementara ke
-     Drive akun penyimpanan. Akses itu juga hanya "drive.file".
-   - Mode LANGSUNG (BROKER_URL kosong): akun yang login = akun penyimpanan.
+   - Mode PASSWORD (SERVER_URL diisi): masuk cukup dengan password Vena.
+     Server kecil di Google Apps Script (milik akun penyimpanan) memeriksa
+     password, lalu memberi akses sementara ke Drive. Tanpa HP, tanpa akun Google.
+   - Mode GOOGLE (SERVER_URL kosong): masuk dengan akun Google penyimpanan.
    ================================================================ */
-class AuthError extends Error { constructor() { super('Sesi Google habis'); this.auth = true; } }
-const brokerUrl = () => (CFG.BROKER_URL || '').trim();
-const brokerMode = () => !!brokerUrl();
-const storageEmail = () => (CFG.STORAGE_EMAIL || '').trim().toLowerCase();
+class AuthError extends Error { constructor() { super('Sesi habis'); this.auth = true; } }
+const serverUrl = () => (CFG.SERVER_URL || CFG.BROKER_URL || '').trim();
+const brokerMode = () => !!serverUrl();
 
 function waitForGis() {
   return new Promise((resolve, reject) => {
@@ -153,30 +150,24 @@ function waitForGis() {
 }
 
 function initTokenClient() {
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: clientId(),
-    scope: brokerMode() ? 'openid email profile' : DRIVE_SCOPE,
-    callback: () => {},
-  });
-}
-
-function gisError(e) {
-  const map = {
-    popup_closed: 'Jendela login ditutup sebelum selesai.',
-    popup_failed_to_open: 'Jendela login diblokir browser. Izinkan pop-up untuk situs ini, lalu coba lagi.',
-  };
-  return new Error(map[e.type] || e.message || e.type);
+  tokenClient = google.accounts.oauth2.initTokenClient({ client_id: clientId(), scope: DRIVE_SCOPE, callback: () => {} });
 }
 
 function requestToken(prompt) {
   return new Promise((resolve, reject) => {
     tokenClient.callback = (r) => {
       if (r.error) return reject(new Error(r.error_description || r.error));
-      if (!brokerMode() && !google.accounts.oauth2.hasGrantedAllScopes(r, DRIVE_SCOPE))
+      if (!google.accounts.oauth2.hasGrantedAllScopes(r, DRIVE_SCOPE))
         return reject(new Error('Akses ke Google Drive belum diizinkan. Masuk lagi dan centang izin Google Drive.'));
       resolve(r);
     };
-    tokenClient.error_callback = (e) => reject(gisError(e));
+    tokenClient.error_callback = (e) => {
+      const map = {
+        popup_closed: 'Jendela login ditutup sebelum selesai.',
+        popup_failed_to_open: 'Jendela login diblokir browser. Izinkan pop-up untuk situs ini, lalu coba lagi.',
+      };
+      reject(new Error(map[e.type] || e.message || e.type));
+    };
     const hint = allowedEmail() || LS.get('vena.lastEmail') || '';
     const opts = { prompt };
     if (hint) opts.login_hint = hint;
@@ -184,17 +175,17 @@ function requestToken(prompt) {
   });
 }
 
-/* ---- panggil penjaga (Apps Script) ---- */
-async function broker(action, data = {}) {
+/* ---- server Vena (Apps Script) ---- */
+async function server(action, data = {}) {
   let res;
   try {
-    res = await fetch(brokerUrl(), {
+    res = await fetch(serverUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // tanpa preflight CORS
       body: JSON.stringify(Object.assign({ action }, data)),
     });
   } catch {
-    throw new Error('Server Vena (Apps Script) tidak bisa dihubungi. Periksa koneksi internet dan BROKER_URL di config.js.');
+    throw new Error('Server Vena tidak bisa dihubungi. Periksa koneksi internet.');
   }
   let j;
   try { j = await res.json(); }
@@ -203,31 +194,39 @@ async function broker(action, data = {}) {
   return j;
 }
 
-/* ---- penyimpanan sesi lokal ---- */
-function saveSession() {
-  LS.set('vena.session', JSON.stringify({ token: S.token, exp: S.exp, bs: S.bsession, admin: S.admin }));
+/* ---- sesi lokal ---- */
+function saveSession(persist) {
+  const data = JSON.stringify({ token: S.token, exp: S.exp, bs: S.bsession });
+  const remember = persist !== undefined ? persist : !(S.bsession && S.bsession.temp);
+  if (remember) { LS.set('vena.session', data); try { sessionStorage.removeItem('vena.session'); } catch {} }
+  else { try { sessionStorage.setItem('vena.session', data); } catch {} LS.del('vena.session'); }
 }
 function loadSession() {
+  let raw = LS.get('vena.session');
+  if (!raw) { try { raw = sessionStorage.getItem('vena.session'); } catch {} }
   try {
-    const s = JSON.parse(LS.get('vena.session') || 'null');
+    const s = JSON.parse(raw || 'null');
     if (!s) return;
     if (s.token && s.exp > Date.now() + 30000) { S.token = s.token; S.exp = s.exp; }
     if (s.bs && s.bs.exp > Date.now()) S.bsession = s.bs;
-    if (s.admin) S.admin = s.admin;
   } catch {}
 }
 function setToken(r) {
   S.token = r.access_token;
-  S.exp = Date.now() + (Number(r.expires_in || 3599) - 60) * 1000;
+  S.exp = Date.now() + (Number(r.expires_in || 1800) - 60) * 1000;
   saveSession();
 }
 function clearSession() {
-  S.token = null; S.exp = 0; S.bsession = null; S.admin = null;
+  S.token = null; S.exp = 0; S.bsession = null;
   LS.del('vena.session');
+  try { sessionStorage.removeItem('vena.session'); } catch {}
 }
 function expireSession() {
   clearSession();
-  if (!$('#screenApp').hidden) $('#sessionBanner').hidden = false;
+  if (!$('#screenApp').hidden) {
+    if (brokerMode()) { toast('Sesi berakhir. Masuk lagi dengan password.', { error: true }); logout(); }
+    else $('#sessionBanner').hidden = false;
+  }
 }
 
 /* ---- token Drive yang selalu segar ---- */
@@ -238,11 +237,10 @@ async function getToken(force = false) {
   if (!tokenPromise) {
     tokenPromise = (async () => {
       try {
-        setToken(await broker('token', { session: S.bsession.id }));
+        setToken(await server('token', { session: S.bsession.id }));
         return S.token;
       } catch (e) {
-        if (e.code === 'AUTH' || e.code === 'FORBIDDEN') { expireSession(); throw new AuthError(); }
-        if (e.code === 'NOT_LINKED') { S.token = null; showLink(); throw new AuthError(); }
+        if (e.code === 'AUTH') { expireSession(); throw new AuthError(); }
         throw e;
       }
     })().finally(() => { tokenPromise = null; });
@@ -250,36 +248,36 @@ async function getToken(force = false) {
   return tokenPromise;
 }
 
-/* ---- login ---- */
-async function loginWith(r) {
-  // mode langsung: token login = token Drive
-  if (!brokerMode()) { setToken(r); return true; }
-  // mode penjaga: kenali akun admin, lalu minta akses Drive ke penjaga
-  let info = {};
+/* ---- masuk ---- */
+async function passwordLogin(e) {
+  e.preventDefault();
+  const pw = $('#pwInput').value;
+  const remember = $('#pwRemember').checked;
+  $('#loginError').textContent = '';
+  if (!pw) { $('#loginError').textContent = 'Ketik password Anda.'; $('#pwInput').focus(); return; }
+  const btn = $('#pwSubmit');
+  btn.disabled = true; btn.textContent = 'Memeriksa…';
   try {
-    const u = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + r.access_token } });
-    info = await u.json();
-  } catch {}
-  const email = String(info.email || '').toLowerCase();
-  const allow = allowedEmail();
-  if (allow && email && email !== allow) throw new Error(`Akun ${email} tidak diizinkan. Masuk dengan ${allow}.`);
-  const res = await broker('login', { access_token: r.access_token });
-  S.bsession = { id: res.session, exp: Date.now() + (Number(res.session_ttl) - 120) * 1000 };
-  S.admin = { email, name: info.name || email, picture: info.picture || '' };
-  LS.set('vena.lastEmail', email);
-  LS.set('vena.lastName', S.admin.name);
-  saveSession();
-  if (!res.linked || !res.drive) { showLink(); return false; }
-  setToken(res.drive);
-  return true;
+    const res = await server('login', { password: pw, remember });
+    S.bsession = { id: res.session, exp: Date.now() + (Number(res.session_ttl) - 120) * 1000, temp: !remember };
+    setToken(res.drive);
+    LS.set('vena.remember', remember ? '1' : '0');
+    $('#pwInput').value = '';
+    await afterLogin();
+  } catch (err) {
+    $('#loginError').textContent = err.message;
+    $('#pwInput').select();
+  } finally {
+    btn.disabled = false; btn.textContent = 'Masuk';
+  }
 }
 
 async function signIn(prompt) {
   $('#loginError').textContent = '';
   $('#btnLogin').disabled = true;
   try {
-    const r = await requestToken(prompt);
-    if (await loginWith(r)) await afterLogin();
+    setToken(await requestToken(prompt));
+    await afterLogin();
   } catch (e) {
     if (!$('#screenApp').hidden) fail(e); else $('#loginError').textContent = e.message;
   } finally {
@@ -299,10 +297,10 @@ async function afterLogin() {
       $('#loginError').textContent = `Akun ${email} tidak diizinkan. Masuk dengan ${allow}.`;
       return;
     }
-    LS.set('vena.lastEmail', email);
-    LS.set('vena.lastName', about.user.displayName || '');
   }
-  S.user = about.user;          // pemilik Drive penyimpanan
+  LS.set('vena.lastEmail', email);
+  LS.set('vena.lastName', about.user.displayName || '');
+  S.user = about.user;
   S.quota = about.storageQuota;
   $('#sessionBanner').hidden = true;
   renderAccount();
@@ -314,9 +312,9 @@ async function afterLogin() {
 }
 
 async function reconnect() {
+  if (brokerMode()) { logout(); return; }
   try {
-    const r = await requestToken('');
-    if (!(await loginWith(r))) return;
+    setToken(await requestToken(''));
     $('#sessionBanner').hidden = true;
     toast('Tersambung lagi.');
     refreshQuota();
@@ -330,43 +328,7 @@ function logout() {
   location.hash = '';
   setupLoginScreen();
   show('screenLogin');
-}
-
-/* ---- hubungkan Drive penyimpanan (sekali saja, mode penjaga) ---- */
-function showLink() {
-  const se = storageEmail();
-  $('#linkEmail').textContent = se || 'akun Google penyimpanan';
-  $('#linkAdmin').textContent = S.admin ? S.admin.email : '';
-  $('#linkError').textContent = '';
-  show('screenLink');
-}
-function linkStorage() {
-  $('#linkError').textContent = '';
-  const btn = $('#btnLink');
-  btn.disabled = true;
-  const cc = google.accounts.oauth2.initCodeClient({
-    client_id: clientId(),
-    scope: 'openid email ' + DRIVE_SCOPE,
-    ux_mode: 'popup',
-    select_account: true,
-    login_hint: storageEmail() || undefined,
-    callback: async (r) => {
-      try {
-        if (r.error) throw new Error(r.error_description || r.error);
-        if (!google.accounts.oauth2.hasGrantedAllScopes(r, DRIVE_SCOPE))
-          throw new Error('Izin Google Drive belum dicentang. Klik lagi dan centang izinnya.');
-        if (!S.bsession) throw new Error('Sesi admin habis. Keluar lalu masuk lagi.');
-        const res = await broker('link', { session: S.bsession.id, code: r.code });
-        setToken(res);
-        toast('Drive penyimpanan terhubung.');
-        await afterLogin();
-      } catch (e) {
-        $('#linkError').textContent = e.message;
-      } finally { btn.disabled = false; }
-    },
-    error_callback: (e) => { $('#linkError').textContent = gisError(e).message; btn.disabled = false; },
-  });
-  cc.requestCode();
+  if (brokerMode()) setTimeout(() => $('#pwInput').focus(), 50);
 }
 
 /* ================================================================ DRIVE API */
@@ -693,12 +655,11 @@ function showEmpty(kind) {
 
 function renderAccount() {
   const st = S.user;
-  const a = brokerMode() && S.admin ? S.admin : { name: st.displayName, email: st.emailAddress, picture: st.photoLink };
-  const u = { displayName: a.name, emailAddress: a.email, photoLink: a.picture };
+  const u = st;
   $('#accName').textContent = u.displayName || 'Akun Google';
   $('#accEmail').textContent = u.emailAddress;
-  $('#accStorage').hidden = !brokerMode();
-  $('#accStorage').textContent = 'File tersimpan di Drive ' + st.emailAddress;
+  $('#accStorage').hidden = false;
+  $('#accStorage').textContent = brokerMode() ? 'Masuk dengan password Vena' : 'Masuk dengan akun Google';
   $('#avatarInitial').textContent = (u.displayName || u.emailAddress || '?').trim()[0].toUpperCase();
   const img = $('#avatarImg');
   if (u.photoLink) {
@@ -1370,18 +1331,37 @@ async function entriesFromDrop(dt) {
 
 /* ================================================================ SETUP & LOGIN */
 function setupLoginScreen() {
+  const pw = brokerMode();
+  $('#pwForm').hidden = !pw;
+  $('#btnLogin').hidden = pw;
+  $('#loginLead').textContent = pw
+    ? 'Masukkan password untuk membuka penyimpanan Anda.'
+    : 'Unggah, atur, dan bagikan file. Semuanya tersimpan aman di Google Drive Anda sendiri.';
+  $('#pwRemember').checked = LS.get('vena.remember') !== '0';
   const last = LS.get('vena.lastEmail');
   const allow = allowedEmail();
   const name = LS.get('vena.lastName');
   $('#btnLoginText').textContent = last ? `Lanjutkan sebagai ${name || last}` : 'Masuk dengan Google';
-  $('#loginHint').textContent = allow ? `Gunakan akun ${allow}.` : (last ? last : '');
-  $('#btnResetSetup').hidden = !!CFG.CLIENT_ID;
+  $('#loginHint').textContent = pw ? '' : (allow ? `Gunakan akun ${allow}.` : (last || ''));
+  $('#btnResetSetup').hidden = pw || !!CFG.CLIENT_ID;
 }
 
 async function boot() {
   applyTheme();
   for (const el of $$('[data-appname]')) el.textContent = CFG.APP_NAME;
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+  setupLoginScreen();
+  if (brokerMode()) {
+    loadSession();
+    if (S.bsession) {
+      try { await afterLogin(); return; }
+      catch (e) { if (!e.auth) { console.warn(e); show('screenLogin'); $('#loginError').textContent = e.message; return; } }
+    }
+    clearSession();
+    show('screenLogin');
+    $('#pwInput').focus();
+    return;
+  }
   if (!clientId()) {
     $('#setupOrigin').textContent = location.origin.startsWith('http') ? location.origin : 'https://vena.web.id';
     $('#setupEmail').value = allowedEmail();
@@ -1389,18 +1369,12 @@ async function boot() {
     return;
   }
   try { await waitForGis(); }
-  catch (e) { show('screenLogin'); setupLoginScreen(); $('#loginError').textContent = e.message; return; }
+  catch (e) { show('screenLogin'); $('#loginError').textContent = e.message; return; }
   initTokenClient();
-  setupLoginScreen();
-  // sesi tersimpan masih berlaku?
   loadSession();
-  if (S.token || (brokerMode() && S.bsession)) {
+  if (S.token) {
     try { await afterLogin(); return; }
-    catch (e) {
-      if (!$('#screenLink').hidden) return;      // Drive penyimpanan belum terhubung
-      if (!e.auth) console.warn(e);
-      clearSession();
-    }
+    catch (e) { if (!e.auth) console.warn(e); clearSession(); }
   }
   show('screenLogin');
 }
@@ -1421,7 +1395,12 @@ function bind() {
   };
   $('#btnResetSetup').onclick = () => { LS.del('vena.clientId'); LS.del('vena.session'); location.reload(); };
   $('#btnLogin').onclick = () => signIn(LS.get('vena.lastEmail') ? '' : 'select_account');
-  $('#btnLink').onclick = linkStorage;
+  $('#pwForm').onsubmit = passwordLogin;
+  $('#pwShow').onclick = () => {
+    const i = $('#pwInput'); const on = i.type === 'password';
+    i.type = on ? 'text' : 'password';
+    $('#pwShow').textContent = on ? 'Sembunyikan' : 'Lihat';
+  };
   $('#btnTheme').onclick = toggleTheme;
 
   $('#btnAccount').onclick = (e) => {

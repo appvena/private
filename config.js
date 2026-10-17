@@ -13,9 +13,11 @@ window.VENA_CONFIG = {
   ALLOWED_EMAIL: "saidrezairfansyahputra@gmail.com",
   STORAGE_EMAIL: "saidrezairfansyahputra@gmail.com",
 
-  // Biarkan kosong. (Hanya diisi kalau nanti ingin login memakai akun lain
-  // dari akun penyimpanan; perlu skrip penjaga di Google Apps Script.)
-  BROKER_URL: "",
+  // Alamat server login (Web app Google Apps Script). Kalau diisi, masuk ke
+  // Vena cukup dengan password — tanpa akun Google, tanpa HP.
+  // Bentuknya: https://script.google.com/macros/s/XXXXXXXX/exec
+  // Kalau dikosongkan, masuk memakai akun Google seperti biasa.
+  SERVER_URL: "https://script.google.com/macros/s/AKfycbykiE_pKpOe0ZSOD9LQ6xsQ67x0ZyztbmPSfpWv4Q9hoZdKo5fhhiM0g7XqB8UaqQaB/exec",
 
   // Nama folder utama yang dibuat otomatis di Google Drive.
   // Semua file yang diunggah lewat aplikasi ini disimpan di dalamnya.

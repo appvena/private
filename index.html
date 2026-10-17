@@ -68,7 +68,20 @@
   <div class="login-body">
     <div class="brand brand-lg"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name" data-appname>Vena</span></div>
     <h1 class="login-title">Semua file Anda,<br>di satu laci.</h1>
-    <p class="muted login-lead">Unggah, atur, dan bagikan file. Semuanya tersimpan aman di Google Drive Anda sendiri.</p>
+    <p class="muted login-lead" id="loginLead">Unggah, atur, dan bagikan file. Semuanya tersimpan aman di Google Drive Anda sendiri.</p>
+    <form id="pwForm" class="pw-form" hidden autocomplete="on">
+      <input type="text" name="username" value="vena" autocomplete="username" hidden>
+      <label class="field">
+        <span>Password</span>
+        <span class="pw-wrap">
+          <input id="pwInput" type="password" autocomplete="current-password" required>
+          <button type="button" id="pwShow" class="link-btn tiny">Lihat</button>
+        </span>
+      </label>
+      <label class="check-row"><input type="checkbox" id="pwRemember" checked> Ingat saya di perangkat ini (30 hari)</label>
+      <button id="pwSubmit" class="btn btn-primary btn-block">Masuk</button>
+      <p class="tiny muted">Di komputer umum, hapus centang “Ingat saya” dan klik Keluar setelah selesai.</p>
+    </form>
     <button id="btnLogin" class="btn btn-google">
       <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
       <span id="btnLoginText">Masuk dengan Google</span>
@@ -76,23 +89,6 @@
     <p id="loginHint" class="tiny muted"></p>
     <p id="loginError" class="error" role="alert"></p>
     <button id="btnResetSetup" class="link-btn tiny" hidden>Ganti Client ID</button>
-  </div>
-</section>
-
-<!-- ============ HUBUNGKAN DRIVE PENYIMPANAN (sekali saja) ============ -->
-<section id="screenLink" class="screen screen-center" hidden>
-  <div class="panel setup">
-    <div class="brand brand-lg"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name" data-appname>Vena</span></div>
-    <h1>Hubungkan Drive penyimpanan</h1>
-    <p class="muted">Anda masuk sebagai <strong id="linkAdmin"></strong>. Sekarang pilih Drive tempat file disimpan. Ini cukup dilakukan sekali.</p>
-    <ol class="steps">
-      <li>Klik tombol di bawah. Jendela Google akan terbuka.</li>
-      <li>Pilih akun <strong id="linkEmail"></strong>.</li>
-      <li>Izinkan akses. Aplikasi hanya bisa membuka file yang diunggah lewat Vena.</li>
-    </ol>
-    <button id="btnLink" class="btn btn-primary btn-block">Hubungkan Google Drive</button>
-    <p id="linkError" class="error" role="alert"></p>
-    <button class="link-btn tiny" data-action="logout">Keluar</button>
   </div>
 </section>
 
