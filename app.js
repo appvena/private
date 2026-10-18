@@ -7,7 +7,7 @@
 'use strict';
 
 /* ---------------------------------------------------------------- versi */
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.2.0';
 const APP_BUILD = '18 Oktober 2026';
 
 /* ---------------------------------------------------------------- konfigurasi */
@@ -551,7 +551,7 @@ async function loadView(silent = false) {
       items = r.q ? await listAll(`(name contains '${qstr(r.q)}' or fullText contains '${qstr(r.q)}') and trashed=false`, { max: 500 }) : [];
     }
     if (seq !== S.loadSeq) return;
-    items = items.filter(f => f.id !== S.rootId);
+    items = items.filter(f => f.id !== S.rootId && !(f.appProperties && f.appProperties.venaTemp));
     S.items = items;
     for (const f of items) if (isFolder(f)) S.meta.set(f.id, { name: f.name, parents: f.parents });
     for (const id of [...S.selected]) if (!items.some(f => f.id === id)) S.selected.delete(id);
@@ -2171,14 +2171,15 @@ function updatePlayAllButton() {
 }
 
 /* ================================================================ PRATINJAU */
-const V = { id: null, url: null, ctl: null };
+const V = { id: null, url: null, ctl: null, pdf: null, wb: null, zoom: 1 };
 function viewerFiles() { return visibleFiles(); }
 async function openViewer(id) {
   const f = itemById(id); if (!f) return;
   V.id = id;
   if (V.ctl) V.ctl.abort();
   if (V.url) { URL.revokeObjectURL(V.url); V.url = null; }
-  const list = viewerFiles();
+  if (V.pdf) { try { V.pdf.destroy(); } catch {} V.pdf = null; }
+  const list = viewerFiles().filter(x => !mediaKind(x));
   const idx = list.findIndex(x => x.id === id);
   $('.viewer-nav.prev').hidden = idx <= 0;
   $('.viewer-nav.next').hidden = idx < 0 || idx >= list.length - 1;
@@ -2189,43 +2190,220 @@ async function openViewer(id) {
   $('#viewer').hidden = false;
   document.body.style.overflow = 'hidden';
   const body = $('#viewerBody');
-  const k = kindOf(f), size = Number(f.size) || 0, e = extOf(f);
+  body.className = 'viewer-body';
+  const k = kindOf(f), size = Number(f.size) || 0, e = extOf(f), mime = f.mimeType || '';
   const msg = (text) => {
-    body.innerHTML = `<div class="viewer-msg">${icon(KIND_ICON[k], 'i i-xl')}<p>${esc(text)}</p>
+    body.className = 'viewer-body';
+    body.innerHTML = `<div class="viewer-msg">${itemSvg(f, 'big')}<p>${esc(text)}</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
-        <button class="btn btn-primary" data-action="viewer-download">${icon('i-download')}Unduh</button>
-        <a class="btn" href="${esc(f.webViewLink || '#')}" target="_blank" rel="noopener">Buka di Google Drive</a></div></div>`;
+        <button class="btn btn-primary" data-action="viewer-download">${icon('i-download')}Unduh</button></div></div>`;
   };
-  if ((f.mimeType || '').startsWith('application/vnd.google-apps.')) return msg('File Google ini dibuka di Google Drive.');
-  const limits = { image: 40e6, video: 250e6, audio: 120e6, pdf: 60e6, code: 3e6 };
-  const textual = k === 'code' || (f.mimeType || '').startsWith('text/') || ['txt', 'md', 'csv', 'log'].includes(e);
-  const kk = textual ? 'code' : k;
-  if (!limits[kk]) return msg('Pratinjau belum tersedia untuk jenis file ini.');
-  if (size > limits[kk]) return msg('File ini terlalu besar untuk dipratinjau di sini.');
-  body.innerHTML = '<div class="spinner"></div>';
+  const loading = (t) => { body.className = 'viewer-body'; body.innerHTML = `<div class="viewer-loading"><div class="spinner"></div><p>${esc(t || 'Memuat…')}</p></div>`; };
+
+  // jenis tampilan
+  const textual = (k === 'code' || mime.startsWith('text/') || ['txt', 'md', 'log', 'json', 'xml'].includes(e)) && e !== 'csv';
+  const gdoc = mime.startsWith('application/vnd.google-apps.');
+  const convertible = ['doc', 'docx', 'odt', 'rtf', 'ppt', 'pptx', 'odp'].includes(e) || (k === 'doc' && !textual && e !== 'pages') || (k === 'slides' && e !== 'key');
+  let mode = null;
+  if (gdoc) mode = ['document', 'presentation', 'spreadsheet', 'drawing'].some(t => mime.endsWith(t)) ? 'gexport' : null;
+  else if (k === 'image') mode = 'image';
+  else if (k === 'pdf') mode = 'pdf';
+  else if (k === 'sheet') mode = 'sheet';
+  else if (textual) mode = 'text';
+  else if (convertible) mode = 'convert';
+  const limits = { image: 40e6, pdf: 120e6, sheet: 25e6, text: 3e6, convert: 50e6, gexport: Infinity };
+  if (!mode) return msg('Pratinjau belum tersedia untuk jenis file ini. Unduh untuk membukanya.');
+  if (size > limits[mode]) return msg('File ini terlalu besar untuk dipratinjau di sini. Unduh untuk membukanya.');
+
+  loading(mode === 'convert' || mode === 'gexport' ? 'Menyiapkan pratinjau dokumen…' : 'Memuat…');
   V.ctl = new AbortController();
+  const signal = V.ctl.signal;
   try {
-    const blob = await fetchBlob(f, V.ctl.signal);
+    if (mode === 'gexport') {
+      const res = await api(`/files/${f.id}/export`, { query: { mimeType: 'application/pdf' }, raw: true, signal });
+      if (V.id !== id) return;
+      return await renderPdf(await res.arrayBuffer(), id);
+    }
+    if (mode === 'convert') {
+      const data = await officeToPdf(f, signal);
+      if (V.id !== id) return;
+      return await renderPdf(data, id);
+    }
+    const blob = await fetchBlob(f, signal);
     if (V.id !== id) return;
-    if (kk === 'code') {
+    if (mode === 'text') {
       const t = await blob.text();
       body.innerHTML = '<pre></pre>'; body.firstChild.textContent = t;
-      return;
+    } else if (mode === 'image') {
+      V.url = URL.createObjectURL(blob);
+      body.innerHTML = `<img alt="${esc(f.name)}" src="${V.url}">`;
+    } else if (mode === 'pdf') {
+      await renderPdf(await blob.arrayBuffer(), id);
+    } else if (mode === 'sheet') {
+      await renderSheet(await blob.arrayBuffer(), e, id);
     }
-    const typed = blob.type && blob.type !== 'application/octet-stream' ? blob : new Blob([blob], { type: f.mimeType || (kk === 'pdf' ? 'application/pdf' : '') });
-    V.url = URL.createObjectURL(typed);
-    if (kk === 'image') body.innerHTML = `<img alt="${esc(f.name)}" src="${V.url}">`;
-    else if (kk === 'video') body.innerHTML = `<video controls autoplay playsinline src="${V.url}"></video>`;
-    else if (kk === 'audio') body.innerHTML = `<audio controls autoplay src="${V.url}"></audio>`;
-    else if (kk === 'pdf') body.innerHTML = `<iframe title="${esc(f.name)}" src="${V.url}"></iframe>`;
   } catch (err) {
     if (err.name === 'AbortError') return;
-    if (V.id === id) msg(err.auth ? 'Sesi Google habis. Sambungkan lagi lalu coba buka file ini.' : 'File tidak bisa dimuat: ' + err.message);
+    if (V.id === id) msg(err.auth ? 'Sesi habis. Masuk lagi lalu coba buka file ini.' : 'Pratinjau tidak bisa dibuat: ' + err.message);
   }
 }
+
+/* ---- pemuat pustaka (hanya diunduh saat dibutuhkan) ---- */
+const libCache = {};
+function loadScript(src) {
+  if (!libCache[src]) libCache[src] = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve;
+    s.onerror = () => { delete libCache[src]; reject(new Error('Komponen pratinjau gagal dimuat. Periksa koneksi internet.')); };
+    document.head.appendChild(s);
+  });
+  return libCache[src];
+}
+const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+async function loadPdfJs() {
+  await loadScript(PDFJS + 'pdf.min.js');
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js';
+  return window.pdfjsLib;
+}
+
+/* ---- Word / PowerPoint → PDF lewat Google Drive (file sementara langsung dihapus) ---- */
+const pdfCache = new Map();
+async function officeToPdf(f, signal) {
+  const key = f.id + '|' + f.modifiedTime;
+  if (pdfCache.has(key)) return pdfCache.get(key).slice(0);
+  const k = kindOf(f);
+  const target = k === 'slides' ? 'application/vnd.google-apps.presentation' : 'application/vnd.google-apps.document';
+  const tmp = await api(`/files/${f.id}/copy`, { method: 'POST', query: { fields: 'id' }, signal,
+    body: { name: '~pratinjau ' + f.name, mimeType: target, parents: [S.rootId], appProperties: { venaTemp: '1' } } });
+  try {
+    const res = await api(`/files/${tmp.id}/export`, { query: { mimeType: 'application/pdf' }, raw: true, signal });
+    const buf = await res.arrayBuffer();
+    if (pdfCache.size > 8) pdfCache.delete(pdfCache.keys().next().value);
+    pdfCache.set(key, buf.slice(0));
+    return buf;
+  } catch (e) {
+    if (/too large|exportSizeLimit/i.test(e.message)) throw new Error('dokumen terlalu besar untuk diubah ke pratinjau');
+    throw e;
+  } finally {
+    api(`/files/${tmp.id}`, { method: 'DELETE' }).catch(() => {});
+  }
+}
+
+/* ---- penampil PDF (jalan di semua perangkat, termasuk HP) ---- */
+async function renderPdf(data, id) {
+  const pdfjsLib = await loadPdfJs();
+  if (V.id !== id) return;
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(data) }).promise;
+  if (V.id !== id) { pdf.destroy(); return; }
+  V.pdf = pdf; V.zoom = 1;
+  const body = $('#viewerBody');
+  body.className = 'viewer-body doc-mode';
+  body.innerHTML = `<div class="pdf-scroll" id="pdfScroll"><div class="pdf-pages" id="pdfPages"></div></div>
+    <div class="doc-bar">
+      <button class="pb" data-action="pdf-zoom-out" title="Perkecil"><svg class="i"><use href="#i-minus"/></svg></button>
+      <span id="pdfZoom">100%</span>
+      <button class="pb" data-action="pdf-zoom-in" title="Perbesar"><svg class="i"><use href="#i-plus"/></svg></button>
+      <span class="doc-sep"></span>
+      <span id="pdfPage">1 / ${pdf.numPages}</span>
+    </div>`;
+  const first = await pdf.getPage(1);
+  V.pageBase = first.getViewport({ scale: 1 });
+  layoutPdf();
+  const sc = $('#pdfScroll');
+  sc.addEventListener('scroll', () => {
+    const pages = $$('#pdfPages .pdf-page');
+    const mid = sc.scrollTop + sc.clientHeight / 3;
+    let n = 1;
+    for (const p of pages) { if (p.offsetTop <= mid) n = Number(p.dataset.n); else break; }
+    $('#pdfPage').textContent = `${n} / ${pdf.numPages}`;
+  }, { passive: true });
+}
+function layoutPdf() {
+  const pdf = V.pdf; if (!pdf) return;
+  const sc = $('#pdfScroll'), wrap = $('#pdfPages');
+  const fitW = Math.max(240, Math.min((sc.clientWidth || window.innerWidth) - 24, 1000));
+  const cssW = Math.round(fitW * V.zoom);
+  const cssH = Math.round(cssW * V.pageBase.height / V.pageBase.width);
+  $('#pdfZoom').textContent = Math.round(V.zoom * 100) + '%';
+  wrap.innerHTML = Array.from({ length: pdf.numPages }, (_, i) =>
+    `<div class="pdf-page" data-n="${i + 1}" style="width:${cssW}px;height:${cssH}px"></div>`).join('');
+  if (V.pdfObs) V.pdfObs.disconnect();
+  V.pdfObs = new IntersectionObserver((ents) => {
+    for (const en of ents) if (en.isIntersecting) { V.pdfObs.unobserve(en.target); drawPdfPage(en.target, cssW); }
+  }, { root: sc, rootMargin: '600px 0px' });
+  for (const el of $$('#pdfPages .pdf-page')) V.pdfObs.observe(el);
+}
+async function drawPdfPage(el, cssW) {
+  const pdf = V.pdf; if (!pdf) return;
+  try {
+    const page = await pdf.getPage(Number(el.dataset.n));
+    const base = page.getViewport({ scale: 1 });
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const vp = page.getViewport({ scale: cssW / base.width * dpr });
+    const c = document.createElement('canvas');
+    c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+    c.style.width = cssW + 'px'; c.style.height = Math.round(cssW * base.height / base.width) + 'px';
+    el.style.height = c.style.height;
+    await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    if (el.isConnected) { el.innerHTML = ''; el.appendChild(c); }
+  } catch {}
+}
+function zoomPdf(d) {
+  if (!V.pdf) return;
+  const sc = $('#pdfScroll');
+  const ratio = sc.scrollTop / (sc.scrollHeight || 1);
+  V.zoom = Math.max(0.5, Math.min(3, Math.round((V.zoom + d) * 4) / 4));
+  layoutPdf();
+  sc.scrollTop = ratio * sc.scrollHeight;
+}
+
+/* ---- penampil Excel / CSV ---- */
+async function renderSheet(data, ext, id) {
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+  if (V.id !== id) return;
+  const wb = window.XLSX.read(new Uint8Array(data), { type: 'array', cellDates: true, dense: false, codepage: 65001 });
+  V.wb = wb;
+  const body = $('#viewerBody');
+  body.className = 'viewer-body doc-mode';
+  const tabs = wb.SheetNames.length > 1
+    ? `<div class="sheet-tabs">${wb.SheetNames.map((n, i) => `<button type="button" data-sheet="${i}">${esc(n)}</button>`).join('')}</div>` : '';
+  body.innerHTML = `<div class="sheet-wrap" id="sheetWrap"></div>${tabs}`;
+  showSheet(0);
+}
+function showSheet(i) {
+  const wb = V.wb; if (!wb) return;
+  const ws = wb.Sheets[wb.SheetNames[i]];
+  const MAX = 3000;
+  let note = '';
+  if (ws['!ref']) {
+    const r = window.XLSX.utils.decode_range(ws['!ref']);
+    if (r.e.r - r.s.r + 1 > MAX) {
+      note = `<p class="sheet-note">Menampilkan ${MAX.toLocaleString('id-ID')} baris pertama dari ${(r.e.r - r.s.r + 1).toLocaleString('id-ID')}. Unduh untuk melihat semuanya.</p>`;
+      r.e.r = r.s.r + MAX - 1;
+      ws['!ref'] = window.XLSX.utils.encode_range(r);
+    }
+  }
+  const html = ws['!ref'] ? window.XLSX.utils.sheet_to_html(ws, { header: '', footer: '' }) : '<p class="sheet-note">Sheet ini kosong.</p>';
+  const wrap = $('#sheetWrap');
+  wrap.innerHTML = note + html;
+  // tambah nomor kolom (A, B, C …) supaya mudah dibaca seperti di Excel
+  const t = wrap.querySelector('table');
+  if (t && t.rows.length) {
+    const cols = Math.max(...[...t.rows].slice(0, 50).map(r => [...r.cells].reduce((s, c) => s + (c.colSpan || 1), 0)));
+    const head = t.createTHead().insertRow(0);
+    head.insertCell().outerHTML = '<th class="corner"></th>';
+    for (let c = 0; c < cols; c++) head.insertCell().outerHTML = `<th>${window.XLSX.utils.encode_col(c)}</th>`;
+    [...t.tBodies[0].rows].forEach((r, n) => { const th = document.createElement('th'); th.textContent = n + 1; r.insertBefore(th, r.firstChild); });
+  }
+  for (const b of $$('.sheet-tabs button')) b.classList.toggle('on', Number(b.dataset.sheet) === i);
+}
+
 function closeViewer(fromBack) {
   if (!fromBack && !$('#viewer').hidden) popOverlay('viewer'); else forgetOverlay('viewer');
   if (V.ctl) V.ctl.abort();
+  if (V.pdf) { try { V.pdf.destroy(); } catch {} V.pdf = null; }
+  if (V.pdfObs) { V.pdfObs.disconnect(); V.pdfObs = null; }
+  V.wb = null;
   if (V.url) { URL.revokeObjectURL(V.url); V.url = null; }
   V.id = null;
   $('#viewerBody').innerHTML = '';
@@ -2233,7 +2411,7 @@ function closeViewer(fromBack) {
   document.body.style.overflow = '';
 }
 function stepViewer(d) {
-  const list = viewerFiles();
+  const list = viewerFiles().filter(x => !mediaKind(x));
   const i = list.findIndex(x => x.id === V.id);
   const n = list[i + d];
   if (n) openViewer(n.id);
@@ -2704,6 +2882,8 @@ function bind() {
         case 'sel-copy': openMove(selectedItems(), 'copy'); return;
         case 'paste': pasteClip(); return;
         case 'install': installApp(); return;
+        case 'pdf-zoom-in': zoomPdf(0.25); return;
+        case 'pdf-zoom-out': zoomPdf(-0.25); return;
         case 'play-all': playAllHere(); return;
         case 'player-toggle': togglePlay(); return;
         case 'player-prev': stepTrack(-1); return;
@@ -2756,6 +2936,8 @@ function bind() {
     }
 
     // pohon folder: buka/tutup cabang
+    const sh = t.closest('[data-sheet]');
+    if (sh) { showSheet(Number(sh.dataset.sheet)); return; }
     const pi = t.closest('[data-play-idx]');
     if (pi) { playAt(Number(pi.dataset.playIdx)); return; }
     const icc = t.closest('[data-ic-color]');
@@ -2849,6 +3031,8 @@ function bind() {
       return;
     }
     if (!$('#viewer').hidden) {
+      if (V.pdf && (e.key === '+' || e.key === '=')) { zoomPdf(0.25); return; }
+      if (V.pdf && e.key === '-') { zoomPdf(-0.25); return; }
       if (e.key === 'Escape') closeViewer();
       else if (e.key === 'ArrowLeft') stepViewer(-1);
       else if (e.key === 'ArrowRight') stepViewer(1);
@@ -2882,6 +3066,7 @@ function bind() {
 
   bindDrag();
   bindPlayer();
+  let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (V.pdf) layoutPdf(); }, 200); });
 
   /* seret & lepas file dari komputer */
   let dragDepth = 0;

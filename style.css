@@ -649,6 +649,37 @@ code { font-size: .88em; background: var(--surface-2); border: 1px solid var(--l
 .viewer-nav.next { right: 10px; }
 .viewer .spinner { border-color: rgba(255,255,255,.15); border-top-color: #fff; }
 
+/* ---------- pratinjau dokumen ---------- */
+.viewer-loading { display: grid; justify-items: center; gap: 12px; color: #C5D0CB; }
+.viewer-loading p { margin: 0; }
+.viewer-msg svg.big { width: 80px; height: 80px; }
+.viewer-body.doc-mode { display: flex; flex-direction: column; align-items: stretch; justify-content: stretch; place-items: stretch; padding: 0; position: relative; }
+.viewer:has(.doc-mode) { background: #0A0F0E; }
+.pdf-scroll { flex: 1; overflow: auto; padding: 12px 12px 70px; -webkit-overflow-scrolling: touch; }
+.pdf-pages { display: grid; justify-content: center; gap: 12px; }
+.pdf-page { background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.4); border-radius: 2px; }
+.pdf-page canvas { display: block; }
+.doc-bar {
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px;
+  background: rgba(20,28,25,.92); color: #EEF3F1; padding: 4px 12px; border-radius: 999px; font-size: 13.5px; font-variant-numeric: tabular-nums;
+  box-shadow: 0 6px 20px rgba(0,0,0,.4);
+}
+.doc-bar .pb { color: #EEF3F1; width: 34px; height: 34px; }
+.doc-bar .pb:hover { background: rgba(255,255,255,.12); }
+.doc-bar #pdfZoom { min-width: 44px; text-align: center; }
+.doc-bar span { white-space: nowrap; }
+.doc-sep { width: 1px; height: 18px; background: rgba(255,255,255,.25); margin: 0 6px; }
+.sheet-wrap { flex: 1; overflow: auto; background: #fff; color: #1B2420; margin: 0 12px; border-radius: 6px; -webkit-overflow-scrolling: touch; }
+.sheet-wrap table { border-collapse: collapse; font: 13px/1.35 system-ui, sans-serif; }
+.sheet-wrap td, .sheet-wrap th { border: 1px solid #DDE3DF; padding: 4px 8px; white-space: nowrap; max-width: 420px; overflow: hidden; text-overflow: ellipsis; }
+.sheet-wrap thead th { position: sticky; top: 0; background: #EEF2EF; color: #5F6D67; font-weight: 700; z-index: 2; }
+.sheet-wrap tbody th { position: sticky; left: 0; background: #EEF2EF; color: #5F6D67; font-weight: 400; text-align: right; z-index: 1; }
+.sheet-wrap thead th.corner { left: 0; z-index: 3; }
+.sheet-note { margin: 0; padding: 8px 12px; background: #FFF6DE; color: #6A4B00; font-size: 13px; }
+.sheet-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 8px 12px 14px; }
+.sheet-tabs button { border: 0; background: rgba(255,255,255,.1); color: #DCE6E1; padding: 7px 14px; border-radius: 8px; white-space: nowrap; font-size: 13.5px; }
+.sheet-tabs button.on { background: #5BBFB2; color: #0B1A17; font-weight: 700; }
+
 /* ---------- toast ---------- */
 .toasts { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 100; display: grid; gap: 8px; justify-items: center; pointer-events: none; width: calc(100vw - 32px); }
 .toast {
@@ -737,6 +768,8 @@ code { font-size: .88em; background: var(--surface-2); border: 1px solid var(--l
   .sort-wrap .select { max-width: 120px; }
   .titlebar #btnTheme { display: none; }
   .viewer-body { padding: 4px 8px 16px; }
+  .pdf-scroll { padding: 8px 4px 70px; }
+  .sheet-wrap { margin: 0 4px; }
   .viewer-nav { top: auto; bottom: 18px; transform: none; }
   .setup { padding: 22px; }
 }
