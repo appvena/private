@@ -1,15 +1,44 @@
 {
   "name": "Vena — Penyimpanan Pribadi",
   "short_name": "Vena",
-  "description": "Simpan, atur, dan bagikan file. Tersimpan di Google Drive Anda.",
+  "description": "Simpan, atur, putar, dan bagikan file dari Google Drive. © 2026 SRISP",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#F2F4F1",
   "theme_color": "#0E6B63",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ]
+    {
+      "src": "icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "./",
+  "lang": "id",
+  "orientation": "any",
+  "categories": [
+    "productivity",
+    "utilities"
+  ],
+  "version": "2.1.0"
 }

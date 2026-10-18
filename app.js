@@ -6,6 +6,10 @@
 (() => {
 'use strict';
 
+/* ---------------------------------------------------------------- versi */
+const APP_VERSION = '2.1.0';
+const APP_BUILD = '18 Oktober 2026';
+
 /* ---------------------------------------------------------------- konfigurasi */
 const CFG = Object.assign({
   CLIENT_ID: '', ALLOWED_EMAIL: '', SERVER_URL: '', BROKER_URL: '', STORAGE_EMAIL: '', ROOT_FOLDER_NAME: 'Vena Drive', APP_NAME: 'Vena'
@@ -310,6 +314,7 @@ async function afterLogin() {
   $('#win').classList.toggle('no-details', dp === '0');
   $('#btnDetails').setAttribute('aria-pressed', String(dp !== '0'));
   show('screenApp');
+  installBackGuard();
   await ensureRoot();
   refreshAppUsage();
   onRoute();
@@ -327,6 +332,7 @@ async function reconnect() {
 }
 
 function logout() {
+  try { stopPlayer(true); } catch {}
   clearSession();
   S.user = null; S.rootId = null;
   location.hash = '';
@@ -475,7 +481,7 @@ function onRoute(silent = false) {
   const navKey = S.route.type === 'folder' ? (S.route.id === S.rootId ? 'home' : '') : S.route.type;
   for (const a of $$('.nav a')) a.classList.toggle('active', a.dataset.nav === navKey);
   $('#searchInput').value = S.route.type === 'search' ? S.route.q : '';
-  $('#screenApp').classList.remove('nav-open');
+  if ($('#screenApp').classList.contains('nav-open')) { $('#screenApp').classList.remove('nav-open'); forgetOverlay('nav'); }
   $('#trashNote').hidden = S.route.type !== 'trash';
   const trash = S.route.type === 'trash';
   for (const b of $$('#cmdbar [data-hide-in]')) b.hidden = trash;
@@ -710,6 +716,7 @@ function render(silentEmpty) {
   for (const b of $$('.seg button')) b.classList.toggle('on', b.dataset.view === S.view);
   for (const b of $$('#listHead button')) b.classList.toggle('on', b.dataset.sort === S.sort && S.route.type !== 'recent');
   $('#sortSelect').value = S.sort;
+  updatePlayAllButton();
   renderSelection();
 }
 
@@ -723,6 +730,7 @@ function itemHTML(f, trash) {
     <div class="nm"><span class="mini">${itemSvg(f, 'mini-svg')}</span><span class="label">${esc(f.name)}</span>${f.starred ? `<span class="star-badge" title="Berbintang">${icon('i-star')}</span>` : ''}</div>
     ${f.starred ? `<span class="star-badge grid-only" title="Berbintang">${icon('i-star')}</span>` : ''}
     ${f.shared ? `<span class="shared-badge" title="${shareUntil(f) ? 'Link berlaku sampai ' + esc(fmtUntil(shareUntil(f))) : 'Dibagikan dengan link'}">${icon('i-link')}</span>` : ''}
+    <button class="more-btn" data-more aria-label="Pilihan untuk ${esc(f.name)}">${icon('i-more-h')}</button>
     <span class="col c-date">${trash ? '' : esc(fmtDate(f.modifiedTime))}</span>
     <span class="col c-type">${esc(isFolder(f) ? 'Folder' : KIND_LABEL[k])}</span>
     <span class="col c-size">${isFolder(f) ? (S.fsize ? esc(fmtSize(folderSize(f.id).bytes)) : '') : esc(fmtSize(f.size))}</span>
@@ -1113,7 +1121,8 @@ function openItemMenu(id, x, y, alignRight) {
     h += b('restore', 'i-restore', 'Pulihkan');
     h += b('delete', 'i-trash', 'Hapus permanen', 'danger');
   } else {
-    h += folder ? b('open', 'i-folder', 'Buka') : b('open', 'i-eye', 'Pratinjau');
+    h += folder ? b('open', 'i-folder', 'Buka') : b('open', mediaKind(f) ? 'i-play' : 'i-eye', mediaKind(f) ? 'Putar' : 'Pratinjau');
+    if (folder) h += b('playfolder', 'i-play', 'Putar musik / video di folder ini');
     h += b('download', 'i-download', folder ? 'Unduh sebagai ZIP' : 'Unduh');
     h += b('share', 'i-link', f.shared ? 'Kelola link berbagi' : 'Bagikan link');
     h += '<hr>';
@@ -1138,6 +1147,7 @@ async function itemAction(act, id) {
   closeMenus();
   switch (act) {
     case 'select': return toggleSelect(f.id);
+    case 'playfolder': return playFolder(f);
     case 'copyto': return openMove(S.selected.has(f.id) && S.selected.size > 1 ? selectedItems() : [f], 'copy');
     case 'duplicate': return copyItems(S.selected.has(f.id) && S.selected.size > 1 ? selectedItems() : [f], (f.parents || [])[0] || S.rootId);
     case 'icon': return openIconPicker(S.selected.has(f.id) && S.selected.size > 1 ? selectedItems() : [f]);
@@ -1158,6 +1168,8 @@ async function itemAction(act, id) {
 function openItem(f) {
   if (isFolder(f)) { location.hash = folderHash(f.id); return; }
   if (S.route.type === 'trash') { toast('Pulihkan file ini dulu untuk membukanya.'); return; }
+  const mk = mediaKind(f);
+  if (mk) { playList(visibleFiles(), f.id, mk); return; }
   openViewer(f.id);
 }
 
@@ -1237,6 +1249,11 @@ async function runAll(list, fn, conc = 4) {
 
 async function trashItems(list) {
   if (!list.length) return;
+  const nF = list.filter(isFolder).length;
+  const ok = await confirmDialog(
+    list.length === 1 ? `Hapus “${list[0].name}”?` : `Hapus ${list.length} item?`,
+    (nF ? 'Folder ikut dihapus beserta isinya. ' : '') + 'Item dipindahkan ke Sampah dan masih bisa dipulihkan selama 30 hari.', 'Hapus');
+  if (!ok) return;
   try {
     const res = await runAll(list, f => api('/files/' + f.id, { method: 'PATCH', query: { fields: 'id' }, body: { trashed: true } }));
     const ok = list.filter((f, i) => !(res[i] instanceof Error));
@@ -1774,6 +1791,7 @@ async function moveItemsTo(list, target) {
   } catch (e) { fail(e, 'Gagal memindahkan'); }
 }
 
+const LP = { timer: null, fired: false, x: 0, y: 0 };
 /* ---------------------------------------------------------------- seret-pindah di dalam aplikasi */
 const DRAG = { ids: null };
 function dropTargetOf(el) {
@@ -1833,6 +1851,325 @@ function bindDrag() {
   });
 }
 
+/* ================================================================ PASANG APLIKASI (PWA) */
+let installEvt = null;
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function updateInstallUI() {
+  for (const b of $$('[data-action="install"]')) b.hidden = isStandalone();
+}
+async function installApp() {
+  closeMenus();
+  if (installEvt) {
+    installEvt.prompt();
+    const r = await installEvt.userChoice.catch(() => ({}));
+    installEvt = null;
+    if (r.outcome === 'accepted') toast('Vena sedang dipasang di perangkat Anda.');
+    updateInstallUI();
+    return;
+  }
+  $('#installIos').hidden = !isIOS();
+  $('#installOther').hidden = isIOS();
+  $('#dlgInstall').showModal();
+}
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; updateInstallUI(); });
+window.addEventListener('appinstalled', () => { installEvt = null; updateInstallUI(); toast('Vena sudah terpasang. Buka dari layar utama.'); });
+
+/* ================================================================ TOMBOL KEMBALI & KELUAR
+   - Tombol kembali (HP / browser) menutup layar yang sedang terbuka dulu
+     (pratinjau, video, menu samping), lalu mundur antar folder.
+   - Di halaman awal, tombol kembali menampilkan dialog "Keluar dari Vena?". */
+const NAV = { overlays: [], ignorePop: 0, guard: false, leaving: false };
+function installBackGuard() {
+  if (NAV.guard) return;
+  NAV.guard = true;
+  history.replaceState({ vena: 'base' }, '');
+  history.pushState({ vena: 'app' }, '');
+}
+function pushOverlay(name) {
+  if (!NAV.guard) return;
+  NAV.overlays.push(name);
+  history.pushState({ vena: 'overlay', name }, '');
+}
+function popOverlay(name) {
+  const i = NAV.overlays.lastIndexOf(name);
+  if (i < 0) return;
+  NAV.overlays.splice(i, 1);
+  NAV.ignorePop++;
+  history.back();
+}
+function forgetOverlay(name) { const i = NAV.overlays.lastIndexOf(name); if (i >= 0) NAV.overlays.splice(i, 1); }
+function closeOverlayFromBack(name) {
+  if (name === 'viewer') closeViewer(true);
+  else if (name === 'video') stopPlayer(true);
+  else if (name === 'nav') $('#screenApp').classList.remove('nav-open');
+}
+async function onPopState(e) {
+  if (NAV.ignorePop) { NAV.ignorePop--; return; }
+  if (NAV.leaving) return;
+  if (NAV.overlays.length) { closeOverlayFromBack(NAV.overlays.pop()); return; }
+  if (e.state && e.state.vena === 'base' && !$('#screenApp').hidden) {
+    const ok = await confirmDialog('Keluar dari Vena?', 'Anda akan menutup aplikasi penyimpanan.', 'Keluar');
+    if (!ok) { history.pushState({ vena: 'app' }, ''); return; }
+    NAV.leaving = true;
+    try { if (P.list.length) stopPlayer(true); } catch {}
+    history.back();
+    setTimeout(() => {               // aplikasi terpasang di HP tidak bisa ditutup dari dalam halaman
+      if (document.visibilityState === 'visible') {
+        NAV.leaving = false;
+        toast('Tekan tombol kembali sekali lagi untuk keluar.', { ms: 3000 });
+      }
+    }, 400);
+  }
+}
+async function confirmLogout() {
+  const ok = await confirmDialog('Keluar dari akun?', 'Anda perlu memasukkan password lagi untuk membuka Vena.', 'Keluar');
+  if (ok) logout();
+}
+
+/* ================================================================ PEMUTAR MUSIK & VIDEO
+   - Musik: bilah pemutar di bawah jendela, tetap berbunyi saat pindah folder.
+   - Video: layar video dengan daftar putar, lanjut otomatis ke video berikutnya.
+   - Diputar langsung dari Drive (streaming); kalau tidak bisa, diunduh dulu.
+   - Kontrol di layar kunci HP / tombol media keyboard (Media Session). */
+const P = { list: [], order: [], pos: -1, kind: null, shuffle: false, repeat: 'off', blobUrl: null, streamOk: false, triedRefresh: 0, usingBlob: false };
+const mediaKind = (f) => { const k = kindOf(f); return (k === 'audio' || k === 'video') && !isGoogleDoc(f) ? k : null; };
+const curTrack = () => P.list[P.order[P.pos]];
+const mediaEl = () => P.kind === 'video' ? $('#plVideo') : $('#plAudio');
+const fmtTime = (s) => { if (!isFinite(s)) return '0:00'; s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
+
+function playList(list, startId, kind) {
+  list = list.filter(f => mediaKind(f) === kind);
+  if (!list.length) return;
+  stopPlayer(true);
+  P.list = list; P.kind = kind;
+  P.order = list.map((_, i) => i);
+  const start = Math.max(0, list.findIndex(f => f.id === startId));
+  if (P.shuffle) shuffleOrder(start); else P.pos = start;
+  if (kind === 'video') { $('#videoStage').hidden = false; document.body.style.overflow = 'hidden'; pushOverlay('video'); }
+  else { $('#player').hidden = false; $('#screenApp').classList.add('playing'); }
+  renderPlaylist();
+  loadTrack();
+}
+function shuffleOrder(keepIdx) {
+  const rest = P.list.map((_, i) => i).filter(i => i !== keepIdx);
+  for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
+  P.order = [keepIdx, ...rest]; P.pos = 0;
+}
+function cleanupBlob() { if (P.blobUrl) { URL.revokeObjectURL(P.blobUrl); P.blobUrl = null; } }
+const streamUrl = (f, token) => `${API}/files/${encodeURIComponent(f.id)}?alt=media&access_token=${encodeURIComponent(token)}`;
+
+async function loadTrack(resumeAt = 0) {
+  const f = curTrack(); if (!f) return;
+  const el = mediaEl();
+  cleanupBlob();
+  P.streamOk = false; P.usingBlob = false; P.triedRefresh = 0;
+  $('#vsMsg').hidden = true;
+  renderNowPlaying();
+  let token;
+  try { token = await getToken(); } catch { return; }
+  if (curTrack() !== f) return;
+  el.src = streamUrl(f, token);
+  if (resumeAt) el.currentTime = resumeAt;
+  el.play().catch(() => {});
+}
+async function fallbackToBlob() {
+  const f = curTrack(); if (!f) return;
+  const el = mediaEl();
+  const at = el.currentTime || 0;
+  const size = Number(f.size) || 0;
+  if (size > (P.kind === 'video' ? 600e6 : 200e6)) { mediaError('File ini terlalu besar untuk diputar di sini. Unduh dulu untuk memutarnya.'); return; }
+  P.usingBlob = true;
+  $('#plSub').textContent = 'Memuat…';
+  try {
+    const blob = await fetchBlob(f);
+    if (curTrack() !== f) return;
+    P.blobUrl = URL.createObjectURL(blob.type && blob.type !== 'application/octet-stream' ? blob : new Blob([blob], { type: f.mimeType || '' }));
+    el.src = P.blobUrl;
+    if (at) el.currentTime = at;
+    el.play().catch(() => {});
+    renderNowPlaying();
+  } catch (e) { mediaError('File tidak bisa diputar: ' + e.message); }
+}
+function mediaError(msg) {
+  if (P.kind === 'video') { $('#vsMsg').textContent = msg; $('#vsMsg').hidden = false; }
+  else toast(msg, { error: true });
+  // lompat ke berikutnya kalau ini daftar putar
+  if (P.list.length > 1) setTimeout(() => stepTrack(1, true), 1500);
+}
+async function onMediaError(e) {
+  if (!curTrack()) return;
+  const el = mediaEl();
+  if (e && e.target !== el) return;          // elemen lain yang baru dihentikan
+  if (!el.getAttribute('src')) return;
+  if (P.usingBlob) { mediaError('Format file ini tidak didukung browser.'); return; }
+  if (P.streamOk && P.triedRefresh < 2) {          // token habis di tengah lagu → sambung lagi
+    P.triedRefresh++;
+    const at = el.currentTime;
+    try { const t = await getToken(true); el.src = streamUrl(curTrack(), t); el.currentTime = at; el.play().catch(() => {}); return; } catch {}
+  }
+  fallbackToBlob();
+}
+function stepTrack(d, auto = false) {
+  if (!P.list.length) return;
+  const el = mediaEl();
+  if (d < 0 && el.currentTime > 4) { el.currentTime = 0; return; }   // seperti pemutar musik biasa
+  let pos = P.pos + d;
+  if (pos >= P.order.length) {
+    if (P.repeat === 'all' || !auto) pos = 0;
+    else { el.pause(); renderNowPlaying(); return; }
+  }
+  if (pos < 0) pos = P.order.length - 1;
+  P.pos = pos;
+  renderPlaylist();
+  loadTrack();
+}
+function playAt(listIdx) {
+  P.pos = Math.max(0, P.order.indexOf(listIdx));
+  renderPlaylist(); loadTrack();
+}
+function togglePlay() {
+  const el = mediaEl(); if (!curTrack()) return;
+  if (el.paused) el.play().catch(() => {}); else el.pause();
+}
+function toggleShuffle() {
+  P.shuffle = !P.shuffle;
+  const cur = P.order[P.pos];
+  if (P.shuffle) shuffleOrder(cur); else { P.order = P.list.map((_, i) => i); P.pos = cur; }
+  LS.set('vena.shuffle', P.shuffle ? '1' : '0');
+  renderPlaylist(); renderNowPlaying();
+}
+function cycleRepeat() {
+  P.repeat = P.repeat === 'off' ? 'all' : P.repeat === 'all' ? 'one' : 'off';
+  LS.set('vena.repeat', P.repeat);
+  renderNowPlaying();
+  toast(P.repeat === 'all' ? 'Ulangi semua' : P.repeat === 'one' ? 'Ulangi satu lagu' : 'Ulangi mati', { ms: 1500 });
+}
+function stopPlayer(silent) {
+  for (const el of [$('#plAudio'), $('#plVideo')]) { el.pause(); el.removeAttribute('src'); el.load(); }
+  cleanupBlob();
+  const wasVideo = !$('#videoStage').hidden;
+  $('#player').hidden = true; $('#videoStage').hidden = true; $('#plList').hidden = true;
+  $('#screenApp').classList.remove('playing');
+  if (wasVideo) { document.body.style.overflow = ''; if (!silent) popOverlay('video'); else forgetOverlay('video'); }
+  P.list = []; P.order = []; P.pos = -1; P.kind = null;
+  if ('mediaSession' in navigator) navigator.mediaSession.metadata = null;
+}
+
+/* ---- tampilan ---- */
+function trackArt(f) {
+  const t = TH.mem.get(f.id) || blobThumbs.get(f.id);
+  return t ? `<img alt="" src="${t}">` : `<svg viewBox="0 0 24 24"><use href="#s-${P.kind === 'video' ? 'video' : 'musik'}"/></svg>`;
+}
+const trackTitle = (f) => f.name.replace(/\.[^.]+$/, '');
+function renderNowPlaying() {
+  const f = curTrack(); if (!f) return;
+  const el = mediaEl();
+  const n = `${P.pos + 1} dari ${P.order.length}`;
+  const playing = !el.paused;
+  for (const id of ['#plPlay', '#vsPlay']) $(id + ' use').setAttribute('href', playing ? '#i-pause' : '#i-play');
+  for (const id of ['#plShuffle', '#vsShuffle']) $(id).setAttribute('aria-pressed', String(P.shuffle));
+  for (const id of ['#plRepeat', '#vsRepeat']) {
+    $(id).setAttribute('aria-pressed', String(P.repeat !== 'off'));
+    $(id + ' use').setAttribute('href', P.repeat === 'one' ? '#i-repeat-one' : '#i-repeat');
+  }
+  if (P.kind === 'audio') {
+    $('#plTitle').textContent = trackTitle(f);
+    $('#plSub').textContent = n + (P.shuffle ? ', acak' : '');
+    $('#plArt').innerHTML = trackArt(f);
+  } else {
+    $('#vsTitle').textContent = f.name;
+    $('#vsSub').textContent = n;
+  }
+  for (const li of $$('#plItems li, #vsItems li')) li.classList.toggle('on', Number(li.dataset.i) === P.order[P.pos]);
+  if ('mediaSession' in navigator) {
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: trackTitle(f), artist: CFG.APP_NAME, album: $('#winTitle').textContent || '',
+        artwork: [{ src: 'icon-512.png', sizes: '512x512', type: 'image/png' }],
+      });
+      navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+    } catch {}
+  }
+}
+function renderPlaylist() {
+  const rows = P.order.map((i, n) => {
+    const f = P.list[i];
+    return `<li data-i="${i}" class="${n === P.pos ? 'on' : ''}"><button type="button" data-play-idx="${i}"><span class="n">${n + 1}</span><span class="t">${esc(trackTitle(f))}</span><span class="s">${esc(fmtSize(f.size))}</span></button></li>`;
+  }).join('');
+  $('#plItems').innerHTML = rows; $('#vsItems').innerHTML = rows;
+  $('#plCount').textContent = `${P.list.length} ${P.kind === 'video' ? 'video' : 'lagu'}`;
+  renderNowPlaying();
+}
+function bindPlayer() {
+  for (const el of [$('#plAudio'), $('#plVideo')]) {
+    el.addEventListener('playing', () => { P.streamOk = true; renderNowPlaying(); });
+    el.addEventListener('pause', renderNowPlaying);
+    el.addEventListener('play', renderNowPlaying);
+    el.addEventListener('ended', () => {
+      if (P.repeat === 'one') { el.currentTime = 0; el.play().catch(() => {}); }
+      else stepTrack(1, true);
+    });
+    el.addEventListener('error', onMediaError);
+  }
+  const a = $('#plAudio'), seek = $('#plSeek');
+  let dragging = false;
+  a.addEventListener('timeupdate', () => {
+    $('#plCur').textContent = fmtTime(a.currentTime);
+    $('#plDur').textContent = fmtTime(a.duration);
+    if (!dragging && a.duration) seek.value = Math.round(a.currentTime / a.duration * 1000);
+    if ('mediaSession' in navigator && a.duration && navigator.mediaSession.setPositionState) {
+      try { navigator.mediaSession.setPositionState({ duration: a.duration, position: a.currentTime, playbackRate: a.playbackRate }); } catch {}
+    }
+  });
+  seek.addEventListener('input', () => { dragging = true; $('#plCur').textContent = fmtTime(seek.value / 1000 * (a.duration || 0)); });
+  seek.addEventListener('change', () => { if (a.duration) a.currentTime = seek.value / 1000 * a.duration; dragging = false; });
+  if ('mediaSession' in navigator) {
+    const ms = navigator.mediaSession;
+    const set = (k, fn) => { try { ms.setActionHandler(k, fn); } catch {} };
+    set('play', () => mediaEl().play());
+    set('pause', () => mediaEl().pause());
+    set('previoustrack', () => stepTrack(-1));
+    set('nexttrack', () => stepTrack(1));
+    set('seekto', (d) => { mediaEl().currentTime = d.seekTime; });
+  }
+  P.shuffle = LS.get('vena.shuffle') === '1';
+  P.repeat = LS.get('vena.repeat') || 'off';
+}
+
+/* putar semua media di folder (termasuk subfolder) */
+async function playFolder(folder) {
+  const p = progressToast('Menyiapkan daftar putar');
+  p.set('Mencari musik & video…', null);
+  const found = [];
+  try {
+    const walk = async (id, depth) => {
+      if (depth > 6 || found.length > 1000) return;
+      const kids = await listAll(`'${qstr(id)}' in parents and trashed=false`, { orderBy: 'folder,name' });
+      for (const k of sorted(kids)) {
+        if (isFolder(k)) await walk(k.id, depth + 1);
+        else if (mediaKind(k)) found.push(k);
+      }
+    };
+    await walk(folder.id, 0);
+  } catch (e) { p.close(); fail(e); return; }
+  p.close();
+  const audio = found.filter(f => mediaKind(f) === 'audio'), video = found.filter(f => mediaKind(f) === 'video');
+  if (!audio.length && !video.length) { toast('Tidak ada musik atau video di folder ini.'); return; }
+  if (audio.length) playList(audio, audio[0].id, 'audio'); else playList(video, video[0].id, 'video');
+}
+function playAllHere() {
+  const files = visibleFiles();
+  const audio = files.filter(f => mediaKind(f) === 'audio');
+  const video = files.filter(f => mediaKind(f) === 'video');
+  if (audio.length) playList(audio, audio[0].id, 'audio');
+  else if (video.length) playList(video, video[0].id, 'video');
+}
+function updatePlayAllButton() {
+  const has = S.route.type !== 'trash' && visibleFiles().some(f => mediaKind(f));
+  $('#cmdPlay').hidden = !has;
+}
+
 /* ================================================================ PRATINJAU */
 const V = { id: null, url: null, ctl: null };
 function viewerFiles() { return visibleFiles(); }
@@ -1848,6 +2185,7 @@ async function openViewer(id) {
   $('#viewerName').textContent = f.name;
   $('#viewerMeta').textContent = [fmtSize(f.size), fmtDate(f.modifiedTime)].filter(Boolean).join(', ');
   $('#viewerOpenDrive').href = f.webViewLink || '#';
+  if ($('#viewer').hidden) pushOverlay('viewer');
   $('#viewer').hidden = false;
   document.body.style.overflow = 'hidden';
   const body = $('#viewerBody');
@@ -1885,7 +2223,8 @@ async function openViewer(id) {
     if (V.id === id) msg(err.auth ? 'Sesi Google habis. Sambungkan lagi lalu coba buka file ini.' : 'File tidak bisa dimuat: ' + err.message);
   }
 }
-function closeViewer() {
+function closeViewer(fromBack) {
+  if (!fromBack && !$('#viewer').hidden) popOverlay('viewer'); else forgetOverlay('viewer');
   if (V.ctl) V.ctl.abort();
   if (V.url) { URL.revokeObjectURL(V.url); V.url = null; }
   V.id = null;
@@ -2238,6 +2577,9 @@ function setupLoginScreen() {
 
 async function boot() {
   applyTheme();
+  for (const el of $$('[data-version]')) el.textContent = 'Versi ' + APP_VERSION;
+  for (const el of $$('[data-version-long]')) el.textContent = `${CFG.APP_NAME} versi ${APP_VERSION} (${APP_BUILD})`;
+  updateInstallUI();
   for (const el of $$('[data-appname]')) el.textContent = CFG.APP_NAME;
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
   setupLoginScreen();
@@ -2317,9 +2659,11 @@ function bind() {
   $('#shareExpiry').onchange = changeExpiry;
   $('#dlgMove').addEventListener('close', () => { if ($('#dlgMove').returnValue === 'ok') doMove(); });
 
-  window.addEventListener('hashchange', () => { if (!$('#viewer').hidden) closeViewer(); onRoute(); });
+  window.addEventListener('hashchange', () => { if (!$('#viewer').hidden) closeViewer(true); onRoute(); });
+  window.addEventListener('popstate', onPopState);
   window.addEventListener('beforeunload', (e) => {
-    if (U.tasks.some(t => t.status === 'uploading' || t.status === 'queued')) { e.preventDefault(); e.returnValue = ''; }
+    if ($('#screenApp').hidden || NAV.leaving) return;
+    e.preventDefault(); e.returnValue = '';      // browser menampilkan dialog "Tinggalkan situs?"
   });
 
   /* klik global (delegasi) */
@@ -2344,9 +2688,9 @@ function bind() {
         case 'upload-files': $('#pickFiles').click(); return;
         case 'upload-folder': $('#pickFolder').click(); return;
         case 'new-folder': newFolder(); return;
-        case 'open-sidebar': $('#screenApp').classList.add('nav-open'); return;
-        case 'close-sidebar': $('#screenApp').classList.remove('nav-open'); return;
-        case 'logout': logout(); return;
+        case 'open-sidebar': $('#screenApp').classList.add('nav-open'); pushOverlay('nav'); return;
+        case 'close-sidebar': if ($('#screenApp').classList.contains('nav-open')) { $('#screenApp').classList.remove('nav-open'); popOverlay('nav'); } return;
+        case 'logout': confirmLogout(); return;
         case 'theme': toggleTheme(); return;
         case 'reconnect': reconnect(); return;
         case 'home': location.hash = '#/'; return;
@@ -2359,6 +2703,19 @@ function bind() {
         case 'sel-icon': openIconPicker(selectedItems()); return;
         case 'sel-copy': openMove(selectedItems(), 'copy'); return;
         case 'paste': pasteClip(); return;
+        case 'install': installApp(); return;
+        case 'play-all': playAllHere(); return;
+        case 'player-toggle': togglePlay(); return;
+        case 'player-prev': stepTrack(-1); return;
+        case 'player-next': stepTrack(1); return;
+        case 'player-shuffle': toggleShuffle(); return;
+        case 'player-repeat': cycleRepeat(); return;
+        case 'player-list': {
+          if (P.kind === 'video') $('#videoStage').classList.toggle('list-off');
+          else { $('#plList').hidden = !$('#plList').hidden; $('#plListBtn').setAttribute('aria-pressed', String(!$('#plList').hidden)); }
+          return;
+        }
+        case 'player-close': stopPlayer(); return;
         case 'icon-reset': IC.color = ''; IC.sym = ''; paintIconPicker(); return;
         case 'nav-back': navStep(-1); return;
         case 'nav-fwd': navStep(1); return;
@@ -2399,6 +2756,8 @@ function bind() {
     }
 
     // pohon folder: buka/tutup cabang
+    const pi = t.closest('[data-play-idx]');
+    if (pi) { playAt(Number(pi.dataset.playIdx)); return; }
     const icc = t.closest('[data-ic-color]');
     if (icc) { IC.color = icc.dataset.icColor; paintIconPicker(); return; }
     const ics = t.closest('[data-ic-sym]');
@@ -2411,6 +2770,13 @@ function bind() {
 
     // item di jendela
     const item = t.closest('#items .it');
+    if (item && LP.fired) { LP.fired = false; return; }       // habis tekan-lama
+    if (item && t.closest('[data-more]')) {
+      e.stopPropagation();
+      const r = t.closest('[data-more]').getBoundingClientRect();
+      openItemMenu(item.dataset.id, r.right, r.bottom + 4, true);
+      return;
+    }
     if (item) {
       const id = item.dataset.id;
       if (lastPointer === 'touch') {
@@ -2432,6 +2798,24 @@ function bind() {
 
   let lastPointer = 'mouse';
   document.addEventListener('pointerdown', (e) => { lastPointer = e.pointerType || 'mouse'; }, true);
+  // tekan-lama di HP (termasuk iPhone yang tidak punya klik kanan) → menu item
+  document.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch') return;
+    const it = e.target.closest && e.target.closest('#items .it');
+    if (!it || e.target.closest('[data-more]')) return;
+    LP.x = e.clientX; LP.y = e.clientY; LP.fired = false;
+    clearTimeout(LP.timer);
+    LP.timer = setTimeout(() => {
+      LP.fired = true;
+      if (navigator.vibrate) navigator.vibrate(12);
+      openItemMenu(it.dataset.id, LP.x, LP.y, false);
+    }, 520);
+  });
+  const lpCancel = (e) => { if (e && e.type === 'pointermove' && Math.hypot(e.clientX - LP.x, e.clientY - LP.y) < 10) return; clearTimeout(LP.timer); };
+  document.addEventListener('pointermove', lpCancel);
+  document.addEventListener('pointerup', () => clearTimeout(LP.timer));
+  document.addEventListener('pointercancel', () => clearTimeout(LP.timer));
+  document.addEventListener('scroll', () => clearTimeout(LP.timer), true);
 
   document.addEventListener('dblclick', (e) => {
     const item = e.target.closest('#items .it');
@@ -2442,9 +2826,10 @@ function bind() {
   document.addEventListener('contextmenu', (e) => {
     if ($('#screenApp').hidden) return;
     const item = e.target.closest('#items .it');
+    if (item && lastPointer === 'touch') { e.preventDefault(); return; }
     if (item) {
       e.preventDefault();
-      if (!S.selected.has(item.dataset.id) && lastPointer !== 'touch') selectOnly(item.dataset.id);
+      if (!S.selected.has(item.dataset.id)) selectOnly(item.dataset.id);
       openItemMenu(item.dataset.id, e.clientX, e.clientY, false);
       return;
     }
@@ -2458,6 +2843,11 @@ function bind() {
 
   document.addEventListener('keydown', (e) => {
     const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+    if (!$('#videoStage').hidden) {
+      if (e.key === 'Escape') stopPlayer();
+      else if (e.key === 'MediaTrackNext' || (e.shiftKey && e.key === 'N')) stepTrack(1);
+      return;
+    }
     if (!$('#viewer').hidden) {
       if (e.key === 'Escape') closeViewer();
       else if (e.key === 'ArrowLeft') stepViewer(-1);
@@ -2491,6 +2881,7 @@ function bind() {
   });
 
   bindDrag();
+  bindPlayer();
 
   /* seret & lepas file dari komputer */
   let dragDepth = 0;
