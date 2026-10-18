@@ -7,7 +7,7 @@
 'use strict';
 
 /* ---------------------------------------------------------------- versi */
-const APP_VERSION = '3.0.1';
+const APP_VERSION = '3.0.2';
 const APP_BUILD = '18 Oktober 2026';
 
 /* ---------------------------------------------------------------- konfigurasi */
@@ -1110,7 +1110,10 @@ function paintSelection() {
   }
   renderSelection();
 }
-function selectOnly(id) { S.selected = new Set([id]); S.anchor = id; paintSelection(); }
+function selectOnly(id) {
+  S.selected = new Set([id]); S.anchor = id; paintSelection();
+  const f = itemById(id); if (f && matchMedia('(hover: hover)').matches) prepareDragOut(f);
+}
 function toggleSelect(id) {
   if (S.selected.has(id)) S.selected.delete(id); else S.selected.add(id);
   S.anchor = id; paintSelection();
@@ -2077,6 +2080,22 @@ async function moveItemsTo(list, target) {
 }
 
 const LP = { timer: null, fired: false, x: 0, y: 0 };
+/* ---- seret ke desktop: file disiapkan dulu di browser (Google tidak mengizinkan unduhan lewat alamat ber-token) ---- */
+const DL = { ready: new Map(), busy: new Map(), order: [], hint: null };
+const DRAG_OUT_MAX = 80e6;
+function prepareDragOut(f) {
+  if (!f || isFolder(f) || isGoogleDoc(f) || Number(f.size) > DRAG_OUT_MAX || DL.ready.has(f.id) || DL.busy.has(f.id)) return;
+  const job = fetchBlob(f).then(blob => {
+    DL.ready.set(f.id, URL.createObjectURL(blob));
+    DL.order.push({ id: f.id, size: Number(f.size) || 0 });
+    let total = DL.order.reduce((n, x) => n + x.size, 0);
+    while (total > 200e6 && DL.order.length > 1) {        // simpan paling banyak ±200 MB
+      const old = DL.order.shift(); total -= old.size;
+      URL.revokeObjectURL(DL.ready.get(old.id)); DL.ready.delete(old.id);
+    }
+  }).catch(() => {}).finally(() => DL.busy.delete(f.id));
+  DL.busy.set(f.id, job);
+}
 /* ---------------------------------------------------------------- seret-pindah di dalam aplikasi */
 const DRAG = { ids: null };
 function dropTargetOf(el) {
@@ -2105,10 +2124,14 @@ function bindDrag() {
     e.dataTransfer.setData('text/plain', selectedItems().map(f => f.name).join('\n'));
     // seret ke desktop / Explorer (Chrome & Edge): file langsung diunduh ke tempat dilepas
     const one = selectedItems();
-    if (one.length === 1 && !isFolder(one[0]) && !isGoogleDoc(one[0]) && S.token) {
-      const f = one[0];
-      const safe = f.name.replace(/:/g, '_');
-      try { e.dataTransfer.setData('DownloadURL', `${f.mimeType || 'application/octet-stream'}:${safe}:${streamUrl(f, S.token)}`); } catch {}
+    if (one.length === 1 && !isFolder(one[0]) && !isGoogleDoc(one[0])) {
+      const f = one[0], ready = DL.ready.get(f.id);
+      if (ready) {
+        try { e.dataTransfer.setData('DownloadURL', `${f.mimeType || 'application/octet-stream'}:${f.name.replace(/:/g, '_')}:${ready}`); } catch {}
+      } else if (lastPointerType === 'mouse') {
+        prepareDragOut(f);
+        DL.hint = f.id;
+      }
     }
     if (DRAG.ids.length > 1) {
       ghost = document.createElement('div');
@@ -2119,7 +2142,13 @@ function bindDrag() {
     }
     for (const id of DRAG.ids) { const el = $(`#items .it[data-id="${CSS.escape(id)}"]`); if (el) el.classList.add('dragging'); }
   });
-  document.addEventListener('dragend', () => {
+  document.addEventListener('dragend', (e) => {
+    if (DL.hint && e.dataTransfer && e.dataTransfer.dropEffect === 'none') {
+      const f = itemById(DL.hint);
+      if (f && Number(f.size) <= DRAG_OUT_MAX) toast(`“${f.name}” sedang disiapkan. Tunggu sebentar lalu seret lagi ke desktop.`, { ms: 4000 });
+      else if (f) toast('File di atas 80 MB tidak bisa diseret ke desktop. Pakai tombol Unduh.', { ms: 5000 });
+    }
+    DL.hint = null;
     DRAG.ids = null; clearHover();
     if (ghost) { ghost.remove(); ghost = null; }
     for (const el of $$('#items .it.dragging')) el.classList.remove('dragging');
@@ -2610,27 +2639,26 @@ async function loadTrack(resumeAt = 0) {
   P.streamOk = false; P.usingBlob = false; P.triedRefresh = 0;
   $('#vsMsg').hidden = true;
   renderNowPlaying();
-  let token;
-  try { token = await getToken(); } catch { return; }
-  if (curTrack() !== f) return;
-  el.src = streamUrl(f, token);
-  if (resumeAt) el.currentTime = resumeAt;
-  el.play().catch(() => {});
+  // Google menolak token di alamat (403), jadi file diambil dengan izin resmi lalu diputar
+  el.removeAttribute('src');
+  $('#plSub') && P.kind === 'audio' && ($('#plSub').textContent = 'Memuat…');
+  return fallbackToBlob(resumeAt);
 }
-async function fallbackToBlob() {
+async function fallbackToBlob(resumeAt) {
   const f = curTrack(); if (!f) return;
   const el = mediaEl();
-  const at = el.currentTime || 0;
+  const at = resumeAt || el.currentTime || 0;
   const size = Number(f.size) || 0;
   if (size > (P.kind === 'video' ? 600e6 : 200e6)) { mediaError('File ini terlalu besar untuk diputar di sini. Unduh dulu untuk memutarnya.'); return; }
   P.usingBlob = true;
   $('#plSub').textContent = 'Memuat…';
   try {
-    const blob = await fetchBlob(f);
+    const blob = PRE.id === f.id && PRE.blob ? PRE.blob : await fetchBlob(f);
     if (curTrack() !== f) return;
     P.blobUrl = URL.createObjectURL(blob.type && blob.type !== 'application/octet-stream' ? blob : new Blob([blob], { type: f.mimeType || '' }));
     el.src = P.blobUrl;
     if (at) el.currentTime = at;
+    preloadNext();
     el.play().catch(() => {});
     renderNowPlaying();
   } catch (e) { mediaError('File tidak bisa diputar: ' + e.message); }
@@ -2640,6 +2668,14 @@ function mediaError(msg) {
   else toast(msg, { error: true });
   // lompat ke berikutnya kalau ini daftar putar
   if (P.list.length > 1) setTimeout(() => stepTrack(1, true), 1500);
+}
+const PRE = { id: null, blob: null };
+async function preloadNext() {
+  if (P.kind !== 'audio' || P.order.length < 2) return;
+  const nf = P.list[P.order[(P.pos + 1) % P.order.length]];
+  if (!nf || PRE.id === nf.id || Number(nf.size) > 60e6) return;
+  PRE.id = nf.id; PRE.blob = null;
+  try { const b = await fetchBlob(nf); if (PRE.id === nf.id) PRE.blob = b; } catch { PRE.id = null; }
 }
 async function onMediaError(e) {
   if (!curTrack()) return;
