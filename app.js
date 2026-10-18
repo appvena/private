@@ -7,7 +7,7 @@
 'use strict';
 
 /* ---------------------------------------------------------------- versi */
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.4.0';
 const APP_BUILD = '18 Oktober 2026';
 
 /* ---------------------------------------------------------------- konfigurasi */
@@ -33,7 +33,7 @@ const FIELDS = 'id,name,mimeType,size,modifiedTime,createdTime,thumbnailLink,sta
 
 /* ---------------------------------------------------------------- state */
 const S = {
-  token: null, exp: 0, bsession: null, user: null, quota: null, rootId: null,
+  token: null, exp: 0, bsession: null, user: null, drives: [], curDrive: null, parentMap: null, quota: null, rootId: null,
   route: { type: 'folder', id: null, q: '' },
   items: [], selected: new Set(),
   view: LS.get('vena.view') || 'grid',
@@ -316,6 +316,7 @@ async function afterLogin() {
   show('screenApp');
   installBackGuard();
   await ensureRoot();
+  try { await loadDrives(); } catch (e) { S.drives = [{ id: S.rootId, root: true, letter: 'C', label: 'Data', color: '', limit: 0 }]; }
   refreshAppUsage();
   onRoute();
 }
@@ -334,7 +335,7 @@ async function reconnect() {
 function logout() {
   try { stopPlayer(true); } catch {}
   clearSession();
-  S.user = null; S.rootId = null;
+  S.user = null; S.rootId = null; S.drives = []; S.curDrive = null;
   location.hash = '';
   setupLoginScreen();
   show('screenLogin');
@@ -438,11 +439,12 @@ async function refreshAppUsage() {
         const cur = sizes.get(p) || { bytes: 0, files: 0 };
         cur.bytes += Number(f.size) || 0; cur.files++;
         sizes.set(p, cur);
-        if (p === S.rootId) break;
+        if (isDriveRoot(p)) break;
         p = parentOfFolder.get(p);
       }
     }
     S.fsize = sizes;
+    S.parentMap = parentOfFolder;
     renderQuota();
     paintFolderSizes();
   } catch {}
@@ -453,6 +455,8 @@ function paintFolderSizes() {
     const f = itemById(el.dataset.id);
     if (f && isFolder(f) && S.fsize) el.querySelector('.c-size').textContent = fmtSize(folderSize(f.id).bytes);
   }
+  renderDrives();
+  if (S.route.type === 'drives') return;
   if (S.sort === 'size' && S.route.type !== 'recent') render(); else renderDetails();
 }
 let quotaTimer;
@@ -461,14 +465,14 @@ const refreshQuotaSoon = () => { clearTimeout(quotaTimer); quotaTimer = setTimeo
 /* ================================================================ RUTE */
 function parseHash() {
   const h = decodeURIComponent(location.hash.replace(/^#\/?/, ''));
-  if (!h) return { type: 'folder', id: S.rootId };
+  if (!h) return { type: 'drives' };
   if (h.startsWith('f/')) return { type: 'folder', id: h.slice(2) || S.rootId };
   if (h.startsWith('search/')) return { type: 'search', q: h.slice(7) };
   if (['recent', 'starred', 'shared', 'trash'].includes(h)) return { type: h };
-  return { type: 'folder', id: S.rootId };
+  return { type: 'drives' };
 }
-const folderHash = (id) => id === S.rootId ? '#/' : '#/f/' + id;
-const curFolderId = () => S.route.type === 'folder' ? S.route.id : S.rootId;
+const folderHash = (id) => '#/f/' + id;
+const curFolderId = () => S.route.type === 'folder' ? S.route.id : curDrive();
 
 function onRoute(silent = false) {
   if (!S.rootId) return;
@@ -478,7 +482,8 @@ function onRoute(silent = false) {
   trackHistory(S.routeKey);
   if (prevKey !== S.routeKey) { S.selected.clear(); S.anchor = null; }
   closeMenus();
-  const navKey = S.route.type === 'folder' ? (S.route.id === S.rootId ? 'home' : '') : S.route.type;
+  const navKey = S.route.type === 'drives' ? 'home' : S.route.type === 'folder' ? '' : S.route.type;
+  if (S.route.type === 'folder') S.curDrive = isDriveRoot(S.route.id) ? S.route.id : driveOfFolder(S.route.id);
   for (const a of $$('.nav a')) a.classList.toggle('active', a.dataset.nav === navKey);
   $('#searchInput').value = S.route.type === 'search' ? S.route.q : '';
   if ($('#screenApp').classList.contains('nav-open')) { $('#screenApp').classList.remove('nav-open'); forgetOverlay('nav'); }
@@ -489,6 +494,7 @@ function onRoute(silent = false) {
   $('#sortSelect').disabled = S.route.type === 'recent';
   updateClipUI();
   updateNavButtons();
+  renderDrives();
   renderTree();
   loadView(silent);
 }
@@ -509,19 +515,19 @@ function navStep(d) {
   location.hash = H.stack[i];
 }
 function parentOf(id) {
-  if (!id || id === S.rootId) return null;
+  if (!id || isDriveRoot(id)) return null;
   const m = S.meta.get(id);
-  return (m && m.parents && m.parents[0]) || S.rootId;
+  return (m && m.parents && m.parents[0]) || curDrive();
 }
 function navUp() {
-  if (S.route.type !== 'folder') { location.hash = '#/'; return; }
+  if (S.route.type !== 'folder' || isDriveRoot(S.route.id)) { location.hash = '#/'; return; }
   const p = parentOf(S.route.id);
   if (p) location.hash = folderHash(p);
 }
 function updateNavButtons() {
   $('#navBack').disabled = H.idx <= 0;
   $('#navFwd').disabled = H.idx >= H.stack.length - 1;
-  $('#navUp').disabled = S.route.type === 'folder' && S.route.id === S.rootId;
+  $('#navUp').disabled = S.route.type === 'drives';
 }
 
 async function loadView(silent = false) {
@@ -536,6 +542,12 @@ async function loadView(silent = false) {
   }
   try {
     let items;
+    if (r.type === 'drives') {
+      S.items = []; S.selected.clear();
+      $('#listLoading').hidden = true;
+      renderDrives(); renderDrivesOverview(); updatePlayAllButton(); renderSelection();
+      return;
+    }
     if (r.type === 'folder') {
       items = await listAll(`'${qstr(r.id)}' in parents and trashed=false`, { orderBy: 'folder,name' });
     } else if (r.type === 'recent') {
@@ -551,7 +563,7 @@ async function loadView(silent = false) {
       items = r.q ? await listAll(`(name contains '${qstr(r.q)}' or fullText contains '${qstr(r.q)}') and trashed=false`, { max: 500 }) : [];
     }
     if (seq !== S.loadSeq) return;
-    items = items.filter(f => f.id !== S.rootId && !(f.appProperties && f.appProperties.venaTemp));
+    items = items.filter(f => !isDriveRoot(f.id) && f.id !== S.rootId && !(f.appProperties && f.appProperties.venaTemp));
     S.items = items;
     for (const f of items) if (isFolder(f)) S.meta.set(f.id, { name: f.name, parents: f.parents });
     for (const id of [...S.selected]) if (!items.some(f => f.id === id)) S.selected.delete(id);
@@ -574,7 +586,7 @@ async function loadView(silent = false) {
 async function folderChain(id) {
   const chain = [];
   let cur = id, guard = 0;
-  while (cur && cur !== S.rootId && guard++ < 25) {
+  while (cur && !isDriveRoot(cur) && guard++ < 25) {
     let m = S.meta.get(cur);
     if (!m) {
       try {
@@ -596,25 +608,212 @@ function setTitle(t) {
 async function renderCrumbs() {
   const el = $('#crumbs');
   const r = S.route;
-  const root = `<span class="root-ico">${icon('i-drawer')}</span>`;
+  const root = `<span class="root-ico">${icon('i-pc')}</span>`;
   const sep = `<span class="sep">${icon('i-chevron-right')}</span>`;
-  if (r.type === 'search') { el.innerHTML = root + `<button data-go="${S.rootId}">File saya</button>${sep}<span class="current">Hasil pencarian “${esc(r.q)}”</span>`; setTitle('Cari: ' + r.q); return; }
-  if (r.type !== 'folder') { el.innerHTML = root + `<span class="current">${VIEW_TITLES[r.type]}</span>`; setTitle(VIEW_TITLES[r.type]); return; }
-  if (r.id === S.rootId) { el.innerHTML = root + `<span class="current">File saya</span>`; setTitle('File saya'); return; }
+  const home = `<button data-go-home>Komputer ini</button>`;
+  if (r.type === 'drives') { el.innerHTML = root + `<span class="current">Komputer ini</span>`; setTitle('Komputer ini'); return; }
+  if (r.type === 'search') { el.innerHTML = root + home + sep + `<span class="current">Hasil pencarian “${esc(r.q)}”</span>`; setTitle('Cari: ' + r.q); return; }
+  if (r.type !== 'folder') { el.innerHTML = root + home + sep + `<span class="current">${VIEW_TITLES[r.type]}</span>`; setTitle(VIEW_TITLES[r.type]); return; }
   const seq = S.loadSeq;
-  el.innerHTML = root + `<button data-go="${S.rootId}">File saya</button>${sep}<span class="current">…</span>`;
+  const drv = driveById(curDrive());
+  const dname = drv ? driveName(drv) : 'Drive';
+  if (isDriveRoot(r.id)) { el.innerHTML = root + home + sep + `<span class="current">${esc(dname)}</span>`; setTitle(dname); renderDrives(); return; }
+  el.innerHTML = root + home + sep + `<button data-go="${curDrive()}">${esc(dname)}</button>${sep}<span class="current">…</span>`;
   const chain = await folderChain(r.id);
   if (seq !== S.loadSeq) return;
-  let html = root + `<button data-go="${S.rootId}" data-drop="${S.rootId}">File saya</button>`;
+  // drive yang sebenarnya = induk dari folder teratas di rantai
+  const top = chain[0] && S.meta.get(chain[0].id);
+  const realDrive = top && top.parents && isDriveRoot(top.parents[0]) ? top.parents[0] : curDrive();
+  if (realDrive !== S.curDrive) { S.curDrive = realDrive; renderTree(); }
+  const d2 = driveById(realDrive);
+  let html = root + home + sep + `<button data-go="${realDrive}" data-drop="${realDrive}">${esc(d2 ? driveName(d2) : dname)}</button>`;
   chain.forEach((c, i) => {
     html += sep;
     html += i === chain.length - 1 ? `<span class="current" title="${esc(c.name)}">${esc(c.name)}</span>` : `<button data-go="${c.id}" data-drop="${c.id}" title="${esc(c.name)}">${esc(c.name)}</button>`;
   });
   el.innerHTML = html;
   el.scrollLeft = el.scrollWidth;
-  setTitle(chain.length ? chain[chain.length - 1].name : 'File saya');
+  setTitle(chain.length ? chain[chain.length - 1].name : dname);
   updateNavButtons();
+  renderDrives();
   expandTreeTo(chain.map(c => c.id));
+}
+
+/* ================================================================ DRIVE (partisi seperti C: D: E:)
+   Setiap drive = satu folder utama terpisah di Google Drive.
+   C: = folder "Vena Drive" yang sudah ada. Drive lain ditandai appProperties
+   venaDrive=1 beserta huruf, nama, warna, dan batas kapasitas (opsional). */
+const isDriveRoot = (id) => S.drives.some(d => d.id === id);
+const driveById = (id) => S.drives.find(d => d.id === id);
+const driveName = (d) => `${d.label} (${d.letter}:)`;
+const curDrive = () => S.curDrive && driveById(S.curDrive) ? S.curDrive : S.rootId;
+function toDrive(f, isRoot) {
+  const ap = f.appProperties || {};
+  return { id: f.id, root: !!isRoot, letter: ap.venaLetter || (isRoot ? 'C' : '?'), label: ap.venaLabel || (isRoot ? 'Data' : f.name),
+           color: ICON_COLORS[ap.venaDColor] ? ap.venaDColor : '', limit: Number(ap.venaLimit) || 0 };
+}
+async function loadDrives() {
+  const [root, r] = await Promise.all([
+    api('/files/' + S.rootId, { query: { fields: 'id,name,appProperties' } }),
+    api('/files', { query: { q: "appProperties has { key='venaDrive' and value='1' } and trashed=false", fields: 'files(id,name,appProperties)', pageSize: 100, spaces: 'drive' } }),
+  ]);
+  S.drives = [toDrive(root, true), ...(r.files || []).map(f => toDrive(f))].sort((a, b) => a.letter.localeCompare(b.letter));
+  for (const d of S.drives) S.meta.set(d.id, { name: driveName(d), parents: [] });
+  renderDrives();
+}
+// cari drive tempat sebuah folder berada
+function driveOfFolder(id) {
+  let cur = id, guard = 0;
+  while (cur && guard++ < 40) {
+    if (isDriveRoot(cur)) return cur;
+    const m = S.meta.get(cur);
+    cur = (m && m.parents && m.parents[0]) || (S.parentMap && S.parentMap.get(cur));
+  }
+  return S.rootId;
+}
+const driveUsed = (d) => folderSize(d.id).bytes;
+function driveColor(d) { return d.color ? ICON_COLORS[d.color] : null; }
+function diskSvg(d, cls = '') {
+  const c = driveColor(d);
+  const body = c ? c.front : 'var(--accent-soft)', edge = c ? c.back : 'var(--accent)', ink = c ? c.ink : 'var(--accent)';
+  return `<svg class="${cls}" viewBox="0 0 48 36" aria-hidden="true">
+    <rect x="2" y="6" width="44" height="26" rx="6" fill="${body}" stroke="${edge}" stroke-width="2"/>
+    <rect x="2" y="24" width="44" height="8" rx="3" fill="${edge}" opacity=".35"/>
+    <circle cx="39" cy="28" r="1.8" fill="${ink}"/>
+    <text x="17" y="22" text-anchor="middle" font-family="Bricolage Grotesque, system-ui, sans-serif" font-weight="700" font-size="15" fill="${ink}">${esc(d.letter)}</text></svg>`;
+}
+function usageText(d) {
+  const used = driveUsed(d);
+  return d.limit ? `${fmtSize(used)} dari ${fmtSize(d.limit)}` : `${fmtSize(used)} terpakai`;
+}
+function usagePct(d) { return d.limit ? Math.min(100, driveUsed(d) / d.limit * 100) : 0; }
+function renderDrives() {
+  const el = $('#driveList'); if (!el) return;
+  const cur = S.route.type === 'folder' ? curDrive() : null;
+  el.innerHTML = S.drives.map(d => `<li>
+    <button class="drv-row${cur === d.id ? ' active' : ''}" data-go="${d.id}" data-drop="${d.id}" data-drive="${d.id}" title="${esc(driveName(d))}">
+      ${diskSvg(d, 'drv-ico')}
+      <span class="drv-txt"><span class="drv-name">${esc(driveName(d))}</span>
+        <span class="drv-bar${d.limit ? '' : ' nolimit'}"><span style="width:${usagePct(d)}%"></span></span>
+        <span class="drv-use">${esc(usageText(d))}</span></span>
+    </button></li>`).join('');
+  $('#treeLabel').hidden = $('#tree').hidden = S.route.type === 'drives';
+  $('#treeLabel').textContent = S.route.type === 'folder' ? 'Folder di ' + driveName(driveById(curDrive()) || S.drives[0] || { label: 'Data', letter: 'C' }) : 'Folder';
+  if (S.route.type === 'drives') renderDrivesOverview();
+}
+function renderDrivesOverview() {
+  const box = $('#items');
+  box.className = 'items drives-grid';
+  $('#content').classList.remove('listing');
+  $('#emptyState').hidden = true;
+  box.innerHTML = S.drives.map(d => {
+    const pct = usagePct(d), warn = d.limit && pct > 90;
+    return `<div class="drv-card" data-drive="${d.id}" data-drop="${d.id}" tabindex="0" role="button">
+      ${diskSvg(d, 'drv-big')}
+      <div class="drv-card-body">
+        <strong>${esc(driveName(d))}</strong>
+        <span class="drv-bar${d.limit ? '' : ' nolimit'}${warn ? ' warn' : ''}"><span style="width:${pct}%"></span></span>
+        <span class="drv-use">${esc(usageText(d))}${d.limit ? `, sisa ${esc(fmtSize(Math.max(0, d.limit - driveUsed(d))))}` : ''}</span>
+        <span class="drv-use">${folderSize(d.id).files.toLocaleString('id-ID')} file</span>
+      </div>
+      <button class="more-btn drv-more" data-drive-more="${d.id}" aria-label="Pilihan drive">${icon('i-more-h')}</button>
+    </div>`;
+  }).join('') + `<button class="drv-card drv-add" data-action="new-drive">${icon('i-plus')}<span>Tambah drive</span></button>`;
+  renderStatus(); renderDetails();
+}
+
+/* ---- dialog buat / ubah drive ---- */
+const DD = { edit: null, color: '' };
+function openDriveDialog(d) {
+  DD.edit = d || null;
+  DD.color = d ? d.color : 'biru';
+  const used = new Set(S.drives.filter(x => x !== d).map(x => x.letter));
+  const letters = 'CDEFGHIJKLMNOPQRSTUVWXYZ'.split('').filter(l => !used.has(l));
+  $('#driveLetter').innerHTML = letters.map(l => `<option value="${l}">${l}:</option>`).join('');
+  $('#driveLetter').value = d ? d.letter : letters[0];
+  $('#driveLabel').value = d ? d.label : '';
+  $('#driveLimit').value = d && d.limit ? Math.round(d.limit / 1073741824) : '';
+  $('#driveTitle').textContent = d ? 'Ubah drive ' + d.letter + ':' : 'Tambah drive';
+  $('#driveOk').textContent = d ? 'Simpan' : 'Buat drive';
+  $('#driveNote').hidden = !!d;
+  $('#driveColors').innerHTML = `<button type="button" class="none" data-dcolor="" title="Bawaan" aria-label="Warna bawaan"></button>` +
+    Object.entries(ICON_COLORS).map(([k, c]) => `<button type="button" data-dcolor="${k}" title="${c.label}" aria-label="${c.label}" style="--c:${c.front}"></button>`).join('');
+  paintDriveDialog();
+  const dlg = $('#dlgDrive');
+  dlg.returnValue = '';
+  dlg.onclose = () => { if (dlg.returnValue === 'ok') saveDrive(); };
+  dlg.showModal();
+  setTimeout(() => $('#driveLabel').focus(), 30);
+}
+function paintDriveDialog() {
+  for (const b of $$('#driveColors button')) b.setAttribute('aria-checked', String(b.dataset.dcolor === DD.color));
+  const fake = { letter: $('#driveLetter').value || 'D', label: $('#driveLabel').value.trim() || 'Drive baru', color: DD.color, limit: 0 };
+  $('#drivePreview').innerHTML = diskSvg(fake, 'drv-big') + `<strong>${esc(driveName(fake))}</strong>`;
+}
+async function saveDrive() {
+  const label = $('#driveLabel').value.trim();
+  const letter = $('#driveLetter').value;
+  const gb = Number($('#driveLimit').value) || 0;
+  if (!label) { toast('Nama drive belum diisi.', { error: true }); return; }
+  const props = { venaLetter: letter, venaLabel: label, venaDColor: DD.color || null, venaLimit: gb ? String(gb * 1073741824) : null };
+  try {
+    if (DD.edit) {
+      const body = { appProperties: props };
+      if (!DD.edit.root) body.name = `Vena ${letter} - ${label}`;
+      await api('/files/' + DD.edit.id, { method: 'PATCH', query: { fields: 'id' }, body });
+      toast(`Drive ${letter}: disimpan.`);
+      await loadDrives(); renderCrumbs();
+    } else {
+      const f = await api('/files', { method: 'POST', query: { fields: 'id' }, body: {
+        name: `Vena ${letter} - ${label}`, mimeType: FOLDER,
+        appProperties: Object.assign({ venaDrive: '1' }, props),
+        description: `Drive ${letter}: aplikasi ${CFG.APP_NAME}` } });
+      await loadDrives();
+      toast(`Drive ${label} (${letter}:) dibuat.`);
+      location.hash = folderHash(f.id);
+    }
+  } catch (e) { fail(e, 'Gagal menyimpan drive'); }
+}
+async function deleteDrive(d) {
+  if (d.root) { toast('Drive C: adalah drive utama dan tidak bisa dihapus.', { error: true }); return; }
+  const fs = folderSize(d.id);
+  const ok = await confirmDialog(`Hapus drive ${driveName(d)}?`,
+    (fs.files ? `Berisi ${fs.files.toLocaleString('id-ID')} file (${fmtSize(fs.bytes)}). ` : 'Drive ini kosong. ') +
+    'Drive beserta isinya dipindahkan ke Sampah dan masih bisa dipulihkan selama 30 hari.', 'Hapus drive');
+  if (!ok) return;
+  try {
+    await api('/files/' + d.id, { method: 'PATCH', query: { fields: 'id' }, body: { trashed: true } });
+    S.drives = S.drives.filter(x => x.id !== d.id);
+    toast(`Drive ${driveName(d)} dihapus.`);
+    if (S.route.type === 'folder' && curDrive() === d.id) location.hash = '#/'; else renderDrives();
+    refreshQuotaSoon();
+  } catch (e) { fail(e, 'Gagal menghapus drive'); }
+}
+function openDriveMenu(id, x, y, alignRight) {
+  const d = driveById(id); if (!d) return;
+  closeMenus();
+  const m = $('#menuItem');
+  const b = (act, ic, label, cls = '') => `<button role="menuitem" data-drive-action="${act}" data-id="${d.id}" class="${cls}">${icon(ic)}${label}</button>`;
+  m.innerHTML = b('open', 'i-folder', 'Buka') + b('edit', 'i-edit', 'Ubah nama, huruf, warna, kapasitas') +
+    (d.root ? '' : '<hr>' + b('delete', 'i-trash', 'Hapus drive', 'danger'));
+  placeMenu(m, x, y, alignRight);
+}
+function driveAction(act, id) {
+  const d = driveById(id); if (!d) return;
+  closeMenus();
+  if (act === 'open') location.hash = folderHash(d.id);
+  else if (act === 'edit') openDriveDialog(d);
+  else if (act === 'delete') deleteDrive(d);
+}
+// cek batas kapasitas sebelum menambah isi drive
+async function fitsInDrive(targetFolder, bytes) {
+  const d = driveById(driveOfFolder(targetFolder));
+  if (!d || !d.limit || !bytes) return true;
+  const free = d.limit - driveUsed(d);
+  if (bytes <= free) return true;
+  await confirmDialog(`Drive ${driveName(d)} tidak cukup`,
+    `Butuh ${fmtSize(bytes)}, sisa ruang hanya ${fmtSize(Math.max(0, free))}. Hapus sebagian isi drive, pilih drive lain, atau naikkan batas kapasitasnya.`, 'Mengerti');
+  return false;
 }
 
 /* ================================================================ IKON KHUSUS
@@ -838,7 +1037,7 @@ async function loadBlobThumb(box) {
 function showEmpty(kind) {
   const el = $('#emptyState');
   const states = {
-    folder: S.route.id === S.rootId
+    folder: isDriveRoot(S.route.id)
       ? ['Belum ada file', 'Seret file ke jendela ini, atau klik Unggah. Semua file tersimpan di Google Drive Anda.', 'Unggah file']
       : ['Folder ini kosong', 'Seret file ke jendela ini, atau klik Unggah.', 'Unggah file'],
     recent: ['Belum ada file', 'File yang baru diunggah atau diubah akan muncul di sini.', 'Unggah file'],
@@ -920,6 +1119,7 @@ function renderSelection() {
   renderDetails();
 }
 function renderStatus() {
+  if (S.route.type === 'drives') { $('#statusCount').textContent = `${S.drives.length} drive`; $('#statusSel').textContent = ''; return; }
   const all = S.items, sel = selectedItems();
   const nF = all.filter(isFolder).length, nFi = all.length - nF;
   const parts = [];
@@ -986,6 +1186,15 @@ function renderDetails() {
       <div class="d-actions">${acts}</div>`;
     return;
   }
+  if (S.route.type === 'drives') {
+    const tot = S.drives.reduce((n, d) => n + driveUsed(d), 0);
+    el.innerHTML = `<div class="d-preview">${icon('i-pc', 'i i-xl')}</div><h3>Komputer ini</h3>
+      <dl>${S.drives.map(d => `<dt>${esc(d.letter)}:</dt><dd>${esc(d.label)}, ${esc(usageText(d))}</dd>`).join('')}
+      <dt>Total</dt><dd>${esc(fmtSize(tot))}</dd></dl>
+      <p class="d-hint">Klik drive untuk membukanya. Klik kanan drive untuk mengubah nama, huruf, warna, atau batas kapasitas. Seret file ke drive di panel kiri untuk memindahkannya.</p>
+      <div class="d-actions"><button class="btn btn-primary" data-action="new-drive">${icon('i-plus')}Tambah drive</button></div>`;
+    return;
+  }
   const title = S.route.type === 'folder' ? ($('#winTitle').textContent || 'File saya') : (VIEW_TITLES[S.route.type] || 'Hasil pencarian');
   const files = S.items.filter(f => !isFolder(f));
   const size = files.reduce((s, f) => s + (Number(f.size) || 0), 0);
@@ -1031,8 +1240,10 @@ function expandTreeTo(ids) {
 }
 function renderTree() {
   const el = $('#tree'); if (!el || !S.rootId) return;
-  const root = T.nodes.get(S.rootId);
-  if (!root || !root.children) { el.innerHTML = '<li class="tree-empty">Memuat…</li>'; if (!T.loadingRoot) { T.loadingRoot = true; loadTreeChildren(S.rootId); } return; }
+  const rid = curDrive();
+  const root = T.nodes.get(rid);
+  T.loading = T.loading || new Set();
+  if (!root || !root.children) { el.innerHTML = '<li class="tree-empty">Memuat…</li>'; if (!T.loading.has(rid)) { T.loading.add(rid); loadTreeChildren(rid); } return; }
   const cur = S.route.type === 'folder' ? S.route.id : null;
   const branch = (ids, depth) => ids.map(id => {
     const n = T.nodes.get(id); if (!n) return '';
@@ -1052,7 +1263,7 @@ let treeTimer;
 function refreshTreeSoon() {
   clearTimeout(treeTimer);
   treeTimer = setTimeout(() => {
-    for (const id of new Set([S.rootId, ...T.open])) { const n = T.nodes.get(id); if (n && n.children) loadTreeChildren(id); }
+    for (const id of new Set([curDrive(), ...S.drives.map(d => d.id), ...T.open])) { const n = T.nodes.get(id); if (n && n.children) loadTreeChildren(id); }
   }, 500);
 }
 function moveFocus(e) {
@@ -1125,6 +1336,7 @@ function openItemMenu(id, x, y, alignRight) {
     if (folder) h += b('playfolder', 'i-play', 'Putar musik / video di folder ini');
     h += b('download', 'i-download', folder ? 'Unduh sebagai ZIP' : 'Unduh');
     h += b('share', 'i-link', f.shared ? 'Kelola link berbagi' : 'Bagikan link');
+    h += b('sendwa', 'i-chat', 'Kirim lewat WhatsApp');
     h += '<hr>';
     h += b('rename', 'i-edit', 'Ganti nama');
     h += b('move', 'i-move', 'Pindahkan ke…');
@@ -1147,9 +1359,10 @@ async function itemAction(act, id) {
   closeMenus();
   switch (act) {
     case 'select': return toggleSelect(f.id);
+    case 'sendwa': return quickSendWa(f);
     case 'playfolder': return playFolder(f);
     case 'copyto': return openMove(S.selected.has(f.id) && S.selected.size > 1 ? selectedItems() : [f], 'copy');
-    case 'duplicate': return copyItems(S.selected.has(f.id) && S.selected.size > 1 ? selectedItems() : [f], (f.parents || [])[0] || S.rootId);
+    case 'duplicate': return copyItems(S.selected.has(f.id) && S.selected.size > 1 ? selectedItems() : [f], (f.parents || [])[0] || curDrive());
     case 'icon': return openIconPicker(S.selected.has(f.id) && S.selected.size > 1 ? selectedItems() : [f]);
     case 'open': return openItem(f);
     case 'download': return downloadFiles([f]);
@@ -1555,6 +1768,8 @@ function updateShareUI(on) {
     ? (u ? `Siapa pun yang punya link bisa melihat, sampai ${fmtUntil(u)}` : 'Siapa pun yang punya link bisa melihat')
     : 'Hanya Anda yang bisa membuka';
   $('#shareLinkRow').hidden = !on;
+  $('#shareApps').hidden = !on;
+  $('#shareNative').hidden = !navigator.share;
   $('#shareExpiryRow').hidden = !on;
 }
 function expiryFromSelect() {
@@ -1617,6 +1832,43 @@ async function expireOldLinks(list) {
   }
   if (old.length) render();
 }
+/* ---- kirim link lewat WhatsApp / Telegram / Email / aplikasi lain ---- */
+function shareMessage(f, link) {
+  const u = shareUntil(f);
+  return `${f.name}\n${link}` + (u ? `\n(Link berlaku sampai ${fmtUntil(u)})` : '');
+}
+function sendVia(app, f, link, win) {
+  const text = shareMessage(f, link);
+  const urls = {
+    wa: 'https://wa.me/?text=' + encodeURIComponent(text),
+    tg: 'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(f.name),
+    mail: 'mailto:?subject=' + encodeURIComponent(f.name) + '&body=' + encodeURIComponent(text),
+  };
+  if (app === 'mail') { if (win) win.close(); location.href = urls.mail; return; }
+  if (win) win.location.href = urls[app]; else window.open(urls[app], '_blank', 'noopener');
+}
+async function sendNative(f, link) {
+  try { await navigator.share({ title: f.name, text: shareMessage(f, ''), url: link }); }
+  catch (e) { if (e.name !== 'AbortError') copyLink(); }
+}
+// dari menu: aktifkan link (kalau belum) lalu langsung buka WhatsApp
+async function quickSendWa(f) {
+  let win = null;
+  if (!f.shared) {
+    const ok = await confirmDialog('Aktifkan link berbagi?', `Siapa pun yang menerima link bisa melihat “${f.name}”. Anda bisa mematikannya kapan saja.`, 'Aktifkan & kirim');
+    if (!ok) return;
+    win = window.open('', '_blank');            // dibuka sekarang supaya tidak diblokir browser
+  }
+  try {
+    if (!f.shared) {
+      await api(`/files/${f.id}/permissions`, { method: 'POST', query: { fields: 'id' }, body: { type: 'anyone', role: 'reader' } });
+      f.shared = true; render();
+    }
+    if (!f.webViewLink) { const r = await api('/files/' + f.id, { query: { fields: 'webViewLink' } }); f.webViewLink = r.webViewLink; }
+    sendVia('wa', f, f.webViewLink, win);
+  } catch (e) { if (win) win.close(); fail(e, 'Gagal membagikan'); }
+}
+
 async function copyLink() {
   const v = $('#shareLink').value;
   try { await navigator.clipboard.writeText(v); toast('Link disalin.'); }
@@ -1626,7 +1878,8 @@ async function copyLink() {
 /* ---------------------------------------------------------------- salin */
 async function copyItems(list, target) {
   if (!list.length) return;
-  if (target !== S.rootId) {
+  if (!(await fitsInDrive(target, list.reduce((n, f) => n + (isFolder(f) ? folderSize(f.id).bytes : Number(f.size) || 0), 0)))) return;
+  if (!isDriveRoot(target)) {
     const chain = await folderChain(target);
     const ids = new Set(list.filter(isFolder).map(f => f.id));
     if (ids.has(target) || chain.some(c => ids.has(c.id))) { toast('Folder tidak bisa disalin ke dalam dirinya sendiri.', { error: true }); return; }
@@ -1657,7 +1910,7 @@ async function copyItems(list, target) {
       if (isFolder(f)) await copyFolder(f, target, name); else await copyFile(f, target, name);
     }
     p.close();
-    const tname = target === S.rootId ? 'File saya' : (S.meta.get(target) || {}).name || 'folder';
+    const tname = (S.meta.get(target) || {}).name || 'folder';
     toast(list.length === 1 ? `“${list[0].name}” disalin ke “${tname}”.` : `${list.length} item disalin ke “${tname}”.`,
       S.route.type === 'folder' && S.route.id === target ? {} : { action: 'Buka', onAction: () => location.hash = folderHash(target) });
     if (S.route.type === 'folder' && S.route.id === target) loadView(true);
@@ -1697,7 +1950,7 @@ async function openMove(list, mode = 'move') {
   MV.items = list; MV.mode = mode;
   $('#moveVerb').textContent = mode === 'copy' ? 'Salin' : 'Pindahkan';
   $('#moveOk').textContent = mode === 'copy' ? 'Salin ke sini' : 'Pindahkan ke sini';
-  MV.at = S.route.type === 'folder' ? S.route.id : S.rootId;
+  MV.at = S.route.type === 'folder' ? S.route.id : null;
   $('#moveWhat').textContent = list.length === 1 ? `“${list[0].name}”` : `${list.length} item`;
   $('#dlgMove').returnValue = '';
   $('#dlgMove').showModal();
@@ -1705,23 +1958,31 @@ async function openMove(list, mode = 'move') {
 }
 async function loadMoveList() {
   const ul = $('#moveList');
-  ul.innerHTML = '<li class="hint">Memuat…</li>';
   const moving = new Set(MV.items.map(f => f.id));
   const at = MV.at;
-  const chain = at === S.rootId ? [] : await folderChain(at);
-  let ch = `<button type="button" data-move-go="${S.rootId}">File saya</button>`;
+  if (!at) {     // tingkat paling atas: pilih drive
+    $('#moveCrumbs').innerHTML = `<span class="current">Komputer ini</span>`;
+    ul.innerHTML = S.drives.map(d => `<li><button type="button" data-move-go="${d.id}">${diskSvg(d, 'mv-disk')}<span>${esc(driveName(d))}</span><span class="chev">${icon('i-chevron-right')}</span></button></li>`).join('');
+    $('#moveOk').disabled = true;
+    return;
+  }
+  ul.innerHTML = '<li class="hint">Memuat…</li>';
+  const drv = isDriveRoot(at) ? at : driveOfFolder(at);
+  const chain = isDriveRoot(at) ? [] : await folderChain(at);
+  const d = driveById(drv);
+  let ch = `<button type="button" data-move-top>Komputer ini</button><span class="sep">${icon('i-chevron-right')}</span>`;
+  ch += chain.length ? `<button type="button" data-move-go="${drv}">${esc(d ? driveName(d) : 'Drive')}</button>` : `<span class="current">${esc(d ? driveName(d) : 'Drive')}</span>`;
   chain.forEach((c, i) => {
     ch += `<span class="sep">${icon('i-chevron-right')}</span>`;
     ch += i === chain.length - 1 ? `<span class="current">${esc(c.name)}</span>` : `<button type="button" data-move-go="${c.id}">${esc(c.name)}</button>`;
   });
-  if (!chain.length) ch = `<span class="current">File saya</span>`;
   $('#moveCrumbs').innerHTML = ch;
   try {
     const folders = (await listAll(`'${qstr(at)}' in parents and mimeType='${FOLDER}' and trashed=false`, { orderBy: 'name' }));
     if (MV.at !== at) return;
     for (const f of folders) S.meta.set(f.id, { name: f.name, parents: f.parents });
     ul.innerHTML = folders.length ? folders.map(f => `<li><button type="button" data-move-go="${f.id}" ${moving.has(f.id) ? 'disabled title="Tidak bisa memindahkan folder ke dalam dirinya sendiri"' : ''}>${icon('i-folder')}<span>${esc(f.name)}</span><span class="chev">${icon('i-chevron-right')}</span></button></li>`).join('')
-      : '<li class="hint">Tidak ada subfolder. Anda bisa memindahkan ke sini.</li>';
+      : `<li class="hint">Tidak ada subfolder. Anda bisa ${MV.mode === 'copy' ? 'menyalin' : 'memindahkan'} ke sini.</li>`;
   } catch (e) { ul.innerHTML = '<li class="hint">Gagal memuat folder.</li>'; fail(e); }
   const same = MV.items.every(f => (f.parents || [])[0] === at);
   const inside = chain.some(c => moving.has(c.id));
@@ -1774,8 +2035,12 @@ async function saveIcons(list, color, sym) {
 async function moveItemsTo(list, target) {
   list = list.filter(f => f.id !== target && (f.parents || [])[0] !== target);
   if (!list.length) return;
+  const tDrive = driveOfFolder(target);
+  const incoming = list.filter(f => driveOfFolder((f.parents || [])[0]) !== tDrive)
+    .reduce((n, f) => n + (isFolder(f) ? folderSize(f.id).bytes : Number(f.size) || 0), 0);
+  if (!(await fitsInDrive(target, incoming))) return;
   const ids = new Set(list.map(f => f.id));
-  if (target !== S.rootId) {
+  if (!isDriveRoot(target)) {
     const chain = await folderChain(target);
     if (chain.some(c => ids.has(c.id))) { toast('Folder tidak bisa dipindahkan ke dalam dirinya sendiri.', { error: true }); return; }
   }
@@ -1783,7 +2048,7 @@ async function moveItemsTo(list, target) {
     await runAll(list, f => api('/files/' + f.id, { method: 'PATCH', query: {
       addParents: target, removeParents: (f.parents || []).join(','), fields: 'id,parents' } }));
     for (const f of list) { f.parents = [target]; if (isFolder(f)) S.meta.set(f.id, { name: f.name, parents: [target] }); }
-    const name = target === S.rootId ? 'File saya' : (S.meta.get(target) || {}).name || 'folder';
+    const name = (S.meta.get(target) || {}).name || 'folder';
     toast(list.length === 1 ? `“${list[0].name}” dipindahkan ke “${name}”.` : `${list.length} item dipindahkan ke “${name}”.`, {
       action: 'Buka', onAction: () => location.hash = folderHash(target) });
     if (S.route.type === 'folder' && S.route.id !== target) S.items = S.items.filter(f => !ids.has(f.id));
@@ -1800,8 +2065,8 @@ function dropTargetOf(el) {
   if (it) { const f = itemById(it.dataset.id); return f && isFolder(f) ? { el: it, id: f.id } : null; }
   const d = el.closest('[data-drop]');
   if (d) return { el: d, id: d.dataset.drop };
-  const nav = el.closest('.nav a[data-nav="home"], .nav a[data-nav="trash"]');
-  if (nav) return { el: nav, id: nav.dataset.nav === 'trash' ? '__trash' : S.rootId };
+  const nav = el.closest('.nav a[data-nav="trash"]');
+  if (nav) return { el: nav, id: '__trash' };
   return null;
 }
 function bindDrag() {
@@ -2420,9 +2685,10 @@ function stepViewer(d) {
 /* ================================================================ UNGGAH */
 const U = { tasks: [], active: 0, max: 3, seq: 0, folderCache: new Map() };
 
-function addUploads(entries, baseParent) {
+async function addUploads(entries, baseParent) {
   // entries: [{file, dir: ['A','B']}]
   if (!entries.length) return;
+  if (!(await fitsInDrive(baseParent, entries.reduce((n, e) => n + (e.file.size || 0), 0)))) return;
   for (const en of entries) {
     U.tasks.push({ id: ++U.seq, file: en.file, dir: en.dir || [], base: baseParent, status: 'queued', loaded: 0, xhr: null, error: '' });
   }
@@ -2835,6 +3101,8 @@ function bind() {
 
   $('#shareToggle').onchange = (e) => setShared(e.target.checked);
   $('#shareExpiry').onchange = changeExpiry;
+  $('#driveLabel').addEventListener('input', paintDriveDialog);
+  $('#driveLetter').addEventListener('change', paintDriveDialog);
   $('#dlgMove').addEventListener('close', () => { if ($('#dlgMove').returnValue === 'ok') doMove(); });
 
   window.addEventListener('hashchange', () => { if (!$('#viewer').hidden) closeViewer(true); onRoute(); });
@@ -2850,6 +3118,16 @@ function bind() {
     // aksi menu item
     const ia = t.closest('[data-item-action]');
     if (ia) { itemAction(ia.dataset.itemAction, ia.dataset.id); return; }
+    if (t.closest('[data-go-home]')) { location.hash = '#/'; return; }
+    if (t.closest('[data-move-top]')) { MV.at = null; loadMoveList(); return; }
+    const da = t.closest('[data-drive-action]');
+    if (da) { driveAction(da.dataset.driveAction, da.dataset.id); return; }
+    const dm = t.closest('[data-drive-more]');
+    if (dm) { e.stopPropagation(); const r = dm.getBoundingClientRect(); openDriveMenu(dm.dataset.driveMore, r.right, r.bottom + 4, true); return; }
+    const dcol = t.closest('[data-dcolor]');
+    if (dcol) { DD.color = dcol.dataset.dcolor; paintDriveDialog(); return; }
+    const card = t.closest('.drv-card[data-drive]');
+    if (card) { location.hash = folderHash(card.dataset.drive); return; }
     const go = t.closest('[data-go]');
     if (go) { location.hash = folderHash(go.dataset.go); return; }
     const mg = t.closest('[data-move-go]');
@@ -2866,6 +3144,7 @@ function bind() {
         case 'upload-files': $('#pickFiles').click(); return;
         case 'upload-folder': $('#pickFolder').click(); return;
         case 'new-folder': newFolder(); return;
+        case 'new-drive': openDriveDialog(); return;
         case 'open-sidebar': $('#screenApp').classList.add('nav-open'); pushOverlay('nav'); return;
         case 'close-sidebar': if ($('#screenApp').classList.contains('nav-open')) { $('#screenApp').classList.remove('nav-open'); popOverlay('nav'); } return;
         case 'logout': confirmLogout(); return;
@@ -2913,6 +3192,10 @@ function bind() {
         case 'sel-delete': deleteItems(selectedItems()); return;
         case 'empty-trash': emptyTrash(); return;
         case 'copy-link': copyLink(); return;
+        case 'send-wa': if (shareItem) sendVia('wa', shareItem, $('#shareLink').value); return;
+        case 'send-tg': if (shareItem) sendVia('tg', shareItem, $('#shareLink').value); return;
+        case 'send-mail': if (shareItem) sendVia('mail', shareItem, $('#shareLink').value); return;
+        case 'send-native': if (shareItem) sendNative(shareItem, $('#shareLink').value); return;
         case 'move-newfolder': {
           const f = await newFolder(MV.at);
           if (f) { MV.at = f.id; loadMoveList(); }
@@ -3007,6 +3290,8 @@ function bind() {
 
   document.addEventListener('contextmenu', (e) => {
     if ($('#screenApp').hidden) return;
+    const drv = e.target.closest && e.target.closest('[data-drive]');
+    if (drv) { e.preventDefault(); openDriveMenu(drv.dataset.drive, e.clientX, e.clientY, false); return; }
     const item = e.target.closest('#items .it');
     if (item && lastPointer === 'touch') { e.preventDefault(); return; }
     if (item) {
@@ -3075,7 +3360,7 @@ function bind() {
     if (!hasFiles(e) || $('#screenApp').hidden) return;
     e.preventDefault();
     dragDepth++;
-    const name = S.route.type === 'folder' && S.route.id !== S.rootId ? ((S.meta.get(S.route.id) || {}).name || 'folder ini') : 'File saya';
+    const name = S.route.type === 'folder' ? ((S.meta.get(S.route.id) || {}).name || 'folder ini') : (driveById(curDrive()) ? driveName(driveById(curDrive())) : 'drive C:');
     $('#dropTarget').textContent = name;
     $('#dropZone').hidden = false;
   });
