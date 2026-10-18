@@ -7,7 +7,7 @@
 'use strict';
 
 /* ---------------------------------------------------------------- versi */
-const APP_VERSION = '2.4.0';
+const APP_VERSION = '2.5.0';
 const APP_BUILD = '18 Oktober 2026';
 
 /* ---------------------------------------------------------------- konfigurasi */
@@ -37,6 +37,7 @@ const S = {
   route: { type: 'folder', id: null, q: '' },
   items: [], selected: new Set(),
   view: LS.get('vena.view') || 'grid',
+  viewBy: (() => { try { return JSON.parse(LS.get('vena.viewBy') || '{}'); } catch { return {}; } })(),
   sort: LS.get('vena.sort') || 'name',
   meta: new Map(),         // id -> {name, parents}  untuk breadcrumb
   loadSeq: 0,
@@ -481,10 +482,11 @@ function onRoute(silent = false) {
   S.routeKey = location.hash || '#/';
   trackHistory(S.routeKey);
   if (prevKey !== S.routeKey) { S.selected.clear(); S.anchor = null; }
+  S.view = S.viewBy[S.routeKey] || 'grid';            // tiap folder punya tampilan sendiri
   closeMenus();
   const navKey = S.route.type === 'drives' ? 'home' : S.route.type === 'folder' ? '' : S.route.type;
   if (S.route.type === 'folder') S.curDrive = isDriveRoot(S.route.id) ? S.route.id : driveOfFolder(S.route.id);
-  for (const a of $$('.nav a')) a.classList.toggle('active', a.dataset.nav === navKey);
+  for (const a of $$('.nav a, .bottom-nav a')) a.classList.toggle('active', a.dataset.nav === navKey);
   $('#searchInput').value = S.route.type === 'search' ? S.route.q : '';
   if ($('#screenApp').classList.contains('nav-open')) { $('#screenApp').classList.remove('nav-open'); forgetOverlay('nav'); }
   $('#trashNote').hidden = S.route.type !== 'trash';
@@ -924,7 +926,7 @@ function itemHTML(f, trash) {
   const k = kindOf(f);
   const thumb = !isFolder(f) && f.thumbnailLink && !(brokerMode() && S.directThumbBad)
     ? `<img data-thumb loading="lazy" referrerpolicy="no-referrer" alt="" src="${esc(f.thumbnailLink.replace(/=s\d+$/, '=s320'))}">` : '';
-  return `<div class="it${sel ? ' selected' : ''}" data-id="${f.id}" tabindex="0" role="option" aria-selected="${sel}" title="${esc(f.name)}"${trash ? '' : ' draggable="true"'}>
+  return `<div class="it${sel ? ' selected' : ''}" data-id="${f.id}" tabindex="0" role="option" aria-selected="${sel}" title="${esc(f.name)}" style="--kind:var(--k-${isFolder(f) ? 'folder' : k})"${trash ? '' : ' draggable="true"'}>
     <div class="ic" data-kind="${k}">${thumb || itemSvg(f)}</div>
     <div class="nm"><span class="mini">${itemSvg(f, 'mini-svg')}</span><span class="label">${esc(f.name)}</span>${f.starred ? `<span class="star-badge" title="Berbintang">${icon('i-star')}</span>` : ''}</div>
     ${f.starred ? `<span class="star-badge grid-only" title="Berbintang">${icon('i-star')}</span>` : ''}
@@ -2116,6 +2118,20 @@ function bindDrag() {
   });
 }
 
+/* ================================================================ MODEL TAMPILAN */
+const getSkin = () => LS.get('vena.skin') === 'modern' ? 'modern' : 'classic';
+function applySkin(sk) {
+  document.documentElement.classList.toggle('skin-modern', sk === 'modern');
+  const v = $('#skinVal'); if (v) v.textContent = sk === 'modern' ? 'Modern' : 'Klasik';
+  for (const b of $$('.skin-opt')) b.setAttribute('aria-pressed', String(b.dataset.skin === sk));
+}
+function setSkin(sk) {
+  LS.set('vena.skin', sk);
+  applySkin(sk);
+  if (V.pdf) layoutPdf();
+}
+function openSkinDialog() { closeMenus(); applySkin(getSkin()); $('#dlgSkin').showModal(); }
+
 /* ================================================================ PASANG APLIKASI (PWA) */
 let installEvt = null;
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
@@ -2501,7 +2517,16 @@ async function openViewer(id) {
       body.innerHTML = '<pre></pre>'; body.firstChild.textContent = t;
     } else if (mode === 'image') {
       V.url = URL.createObjectURL(blob);
-      body.innerHTML = `<img alt="${esc(f.name)}" src="${V.url}">`;
+      body.className = 'viewer-body img-mode';
+      body.innerHTML = `<img alt="${esc(f.name)}" src="${V.url}" title="Klik untuk memperbesar">`;
+      body.firstChild.onclick = (ev) => {          // klik: ukuran asli ⇄ pas layar
+        const z = body.classList.toggle('zoomed');
+        if (z) {
+          const img = ev.target, r = img.getBoundingClientRect();
+          const fx = (ev.clientX - r.left) / r.width, fy = (ev.clientY - r.top) / r.height;
+          requestAnimationFrame(() => { body.scrollLeft = img.scrollWidth * fx - body.clientWidth / 2; body.scrollTop = img.scrollHeight * fy - body.clientHeight / 2; });
+        }
+      };
     } else if (mode === 'pdf') {
       await renderPdf(await blob.arrayBuffer(), id);
     } else if (mode === 'sheet') {
@@ -3021,6 +3046,7 @@ function setupLoginScreen() {
 
 async function boot() {
   applyTheme();
+  applySkin(getSkin());
   for (const el of $$('[data-version]')) el.textContent = 'Versi ' + APP_VERSION;
   for (const el of $$('[data-version-long]')) el.textContent = `${CFG.APP_NAME} versi ${APP_VERSION} (${APP_BUILD})`;
   updateInstallUI();
@@ -3094,7 +3120,13 @@ function bind() {
     $('#searchInput').blur();
   };
   $('#sortSelect').onchange = (e) => { S.sort = e.target.value; LS.set('vena.sort', S.sort); render(); };
-  for (const b of $$('.seg button')) b.onclick = () => { S.view = b.dataset.view; LS.set('vena.view', S.view); render(); };
+  for (const b of $$('.seg button')) b.onclick = () => {
+    S.view = b.dataset.view;
+    S.viewBy[S.routeKey || '#/'] = S.view;            // diingat untuk folder ini saja
+    const keys = Object.keys(S.viewBy); if (keys.length > 300) delete S.viewBy[keys[0]];
+    LS.set('vena.viewBy', JSON.stringify(S.viewBy));
+    render();
+  };
 
   $('#pickFiles').onchange = (e) => { startUpload(e.target.files); e.target.value = ''; };
   $('#pickFolder').onchange = (e) => { startUpload(e.target.files); e.target.value = ''; };
@@ -3161,6 +3193,7 @@ function bind() {
         case 'sel-copy': openMove(selectedItems(), 'copy'); return;
         case 'paste': pasteClip(); return;
         case 'install': installApp(); return;
+        case 'skin': openSkinDialog(); return;
         case 'pdf-zoom-in': zoomPdf(0.25); return;
         case 'pdf-zoom-out': zoomPdf(-0.25); return;
         case 'play-all': playAllHere(); return;
@@ -3219,6 +3252,8 @@ function bind() {
     }
 
     // pohon folder: buka/tutup cabang
+    const sko = t.closest('[data-skin]');
+    if (sko) { setSkin(sko.dataset.skin); return; }
     const sh = t.closest('[data-sheet]');
     if (sh) { showSheet(Number(sh.dataset.sheet)); return; }
     const pi = t.closest('[data-play-idx]');
@@ -3388,7 +3423,7 @@ function bind() {
 
 /* ---------------------------------------------------------------- service worker (PWA) */
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
-  window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
+  window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' }).catch(() => {}));
 }
 
 bind();

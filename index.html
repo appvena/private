@@ -18,8 +18,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.4.0">
-  <script src="config.js?v=2.4.0"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=2.5.0">
+  <script>try { if (localStorage.getItem('vena.skin') === 'modern') document.documentElement.classList.add('skin-modern'); } catch (e) {}</script>
+  <script src="config.js?v=2.5.0"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
@@ -122,6 +124,7 @@
         <hr>
         <button role="menuitem" data-action="theme" id="menuTheme"><svg class="i"><use href="#i-moon"/></svg><span id="menuThemeText">Tema gelap</span></button>
         <button role="menuitem" data-action="install" hidden><svg class="i"><use href="#i-phone"/></svg>Pasang aplikasi</button>
+        <button role="menuitem" data-action="skin"><svg class="i"><use href="#i-layout"/></svg><span>Model tampilan</span><em class="menu-val" id="skinVal">Klasik</em></button>
         <button role="menuitem" data-action="logout"><svg class="i"><use href="#i-logout"/></svg>Keluar</button>
         <hr>
         <div class="menu-foot tiny muted"><span data-version-long></span><span>© 2026 SRISP</span></div>
@@ -287,6 +290,13 @@
   </footer>
  </div>
  <button class="fab only-mobile" data-action="open-new" aria-haspopup="menu" aria-label="Baru"><svg class="i"><use href="#i-plus"/></svg></button>
+ <nav class="bottom-nav" aria-label="Navigasi bawah">
+   <a href="#/" data-nav="home"><svg class="i"><use href="#i-pc"/></svg><span>Drive</span></a>
+   <a href="#/recent" data-nav="recent"><svg class="i"><use href="#i-clock"/></svg><span>Terbaru</span></a>
+   <button class="bn-plus" data-action="open-new" aria-haspopup="menu" aria-label="Baru"><svg class="i"><use href="#i-plus"/></svg></button>
+   <a href="#/starred" data-nav="starred"><svg class="i"><use href="#i-star"/></svg><span>Bintang</span></a>
+   <a href="#/trash" data-nav="trash"><svg class="i"><use href="#i-trash"/></svg><span>Sampah</span></a>
+ </nav>
 </div>
 
 <!-- ============ PANEL UNGGAHAN ============ -->
@@ -381,10 +391,10 @@
     <div id="installOther" hidden>
       <ol class="install-steps">
         <li><span class="ico"><svg class="i"><use href="#i-more"/></svg></span>Buka menu browser (⋮ di kanan atas).</li>
-        <li><span class="ico"><svg class="i"><use href="#i-phone"/></svg></span>Pilih <strong>Instal aplikasi</strong> atau <strong>Tambahkan ke layar utama</strong>.</li>
-        <li><span class="ico"><svg class="i"><use href="#i-check"/></svg></span>Ketuk <strong>Instal</strong>.</li>
+        <li><span class="ico"><svg class="i"><use href="#i-phone"/></svg></span>Pilih <strong>Instal Vena…</strong>, <strong>Instal aplikasi</strong>, atau <strong>Tambahkan ke layar utama</strong>.</li>
+        <li><span class="ico"><svg class="i"><use href="#i-check"/></svg></span>Klik <strong>Instal</strong>.</li>
       </ol>
-      <p class="tiny muted">Di komputer, klik ikon pasang (⊕) di ujung kanan bilah alamat Chrome atau Edge.</p>
+      <p class="tiny muted">Di komputer, bisa juga lewat ikon pasang (⊕) di ujung kanan bilah alamat Chrome atau Edge. Kalau pilihan itu belum muncul, muat ulang halaman sekali (F5) lalu coba lagi.</p>
     </div>
     <div class="dlg-actions"><button value="ok" class="btn btn-primary">Mengerti</button></div>
   </form>
@@ -410,6 +420,24 @@
       <button value="cancel" class="btn btn-ghost" formnovalidate>Batal</button>
       <button value="ok" class="btn btn-primary" id="driveOk">Buat drive</button>
     </div>
+  </form>
+</dialog>
+
+<dialog id="dlgSkin" class="dlg dlg-skin">
+  <form method="dialog">
+    <h3>Model tampilan</h3>
+    <p class="muted">Pilih gaya tampilan Vena. Semua fitur sama, hanya tampilannya yang berbeda.</p>
+    <div class="skin-opts">
+      <button type="button" class="skin-opt" data-skin="classic">
+        <span class="skin-prev classic"><i class="t"></i><i class="n"></i><i class="s"></i><i class="m"><b></b><b></b><b></b><b></b></i></span>
+        <strong>Klasik</strong><small>Seperti jendela pengelola file di komputer</small>
+      </button>
+      <button type="button" class="skin-opt" data-skin="modern">
+        <span class="skin-prev modern"><i class="s"></i><i class="m"><b></b><b></b><b></b><b></b></i></span>
+        <strong>Modern</strong><small>Kartu melayang, warna ungu, navigasi bawah di HP</small>
+      </button>
+    </div>
+    <div class="dlg-actions"><button value="ok" class="btn btn-primary">Selesai</button></div>
   </form>
 </dialog>
 
@@ -537,6 +565,7 @@
     <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></symbol>
     <symbol id="i-pc" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></symbol>
     <symbol id="i-disk" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="3"/><path d="M6 12h7"/><circle cx="17.5" cy="12" r="1.3" fill="currentColor"/></symbol>
+    <symbol id="i-layout" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16M9 10h12"/></symbol>
     <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5m0 0 6-6m-6 6 6 6"/></symbol>
     <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14m0 0-6-6m6 6-6 6"/></symbol>
     <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5m0 0-6 6m6-6 6 6"/></symbol>
@@ -583,6 +612,6 @@
   </defs>
 </svg>
 
-<script src="app.js?v=2.4.0"></script>
+<script src="app.js?v=2.5.0"></script>
 </body>
 </html>
