@@ -503,6 +503,7 @@ code { font-size: .88em; background: var(--surface-2); border: 1px solid var(--l
 .switch:checked { background: var(--accent); }
 .switch:checked::after { transform: translateX(18px); }
 .share-link { display: flex; gap: 8px; margin-top: 8px; }
+.expiry-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0 8px; font-size: 14.5px; }
 .share-link input { flex: 1; min-width: 0; }
 
 /* ---------- pilih ikon ---------- */
@@ -571,6 +572,14 @@ code { font-size: .88em; background: var(--surface-2); border: 1px solid var(--l
   animation: toast-in .2s ease-out;
 }
 .toast.err { background: var(--danger); color: #fff; }
+.toast-progress { width: min(420px, calc(100vw - 32px)); }
+.tp-body { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.tp-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tp-sub { font-size: 12.5px; opacity: .8; }
+.tp-bar { height: 4px; border-radius: 4px; background: color-mix(in srgb, var(--bg) 25%, transparent); overflow: hidden; margin-top: 3px; }
+.tp-bar span { display: block; height: 100%; width: 0; background: var(--bg); transition: width .2s; }
+.toast-progress.indeterminate .tp-bar span { width: 35% !important; animation: indet 1.1s ease-in-out infinite; }
+@keyframes indet { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
 .toast button { border: 0; background: none; color: inherit; font-weight: 700; text-decoration: underline; padding: 2px 4px; }
 @keyframes toast-in { from { transform: translateY(10px); opacity: 0; } }
 

@@ -141,9 +141,10 @@
     <button class="cmd" data-action="upload-files" data-hide-in="trash"><svg class="i"><use href="#i-upload"/></svg><span>Unggah</span></button>
     <span class="cmd-sep" data-hide-in="trash"></span>
     <button class="cmd" data-action="sel-open" data-need="one" data-hide-in="trash"><svg class="i"><use href="#i-eye"/></svg><span>Buka</span></button>
-    <button class="cmd" data-action="sel-download" data-need="files" data-hide-in="trash"><svg class="i"><use href="#i-download"/></svg><span>Unduh</span></button>
+    <button class="cmd" data-action="sel-download" data-need="any" data-hide-in="trash"><svg class="i"><use href="#i-download"/></svg><span>Unduh</span></button>
     <button class="cmd" data-action="sel-share" data-need="one" data-hide-in="trash"><svg class="i"><use href="#i-link"/></svg><span>Bagikan</span></button>
     <button class="cmd" data-action="sel-rename" data-need="one" data-hide-in="trash"><svg class="i"><use href="#i-edit"/></svg><span>Ganti nama</span></button>
+    <button class="cmd" data-action="paste" id="cmdPaste" hidden><svg class="i"><use href="#i-paste"/></svg><span>Tempel</span></button>
     <button class="cmd" data-action="sel-move" data-need="any" data-hide-in="trash"><svg class="i"><use href="#i-move"/></svg><span>Pindahkan</span></button>
     <button class="cmd danger" data-action="sel-trash" data-need="any" data-hide-in="trash"><svg class="i"><use href="#i-trash"/></svg><span>Hapus</span></button>
     <button class="cmd" data-action="sel-restore" data-need="any" data-show-in="trash"><svg class="i"><use href="#i-restore"/></svg><span>Pulihkan</span></button>
@@ -258,6 +259,7 @@
   <button role="menuitem" data-action="upload-folder"><svg class="i"><use href="#i-folder-up"/></svg>Unggah folder</button>
   <hr>
   <button role="menuitem" data-action="new-folder"><svg class="i"><use href="#i-folder-plus"/></svg>Folder baru</button>
+  <button role="menuitem" data-action="paste" id="menuPaste" hidden><svg class="i"><use href="#i-paste"/></svg>Tempel</button>
 </div>
 
 <!-- ============ MENU KONTEKS ITEM ============ -->
@@ -288,7 +290,7 @@
 
 <dialog id="dlgMove" class="dlg dlg-move">
   <form method="dialog">
-    <h3>Pindahkan <span id="moveWhat"></span></h3>
+    <h3><span id="moveVerb">Pindahkan</span> <span id="moveWhat"></span></h3>
     <nav id="moveCrumbs" class="crumbs crumbs-small"></nav>
     <ul id="moveList" class="move-list"></ul>
     <div class="dlg-actions">
@@ -327,6 +329,10 @@
         <small class="muted" id="shareState">Hanya Anda yang bisa membuka</small>
       </span>
       <input type="checkbox" id="shareToggle" class="switch">
+    </label>
+    <label class="expiry-row" id="shareExpiryRow" hidden>
+      <span>Link berlaku</span>
+      <select id="shareExpiry" class="select"></select>
     </label>
     <div class="share-link" id="shareLinkRow" hidden>
       <input id="shareLink" type="text" readonly>
@@ -392,6 +398,8 @@
     <symbol id="s-hadiah" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v9h14v-9M12 8v13M12 8S10.5 3 8 4s4 4 4 4zM12 8s1.5-5 4-4-4 4-4 4z"/></symbol>
     <symbol id="s-toko" viewBox="0 0 24 24"><path d="M3 9 5 4h14l2 5M3 9h18v2a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0zM5 13v8h14v-8M10 21v-5h4v5"/></symbol>
     <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18c1.1 0 1.5-.8 1.5-1.5 0-1.2-1-1.5-1-2.5s.7-1.5 1.7-1.5H17a4 4 0 0 0 4-4c0-4.7-4-8.5-9-8.5z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7" r="1"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></symbol>
+    <symbol id="i-paste" viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h4"/></symbol>
     <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5m0 0 6-6m-6 6 6 6"/></symbol>
     <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14m0 0-6-6m6 6-6 6"/></symbol>
     <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5m0 0-6 6m6-6 6 6"/></symbol>
