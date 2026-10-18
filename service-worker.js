@@ -14,7 +14,7 @@
 //  - Hanya kalau benar-benar tidak ada internet, tampilkan halaman kecil
 //    "Tidak ada koneksi" yang dibuat langsung di sini (bukan dari cache).
 // =====================================================================
-const VERSION = 'vena-2.5.0';
+const VERSION = 'vena-3.0.0';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));

@@ -7,7 +7,7 @@
 'use strict';
 
 /* ---------------------------------------------------------------- versi */
-const APP_VERSION = '2.5.0';
+const APP_VERSION = '3.0.1';
 const APP_BUILD = '18 Oktober 2026';
 
 /* ---------------------------------------------------------------- konfigurasi */
@@ -130,7 +130,7 @@ function toggleTheme() {
 
 /* ---------------------------------------------------------------- layar */
 function show(id) {
-  for (const s of ['screenLoading', 'screenSetup', 'screenLogin', 'screenApp']) $('#' + s).hidden = s !== id;
+  for (const s of ['screenLoading', 'screenSetup', 'screenLogin', 'screenApp', 'screenDesktop', 'screenCmd']) $('#' + s).hidden = s !== id;
 }
 
 /* ================================================================ AUTENTIKASI
@@ -318,6 +318,7 @@ async function afterLogin() {
   installBackGuard();
   await ensureRoot();
   try { await loadDrives(); } catch (e) { S.drives = [{ id: S.rootId, root: true, letter: 'C', label: 'Data', color: '', limit: 0 }]; }
+  enterSkin();
   refreshAppUsage();
   onRoute();
 }
@@ -335,6 +336,7 @@ async function reconnect() {
 
 function logout() {
   try { stopPlayer(true); } catch {}
+  try { leaveMulti(); } catch {}
   clearSession();
   S.user = null; S.rootId = null; S.drives = []; S.curDrive = null;
   location.hash = '';
@@ -368,6 +370,7 @@ async function api(path, { method = 'GET', query, body, raw = false, signal, _re
     if (res.status === 403 && /storage quota/i.test(msg)) msg = 'Ruang Google Drive sudah penuh.';
     const err = new Error(msg); err.status = res.status; throw err;
   }
+  if (method !== 'GET') notifySync();
   if (raw) return res;
   if (res.status === 204) return null;
   const txt = await res.text();
@@ -482,7 +485,7 @@ function onRoute(silent = false) {
   S.routeKey = location.hash || '#/';
   trackHistory(S.routeKey);
   if (prevKey !== S.routeKey) { S.selected.clear(); S.anchor = null; }
-  S.view = S.viewBy[S.routeKey] || 'grid';            // tiap folder punya tampilan sendiri
+  S.view = S.viewBy[S.routeKey] || (EMBED === 'pane' ? 'list' : 'grid');            // tiap folder punya tampilan sendiri
   closeMenus();
   const navKey = S.route.type === 'drives' ? 'home' : S.route.type === 'folder' ? '' : S.route.type;
   if (S.route.type === 'folder') S.curDrive = isDriveRoot(S.route.id) ? S.route.id : driveOfFolder(S.route.id);
@@ -497,6 +500,7 @@ function onRoute(silent = false) {
   updateClipUI();
   updateNavButtons();
   renderDrives();
+  reportRoute();
   renderTree();
   loadView(silent);
 }
@@ -606,6 +610,7 @@ const VIEW_TITLES = { recent: 'Terbaru', starred: 'Berbintang', shared: 'Dibagik
 function setTitle(t) {
   $('#winTitle').textContent = t;
   document.title = t + ' — ' + CFG.APP_NAME;
+  if (EMBED) toParent({ type: 'title', title: t, folder: S.route.type === 'folder' ? S.route.id : null, hash: location.hash || '#/' });
 }
 async function renderCrumbs() {
   const el = $('#crumbs');
@@ -690,6 +695,11 @@ function usageText(d) {
 }
 function usagePct(d) { return d.limit ? Math.min(100, driveUsed(d) / d.limit * 100) : 0; }
 function renderDrives() {
+  if (EMBED === 'pane') {
+    const cur = S.route.type === 'folder' ? curDrive() : null;
+    $('#paneDrives').innerHTML = S.drives.map(d => `<button class="${cur === d.id ? 'on' : ''}" data-go="${d.id}" data-drop="${d.id}" title="${esc(driveName(d))}">${esc(d.letter)}:</button>`).join('');
+  }
+  if (!EMBED && typeof refreshDesktop === 'function') refreshDesktop();
   const el = $('#driveList'); if (!el) return;
   const cur = S.route.type === 'folder' ? curDrive() : null;
   el.innerHTML = S.drives.map(d => `<li>
@@ -772,8 +782,10 @@ async function saveDrive() {
         description: `Drive ${letter}: aplikasi ${CFG.APP_NAME}` } });
       await loadDrives();
       toast(`Drive ${label} (${letter}:) dibuat.`);
-      location.hash = folderHash(f.id);
+      if (isMultiSkin()) { refreshDesktop(); if (getSkin() === 'desktop') openWindow(folderHash(f.id), `${label} (${letter}:)`); }
+      else location.hash = folderHash(f.id);
     }
+    notifySync();
   } catch (e) { fail(e, 'Gagal menyimpan drive'); }
 }
 async function deleteDrive(d) {
@@ -803,7 +815,11 @@ function openDriveMenu(id, x, y, alignRight) {
 function driveAction(act, id) {
   const d = driveById(id); if (!d) return;
   closeMenus();
-  if (act === 'open') location.hash = folderHash(d.id);
+  if (act === 'open') {
+    if (!EMBED && getSkin() === 'desktop' && S.rootId) openWindow(folderHash(d.id), driveName(d));
+    else if (!EMBED && getSkin() === 'commander') { const f = CM.frames[CM.active]; if (f) f.contentWindow.postMessage({ vena: true, type: 'go', hash: folderHash(d.id) }, location.origin); }
+    else location.hash = folderHash(d.id);
+  }
   else if (act === 'edit') openDriveDialog(d);
   else if (act === 'delete') deleteDrive(d);
 }
@@ -1336,6 +1352,7 @@ function openItemMenu(id, x, y, alignRight) {
   } else {
     h += folder ? b('open', 'i-folder', 'Buka') : b('open', mediaKind(f) ? 'i-play' : 'i-eye', mediaKind(f) ? 'Putar' : 'Pratinjau');
     if (folder) h += b('playfolder', 'i-play', 'Putar musik / video di folder ini');
+    if (folder && EMBED === 'window') h += b('newwin', 'i-external', 'Buka di jendela baru');
     h += b('download', 'i-download', folder ? 'Unduh sebagai ZIP' : 'Unduh');
     h += b('share', 'i-link', f.shared ? 'Kelola link berbagi' : 'Bagikan link');
     h += b('sendwa', 'i-chat', 'Kirim lewat WhatsApp');
@@ -1363,6 +1380,7 @@ async function itemAction(act, id) {
     case 'select': return toggleSelect(f.id);
     case 'sendwa': return quickSendWa(f);
     case 'playfolder': return playFolder(f);
+    case 'newwin': return toParent({ type: 'open', hash: folderHash(f.id), title: f.name });
     case 'copyto': return openMove(S.selected.has(f.id) && S.selected.size > 1 ? selectedItems() : [f], 'copy');
     case 'duplicate': return copyItems(S.selected.has(f.id) && S.selected.size > 1 ? selectedItems() : [f], (f.parents || [])[0] || curDrive());
     case 'icon': return openIconPicker(S.selected.has(f.id) && S.selected.size > 1 ? selectedItems() : [f]);
@@ -2074,6 +2092,9 @@ function dropTargetOf(el) {
 function bindDrag() {
   let ghost = null, hover = null;
   const clearHover = () => { if (hover) hover.classList.remove('drop-hover'); hover = null; };
+  document.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.target.closest && e.target.closest('#items .it') && (!S.token || Date.now() > S.exp - 120000)) getToken(true).catch(() => {});
+  }, true);
   document.addEventListener('dragstart', (e) => {
     const it = e.target.closest && e.target.closest('#items .it');
     if (!it || S.route.type === 'trash') { if (it) e.preventDefault(); return; }
@@ -2082,6 +2103,13 @@ function bindDrag() {
     e.dataTransfer.effectAllowed = 'copyMove';
     e.dataTransfer.setData('application/x-vena', DRAG.ids.join(','));
     e.dataTransfer.setData('text/plain', selectedItems().map(f => f.name).join('\n'));
+    // seret ke desktop / Explorer (Chrome & Edge): file langsung diunduh ke tempat dilepas
+    const one = selectedItems();
+    if (one.length === 1 && !isFolder(one[0]) && !isGoogleDoc(one[0]) && S.token) {
+      const f = one[0];
+      const safe = f.name.replace(/:/g, '_');
+      try { e.dataTransfer.setData('DownloadURL', `${f.mimeType || 'application/octet-stream'}:${safe}:${streamUrl(f, S.token)}`); } catch {}
+    }
     if (DRAG.ids.length > 1) {
       ghost = document.createElement('div');
       ghost.className = 'drag-ghost';
@@ -2096,7 +2124,15 @@ function bindDrag() {
     if (ghost) { ghost.remove(); ghost = null; }
     for (const el of $$('#items .it.dragging')) el.classList.remove('dragging');
   });
+  const crossIds = (e) => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('application/x-vena');
   document.addEventListener('dragover', (e) => {
+    if (!DRAG.ids && crossIds(e)) {           // diseret dari jendela lain
+      const t = dropTargetOf(e.target) || (S.route.type === 'folder' && e.target.closest && e.target.closest('#content') ? { el: $('#content'), id: S.route.id } : null);
+      if (!t) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = (e.ctrlKey || e.altKey) ? 'copy' : 'move';
+      if (hover !== t.el) { clearHover(); hover = t.el; hover.classList.add('drop-hover'); }
+      return;
+    }
     if (!DRAG.ids) return;
     const t = dropTargetOf(e.target);
     if (!t || DRAG.ids.includes(t.id)) { clearHover(); e.dataTransfer.dropEffect = 'none'; return; }
@@ -2104,7 +2140,17 @@ function bindDrag() {
     e.dataTransfer.dropEffect = (e.ctrlKey || e.altKey) && t.id !== '__trash' ? 'copy' : 'move';
     if (hover !== t.el) { clearHover(); hover = t.el; hover.classList.add('drop-hover'); }
   });
-  document.addEventListener('drop', (e) => {
+  document.addEventListener('drop', async (e) => {
+    if (!DRAG.ids && crossIds(e)) {
+      e.preventDefault(); clearHover();
+      const t = dropTargetOf(e.target) || (S.route.type === 'folder' ? { id: S.route.id } : null);
+      const ids = (e.dataTransfer.getData('application/x-vena') || '').split(',').filter(Boolean);
+      if (!t || !ids.length) return;
+      const list = await itemsFromIds(ids);
+      if (t.id === '__trash') trashItems(list);
+      else if (e.ctrlKey || e.altKey) copyItems(list, t.id); else moveItemsTo(list, t.id);
+      return;
+    }
     if (!DRAG.ids) return;
     const t = dropTargetOf(e.target);
     e.preventDefault();
@@ -2118,19 +2164,336 @@ function bindDrag() {
   });
 }
 
+/* ================================================================ MODE TERTANAM & SINKRON
+   Model Desktop dan Dua panel memakai beberapa "Vena mini" (iframe) sekaligus.
+   - EMBED = 'window' (jendela di Desktop) atau 'pane' (panel di Dua panel).
+   - Perubahan di satu jendela memberi tahu jendela lain lewat BroadcastChannel. */
+const EMBED = new URLSearchParams(location.search).get('embed') || '';
+const toParent = (msg) => { if (EMBED && window.parent !== window) window.parent.postMessage(Object.assign({ vena: true }, msg), location.origin); };
+const sync = ('BroadcastChannel' in window) ? new BroadcastChannel('vena-sync') : null;
+let syncTimer = null, syncInTimer = null;
+function notifySync() { if (!sync) return; clearTimeout(syncTimer); syncTimer = setTimeout(() => sync.postMessage({ t: 'changed' }), 500); }
+if (sync) sync.onmessage = () => {
+  clearTimeout(syncInTimer);
+  syncInTimer = setTimeout(() => {
+    if (!S.rootId) return;
+    if (!$('#screenApp').hidden && S.route.type !== 'drives') loadView(true);
+    refreshQuotaSoon();
+    if (typeof refreshDesktop === 'function') refreshDesktop();
+  }, 400);
+};
+// file dari jendela lain yang diseret ke sini
+async function itemsFromIds(ids) {
+  const out = [];
+  for (const id of ids) {
+    const f = itemById(id) || await api('/files/' + id, { query: { fields: FIELDS } }).catch(() => null);
+    if (f) out.push(f);
+  }
+  return out;
+}
+// perintah dari jendela utama (Desktop / Dua panel)
+const PANE = { other: null, otherName: '' };
+window.addEventListener('message', async (e) => {
+  if (e.origin !== location.origin || !e.data || !e.data.vena || !EMBED) return;
+  const m = e.data, sel = selectedItems();
+  if (m.type === 'other') { PANE.other = m.folder; PANE.otherName = m.name || ''; return; }
+  if (m.type === 'go') { location.hash = m.hash; return; }
+  if (m.type === 'focus-items') { const first = $('#items .it'); if (first) first.focus(); return; }
+  if (m.type !== 'cmd') return;
+  const need = () => { if (!sel.length) { toast('Pilih file atau folder dulu.'); return false; } return true; };
+  switch (m.cmd) {
+    case 'view': if (sel[0]) openItem(sel[0]); else toast('Pilih file dulu.'); break;
+    case 'rename': if (sel.length === 1) renameItem(sel[0]); else toast('Pilih satu item untuk diganti namanya.'); break;
+    case 'copy': if (need()) { if (!PANE.other) return toast('Panel lain belum membuka folder.'); copyItems(sel, PANE.other); } break;
+    case 'move': if (need()) { if (!PANE.other) return toast('Panel lain belum membuka folder.'); moveItemsTo(sel, PANE.other); } break;
+    case 'mkdir': newFolder(); break;
+    case 'delete': if (need()) { if (S.route.type === 'trash') deleteItems(sel); else trashItems(sel); } break;
+    case 'zip': if (need()) downloadFiles(sel); break;
+    case 'refresh': loadView(); break;
+  }
+});
+function reportRoute() {
+  if (!EMBED) return;
+  const folder = S.route.type === 'folder' ? S.route.id : null;
+  toParent({ type: 'route', folder, hash: location.hash || '#/', title: $('#winTitle').textContent });
+}
+
 /* ================================================================ MODEL TAMPILAN */
-const getSkin = () => LS.get('vena.skin') === 'modern' ? 'modern' : 'classic';
+const SKINS = ['classic', 'desktop', 'commander'];
+const getSkin = () => { const s = LS.get('vena.skin'); return SKINS.includes(s) ? s : 'classic'; };
+const isMultiSkin = () => !EMBED && getSkin() !== 'classic';
 function applySkin(sk) {
-  document.documentElement.classList.toggle('skin-modern', sk === 'modern');
-  const v = $('#skinVal'); if (v) v.textContent = sk === 'modern' ? 'Modern' : 'Klasik';
+  const c = document.documentElement.classList;
+  c.remove('skin-modern', 'skin-desktop', 'skin-commander');
+  if (!EMBED && sk !== 'classic') c.add('skin-' + sk);
+  const v = $('#skinVal'); if (v) v.textContent = { classic: 'Klasik', desktop: 'Desktop', commander: 'Dua panel' }[sk];
   for (const b of $$('.skin-opt')) b.setAttribute('aria-pressed', String(b.dataset.skin === sk));
 }
 function setSkin(sk) {
   LS.set('vena.skin', sk);
   applySkin(sk);
-  if (V.pdf) layoutPdf();
+  if (S.rootId) enterSkin();
 }
-function openSkinDialog() { closeMenus(); applySkin(getSkin()); $('#dlgSkin').showModal(); }
+function openSkinDialog() { closeMenus(); closeStart(); applySkin(getSkin()); $('#dlgSkin').showModal(); }
+// tampilkan layar sesuai model (dipanggil setelah login & saat model diganti)
+function enterSkin() {
+  const sk = getSkin();
+  if (EMBED || sk === 'classic') { leaveMulti(); show('screenApp'); return; }
+  if (sk === 'desktop') { leaveCommander(); show('screenDesktop'); enterDesktop(); }
+  else { leaveDesktop(); show('screenCmd'); enterCommander(); }
+}
+function leaveMulti() { leaveDesktop(); leaveCommander(); }
+const embedSrc = (mode, hash) => `./?embed=${mode}${hash && hash !== '#/' ? hash : '#/'}`;
+// pesan dari jendela/panel di dalam
+window.addEventListener('message', (e) => {
+  if (e.origin !== location.origin || !e.data || !e.data.vena || EMBED) return;
+  const w = OS.wins.find(x => x.frame && x.frame.contentWindow === e.source);
+  if (w) return osMessage(w, e.data);
+  const pi = CM.frames.findIndex(f => f && f.contentWindow === e.source);
+  if (pi >= 0) return cmdrMessage(pi, e.data);
+});
+function refreshDesktop() {
+  if (!$('#screenDesktop').hidden) { renderOsIcons(); renderOsStart(); }
+  if (!$('#screenDesktop').hidden || !$('#screenCmd').hidden) updateFreeText();
+}
+function updateFreeText() {
+  const q = S.quota || {}, lim = Number(q.limit) || 0, used = Number(q.usage) || 0;
+  const t = lim ? `${fmtSize(Math.max(0, lim - used))} kosong` : '';
+  if ($('#osFree')) $('#osFree').textContent = t;
+  if ($('#cmdrFree')) $('#cmdrFree').textContent = t;
+}
+
+/* ---------------------------------------------------------------- DESKTOP OS */
+const OS = { wins: [], z: 20, seq: 0, clock: null, active: null };
+const OS_SPECIAL = [
+  { hash: '#/recent', label: 'Terbaru', icon: 'i-clock' },
+  { hash: '#/starred', label: 'Berbintang', icon: 'i-star' },
+  { hash: '#/shared', label: 'Dibagikan', icon: 'i-link' },
+  { hash: '#/trash', label: 'Sampah', icon: 'i-trash', drop: '__trash' },
+];
+function enterDesktop() {
+  renderOsIcons(); renderOsStart(); updateFreeText();
+  if (!OS.clock) { const tick = () => { $('#osClock').textContent = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }); }; tick(); OS.clock = setInterval(tick, 15000); }
+  if (!OS.wins.length) {
+    let saved = [];
+    try { saved = JSON.parse(LS.get('vena.osWins') || '[]'); } catch {}
+    if (saved.length) for (const s of saved.slice(0, 8)) openWindow(s.hash, s.title, s);
+  }
+  $('#screenDesktop').classList.toggle('os-mobile', innerWidth <= 900);
+}
+function leaveDesktop() {
+  for (const w of [...OS.wins]) w.el.remove();
+  OS.wins = []; $('#osTasks') && ($('#osTasks').innerHTML = '');
+  if (OS.clock) { clearInterval(OS.clock); OS.clock = null; }
+}
+function renderOsIcons() {
+  const icons = S.drives.map(d => `<button class="os-icon" data-os-open="${folderHash(d.id)}" data-os-title="${esc(driveName(d))}" data-drive="${d.id}" data-drop="${d.id}">
+      <span class="os-icon-img">${diskSvg(d, 'os-disk')}</span><span class="os-icon-lbl">${esc(driveName(d))}</span></button>`).join('')
+    + OS_SPECIAL.map(s => `<button class="os-icon" data-os-open="${s.hash}" data-os-title="${s.label}"${s.drop ? ` data-drop="${s.drop}"` : ''}>
+      <span class="os-icon-img sp">${icon(s.icon)}</span><span class="os-icon-lbl">${s.label}</span></button>`).join('');
+  $('#osIcons').innerHTML = icons;
+}
+function renderOsStart() {
+  const u = S.user || {};
+  $('#osUser').textContent = u.displayName || 'Vena';
+  $('#osEmail').textContent = u.emailAddress || '';
+  $('#osAvatar').textContent = (u.displayName || 'V').trim()[0].toUpperCase();
+  $('#osStartDrives').innerHTML = S.drives.map(d => `<button data-os-open="${folderHash(d.id)}" data-os-title="${esc(driveName(d))}">${diskSvg(d, 'os-sdisk')}<span><strong>${esc(driveName(d))}</strong><small>${esc(usageText(d))}</small></span></button>`).join('');
+}
+function toggleStart() { const s = $('#osStart'); s.hidden = !s.hidden; }
+function closeStart() { const s = $('#osStart'); if (s) s.hidden = true; }
+
+function openWindow(hash, title, geo) {
+  closeStart();
+  const mobile = innerWidth <= 900;
+  const n = OS.wins.length;
+  const W = Math.min(980, innerWidth - 120), H = Math.min(620, innerHeight - 140);
+  const g = Object.assign({ x: 140 + (n % 6) * 34, y: 24 + (n % 6) * 30, w: W, h: H, max: false, min: false }, geo || {});
+  const id = 'w' + (++OS.seq);
+  const el = document.createElement('div');
+  el.className = 'dwin';
+  el.dataset.wid = id;
+  el.innerHTML = `<div class="dwin-bar">
+      <span class="dwin-ico">${icon('i-folder')}</span><span class="dwin-title">${esc(title || 'Vena')}</span>
+      <button class="dwin-btn" data-wact="min" title="Kecilkan">${icon('i-minus')}</button>
+      <button class="dwin-btn" data-wact="max" title="Besarkan">${icon('i-square')}</button>
+      <button class="dwin-btn close" data-wact="close" title="Tutup">${icon('i-x')}</button>
+    </div>
+    <div class="dwin-body"><iframe title="${esc(title || 'Vena')}" src="${embedSrc('window', hash)}"></iframe></div>
+    <span class="dwin-rs" data-wrs></span>`;
+  $('#osWindows').appendChild(el);
+  const w = { id, el, frame: el.querySelector('iframe'), hash, title: title || 'Vena', g };
+  OS.wins.push(w);
+  placeWin(w);
+  if (g.max || mobile) setMax(w, true);
+  if (g.min) setMin(w, true); else focusWin(w);
+  renderTasks(); saveWins();
+  return w;
+}
+function placeWin(w) {
+  const { x, y, w: ww, h } = w.g;
+  Object.assign(w.el.style, { left: Math.max(0, x) + 'px', top: Math.max(0, y) + 'px', width: Math.max(320, ww) + 'px', height: Math.max(220, h) + 'px' });
+}
+function focusWin(w) {
+  if (!w) return;
+  OS.active = w.id;
+  w.el.style.zIndex = ++OS.z;
+  for (const x of OS.wins) x.el.classList.toggle('active', x === w);
+  renderTasks();
+}
+function setMin(w, on) { w.g.min = on; w.el.classList.toggle('min', on); if (on && OS.active === w.id) { OS.active = null; for (const x of OS.wins) x.el.classList.remove('active'); } renderTasks(); saveWins(); }
+function setMax(w, on) { w.g.max = on; w.el.classList.toggle('max', on); saveWins(); }
+function closeWin(w) { w.el.remove(); OS.wins = OS.wins.filter(x => x !== w); renderTasks(); saveWins(); }
+function arrangeWins() {
+  closeStart();
+  const vis = OS.wins.filter(w => !w.g.min);
+  const cols = Math.ceil(Math.sqrt(vis.length || 1)), rows = Math.ceil((vis.length || 1) / cols);
+  const area = { x: 120, y: 10, w: innerWidth - 130, h: innerHeight - 70 };
+  vis.forEach((w, i) => {
+    setMax(w, false);
+    w.g = Object.assign(w.g, { x: area.x + (i % cols) * area.w / cols, y: area.y + Math.floor(i / cols) * area.h / rows, w: area.w / cols - 8, h: area.h / rows - 8 });
+    placeWin(w);
+  });
+  saveWins();
+}
+function renderTasks() {
+  $('#osTasks').innerHTML = OS.wins.map(w => `<button class="os-task${OS.active === w.id ? ' on' : ''}${w.g.min ? ' min' : ''}" data-task="${w.id}" title="${esc(w.title)}">${icon('i-folder')}<span>${esc(w.title)}</span></button>`).join('');
+}
+let saveT;
+function saveWins() {
+  clearTimeout(saveT);
+  saveT = setTimeout(() => LS.set('vena.osWins', JSON.stringify(OS.wins.map(w => ({ hash: w.hash, title: w.title, x: w.g.x, y: w.g.y, w: w.g.w, h: w.g.h, max: w.g.max, min: w.g.min })))), 300);
+}
+function osMessage(w, m) {
+  if (m.type === 'title') {
+    w.title = m.title; w.hash = m.hash || w.hash;
+    w.el.querySelector('.dwin-title').textContent = m.title;
+    renderTasks(); saveWins();
+  } else if (m.type === 'route') { w.hash = m.hash || w.hash; saveWins(); }
+  else if (m.type === 'open') openWindow(m.hash, m.title);
+}
+function bindDesktop() {
+  const os = $('#screenDesktop');
+  // buka ikon: klik dua kali (mouse) / ketuk (layar sentuh)
+  os.addEventListener('click', (e) => {
+    const t = e.target;
+    if (!t.closest('#osStart') && !t.closest('[data-action="os-start"]')) closeStart();
+    const op = t.closest('[data-os-open]');
+    if (op && (op.closest('#osStart') || lastPointerType === 'touch')) { openWindow(op.dataset.osOpen, op.dataset.osTitle); return; }
+    if (op) { for (const i of $$('.os-icon')) i.classList.toggle('sel', i === op); return; }
+    const task = t.closest('[data-task]');
+    if (task) {
+      const w = OS.wins.find(x => x.id === task.dataset.task);
+      if (w.g.min) { setMin(w, false); focusWin(w); } else if (OS.active === w.id) setMin(w, true); else focusWin(w);
+      return;
+    }
+    const wb = t.closest('[data-wact]');
+    if (wb) {
+      const w = OS.wins.find(x => x.id === wb.closest('.dwin').dataset.wid);
+      if (wb.dataset.wact === 'min') setMin(w, true);
+      else if (wb.dataset.wact === 'max') setMax(w, !w.g.max);
+      else closeWin(w);
+      return;
+    }
+    if (t === os || t.closest('#osIcons') === t) for (const i of $$('.os-icon')) i.classList.remove('sel');
+  });
+  os.addEventListener('dblclick', (e) => {
+    const op = e.target.closest('.os-icon[data-os-open]');
+    if (op) { openWindow(op.dataset.osOpen, op.dataset.osTitle); return; }
+    const bar = e.target.closest('.dwin-bar');
+    if (bar && !e.target.closest('[data-wact]')) { const w = OS.wins.find(x => x.id === bar.closest('.dwin').dataset.wid); setMax(w, !w.g.max); }
+  });
+  // geser & ubah ukuran jendela
+  os.addEventListener('pointerdown', (e) => {
+    const winEl = e.target.closest('.dwin');
+    if (winEl) focusWin(OS.wins.find(x => x.id === winEl.dataset.wid));
+    const bar = e.target.closest('.dwin-bar'), rs = e.target.closest('[data-wrs]');
+    if ((!bar && !rs) || e.target.closest('[data-wact]') || e.button !== 0) return;
+    const w = OS.wins.find(x => x.id === winEl.dataset.wid);
+    if (w.g.max || innerWidth <= 900) return;
+    e.preventDefault();
+    const sx = e.clientX, sy = e.clientY, g0 = Object.assign({}, w.g);
+    $('#osWindows').classList.add('dragging');
+    const move = (ev) => {
+      if (rs) { w.g.w = Math.max(320, g0.w + ev.clientX - sx); w.g.h = Math.max(220, g0.h + ev.clientY - sy); }
+      else { w.g.x = Math.min(innerWidth - 80, Math.max(-g0.w + 120, g0.x + ev.clientX - sx)); w.g.y = Math.min(innerHeight - 90, Math.max(0, g0.y + ev.clientY - sy)); }
+      placeWin(w);
+    };
+    const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); $('#osWindows').classList.remove('dragging'); saveWins(); };
+    document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+  });
+  // klik di dalam jendela (iframe) → jendela itu jadi aktif
+  window.addEventListener('blur', () => setTimeout(() => {
+    const a = document.activeElement;
+    if (a && a.tagName === 'IFRAME') closeStart();
+    if (a && a.tagName === 'IFRAME') { const w = OS.wins.find(x => x.frame === a); if (w && OS.active !== w.id) focusWin(w); }
+    const pi = CM.frames.indexOf(a); if (pi >= 0) setPane(pi);
+  }, 0));
+  os.addEventListener('contextmenu', (e) => {
+    const d = e.target.closest('.os-icon[data-drive]');
+    if (d) { e.preventDefault(); openDriveMenu(d.dataset.drive, e.clientX, e.clientY, false); }
+  });
+  window.addEventListener('resize', () => $('#screenDesktop').classList.toggle('os-mobile', innerWidth <= 900));
+}
+let lastPointerType = 'mouse';
+document.addEventListener('pointerdown', (e) => { lastPointerType = e.pointerType || 'mouse'; }, true);
+
+/* ---------------------------------------------------------------- DUA PANEL */
+const CM = { frames: [null, null], folders: [null, null], names: ['', ''], active: 0 };
+function enterCommander() {
+  updateFreeText();
+  if (CM.frames[0]) return;
+  let saved = [];
+  try { saved = JSON.parse(LS.get('vena.cmdrPanes') || '[]'); } catch {}
+  const second = S.drives[1] ? S.drives[1].id : S.rootId;
+  const hashes = [saved[0] || folderHash(S.rootId), saved[1] || folderHash(second)];
+  $$('.cmdr-pane').forEach((p, i) => {
+    p.innerHTML = `<iframe title="Panel ${i ? 'kanan' : 'kiri'}" src="${embedSrc('pane', hashes[i])}"></iframe>`;
+    CM.frames[i] = p.querySelector('iframe');
+  });
+  setPane(0);
+}
+function leaveCommander() {
+  $$('.cmdr-pane').forEach(p => { p.innerHTML = ''; });
+  CM.frames = [null, null]; CM.folders = [null, null];
+}
+function setPane(i) {
+  CM.active = i;
+  $$('.cmdr-pane').forEach((p, n) => p.classList.toggle('active', n === i));
+  $$('[data-pane-tab]').forEach((b, n) => b.classList.toggle('on', n === i));
+  $('#fArrow1').textContent = $('#fArrow2').textContent = i === 0 ? '→' : '←';
+}
+function cmdrMessage(i, m) {
+  if (m.type === 'focus') setPane(i);
+  else if (m.type === 'tab') { setPane(1 - i); CM.frames[1 - i].focus(); CM.frames[1 - i].contentWindow.postMessage({ vena: true, type: 'focus-items' }, location.origin); }
+  else if (m.type === 'route' || m.type === 'title') {
+    if (m.folder !== undefined) CM.folders[i] = m.folder;
+    if (m.title) CM.names[i] = m.title;
+    const o = CM.frames[1 - i];
+    if (o) o.contentWindow.postMessage({ vena: true, type: 'other', folder: CM.folders[i], name: CM.names[i] }, location.origin);
+    const me = CM.frames[i];
+    if (me && CM.folders[1 - i]) me.contentWindow.postMessage({ vena: true, type: 'other', folder: CM.folders[1 - i], name: CM.names[1 - i] }, location.origin);
+    LS.set('vena.cmdrPanes', JSON.stringify(CM.frames.map((f, n) => CM.folders[n] ? folderHash(CM.folders[n]) : null)));
+  }
+}
+function cmdrSend(cmd) {
+  const f = CM.frames[CM.active];
+  if (f) { f.contentWindow.postMessage({ vena: true, type: 'cmd', cmd }, location.origin); f.focus(); }
+}
+function bindCommander() {
+  $('#screenCmd').addEventListener('click', (e) => {
+    const fb = e.target.closest('[data-fcmd]');
+    if (fb) { cmdrSend(fb.dataset.fcmd); return; }
+    const tab = e.target.closest('[data-pane-tab]');
+    if (tab) { setPane(Number(tab.dataset.paneTab)); return; }
+  });
+  document.addEventListener('keydown', (e) => {
+    if ($('#screenCmd').hidden || document.querySelector('dialog[open]')) return;
+    const fk = { F2: 'rename', F3: 'view', F5: 'copy', F6: 'move', F7: 'mkdir', F8: 'delete' }[e.key];
+    if (fk) { e.preventDefault(); cmdrSend(fk); }
+    else if (e.key === 'Tab') { e.preventDefault(); setPane(1 - CM.active); CM.frames[CM.active] && CM.frames[CM.active].focus(); }
+  });
+}
 
 /* ================================================================ PASANG APLIKASI (PWA) */
 let installEvt = null;
@@ -2162,7 +2525,7 @@ window.addEventListener('appinstalled', () => { installEvt = null; updateInstall
    - Di halaman awal, tombol kembali menampilkan dialog "Keluar dari Vena?". */
 const NAV = { overlays: [], ignorePop: 0, guard: false, leaving: false };
 function installBackGuard() {
-  if (NAV.guard) return;
+  if (NAV.guard || EMBED) return;
   NAV.guard = true;
   history.replaceState({ vena: 'base' }, '');
   history.pushState({ vena: 'app' }, '');
@@ -2932,6 +3295,7 @@ function sendMultipart(t, parentId, type) {
 
 let landTimer; const landed = new Set();
 function landedIn(parentId) {
+  notifySync();
   landed.add(parentId);
   clearTimeout(landTimer);
   landTimer = setTimeout(() => {
@@ -2997,7 +3361,8 @@ function renderUploads() {
 function startUpload(fileList) {
   const files = [...fileList];
   if (!files.length) return;
-  const base = curFolderId();
+  const base = S.uploadTarget || curFolderId();
+  S.uploadTarget = null;
   addUploads(files.map(f => {
     const rel = f.webkitRelativePath || '';
     const dir = rel ? rel.split('/').slice(0, -1) : [];
@@ -3053,6 +3418,7 @@ async function boot() {
   for (const el of $$('[data-appname]')) el.textContent = CFG.APP_NAME;
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
   setupLoginScreen();
+  if (EMBED) document.title = CFG.APP_NAME;
   if (brokerMode()) {
     loadSession();
     if (S.bsession) {
@@ -3140,7 +3506,8 @@ function bind() {
   window.addEventListener('hashchange', () => { if (!$('#viewer').hidden) closeViewer(true); onRoute(); });
   window.addEventListener('popstate', onPopState);
   window.addEventListener('beforeunload', (e) => {
-    if ($('#screenApp').hidden || NAV.leaving) return;
+    if (EMBED || NAV.leaving || ($('#screenApp').hidden && !isMultiSkin())) return;
+    if ($('#screenLogin') && !$('#screenLogin').hidden) return;
     e.preventDefault(); e.returnValue = '';      // browser menampilkan dialog "Tinggalkan situs?"
   });
 
@@ -3194,6 +3561,9 @@ function bind() {
         case 'paste': pasteClip(); return;
         case 'install': installApp(); return;
         case 'skin': openSkinDialog(); return;
+        case 'os-start': e.stopPropagation(); toggleStart(); return;
+        case 'os-arrange': arrangeWins(); return;
+        case 'cmdr-upload': { const f = CM.folders[CM.active]; if (!f) { toast('Buka folder di panel aktif dulu.'); return; } S.uploadTarget = f; $('#pickFiles').click(); return; }
         case 'pdf-zoom-in': zoomPdf(0.25); return;
         case 'pdf-zoom-out': zoomPdf(-0.25); return;
         case 'play-all': playAllHere(); return;
@@ -3359,6 +3729,7 @@ function bind() {
       return;
     }
     if (e.key === 'Escape') {
+      if ($('#osStart') && !$('#osStart').hidden) { closeStart(); return; }
       if ([...$$('.menu')].some(m => !m.hidden)) { closeMenus(); return; }
       clearSelection();
       $('#screenApp').classList.remove('nav-open');
@@ -3366,6 +3737,11 @@ function bind() {
     }
     if (typing || $('#screenApp').hidden || document.querySelector('dialog[open]')) return;
     const sel = selectedItems();
+    if (EMBED === 'pane') {
+      const fk = { F3: 'view', F5: 'copy', F6: 'move', F7: 'mkdir', F8: 'delete', F2: 'rename' }[e.key];
+      if (fk) { e.preventDefault(); window.dispatchEvent(new MessageEvent('message', { origin: location.origin, data: { vena: true, type: 'cmd', cmd: fk } })); return; }
+      if (e.key === 'Tab') { e.preventDefault(); toParent({ type: 'tab' }); return; }
+    }
     if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); navStep(-1); return; }
     if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); navStep(1); return; }
     if ((e.altKey && e.key === 'ArrowUp') || e.key === 'Backspace') { e.preventDefault(); navUp(); return; }
@@ -3386,6 +3762,8 @@ function bind() {
 
   bindDrag();
   bindPlayer();
+  if (!EMBED) { bindDesktop(); bindCommander(); }
+  if (EMBED) document.addEventListener('pointerdown', () => toParent({ type: 'focus' }), true);
   let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (V.pdf) layoutPdf(); }, 200); });
 
   /* seret & lepas file dari komputer */
