@@ -19,11 +19,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.0.2">
+  <link rel="stylesheet" href="style.css?v=3.0.4">
   <script>(function () { var c = document.documentElement.classList, e = new URLSearchParams(location.search).get('embed');
     if (e) { c.add('embed'); c.add('embed-' + e); }
     try { var s = localStorage.getItem('vena.skin'); if (!e && (s === 'desktop' || s === 'commander')) c.add('skin-' + s); } catch (x) {} })();</script>
-  <script src="config.js?v=3.0.2"></script>
+  <script src="config.js?v=3.0.4"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
@@ -125,6 +125,7 @@
         </div>
         <hr>
         <button role="menuitem" data-action="theme" id="menuTheme"><svg class="i"><use href="#i-moon"/></svg><span id="menuThemeText">Tema gelap</span></button>
+        <button role="menuitem" data-action="change-password" id="menuChangePassword" hidden><svg class="i"><use href="#i-key"/></svg>Ubah password</button>
         <button role="menuitem" data-action="install" hidden><svg class="i"><use href="#i-phone"/></svg>Pasang aplikasi</button>
         <button role="menuitem" data-action="skin"><svg class="i"><use href="#i-layout"/></svg><span>Model tampilan</span><em class="menu-val" id="skinVal">Klasik</em></button>
         <button role="menuitem" data-action="logout"><svg class="i"><use href="#i-logout"/></svg>Keluar</button>
@@ -519,9 +520,30 @@
     </div>
     <div class="dlg-actions"><button value="ok" class="btn btn-primary">Selesai</button></div>
   </form>
-</dialog>
+  </dialog>
 
-<dialog id="dlgShare" class="dlg">
+  <dialog id="dlgPassword" class="dlg">
+    <form method="dialog" id="passwordForm">
+      <h3>Ubah password</h3>
+      <p class="muted">Password baru akan berlaku untuk semua perangkat. Setelah disimpan, Anda perlu masuk lagi.</p>
+      <label class="field"><span>Password lama</span>
+        <input id="currentPassword" type="password" autocomplete="current-password" required>
+      </label>
+      <label class="field"><span>Password baru</span>
+        <input id="newPassword" type="password" autocomplete="new-password" minlength="8" required>
+      </label>
+      <label class="field"><span>Ulangi password baru</span>
+        <input id="confirmPassword" type="password" autocomplete="new-password" minlength="8" required>
+      </label>
+      <p id="passwordError" class="error" role="alert"></p>
+      <div class="dlg-actions">
+        <button type="button" class="btn btn-ghost" data-action="close-password">Batal</button>
+        <button value="ok" id="passwordSubmit" class="btn btn-primary">Simpan password</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlgShare" class="dlg">
   <form method="dialog">
     <h3>Bagikan “<span id="shareName"></span>”</h3>
     <label class="switch-row">
@@ -693,6 +715,6 @@
   </defs>
 </svg>
 
-<script src="app.js?v=3.0.2"></script>
+<script src="app.js?v=3.0.4"></script>
 </body>
 </html>

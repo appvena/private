@@ -724,12 +724,12 @@ code { font-size: .88em; background: var(--surface-2); border: 1px solid var(--l
 .viewer-loading { display: grid; justify-items: center; gap: 12px; color: #C5D0CB; }
 .viewer-loading p { margin: 0; }
 .viewer-msg svg.big { width: 80px; height: 80px; }
-.viewer-body.doc-mode { display: flex; flex-direction: column; align-items: stretch; justify-content: stretch; place-items: stretch; padding: 0; position: relative; }
+.viewer-body.doc-mode { display: flex; flex-direction: column; align-items: stretch; justify-content: stretch; place-items: stretch; padding: 0; position: relative; min-width: 0; }
 .viewer:has(.doc-mode) { background: #0A0F0E; }
-.pdf-scroll { flex: 1; overflow: auto; padding: 12px 12px 70px; -webkit-overflow-scrolling: touch; }
+.pdf-scroll { flex: 1 1 auto; min-width: 0; min-height: 0; overflow: auto; padding: 12px 12px 70px; -webkit-overflow-scrolling: touch; }
 .pdf-pages { display: grid; justify-content: center; gap: 12px; }
-.pdf-page { background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.4); border-radius: 2px; }
-.pdf-page canvas { display: block; }
+.pdf-page { background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.4); border-radius: 2px; overflow: hidden; }
+.pdf-page canvas { display: block; max-width: 100%; height: auto; }
 .doc-bar {
   position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px;
   background: rgba(20,28,25,.92); color: #EEF3F1; padding: 4px 12px; border-radius: 999px; font-size: 13.5px; font-variant-numeric: tabular-nums;

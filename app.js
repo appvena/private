@@ -7,7 +7,7 @@
 'use strict';
 
 /* ---------------------------------------------------------------- versi */
-const APP_VERSION = '3.0.2';
+const APP_VERSION = '3.0.4';
 const APP_BUILD = '18 Oktober 2026';
 
 /* ---------------------------------------------------------------- konfigurasi */
@@ -1078,12 +1078,44 @@ function renderAccount() {
   $('#accEmail').textContent = u.emailAddress;
   $('#accStorage').hidden = false;
   $('#accStorage').textContent = brokerMode() ? 'Masuk dengan password Vena' : 'Masuk dengan akun Google';
+  $('#menuChangePassword').hidden = !brokerMode();
   $('#avatarInitial').textContent = (u.displayName || u.emailAddress || '?').trim()[0].toUpperCase();
   const img = $('#avatarImg');
   if (u.photoLink) {
     img.onload = () => { img.hidden = false; $('#avatarInitial').hidden = true; };
     img.onerror = () => { img.hidden = true; $('#avatarInitial').hidden = false; };
     img.src = u.photoLink;
+  }
+}
+
+function openChangePassword() {
+  if (!brokerMode() || !S.bsession) return;
+  $('#passwordForm').reset();
+  $('#passwordError').textContent = '';
+  $('#dlgPassword').showModal();
+  setTimeout(() => $('#currentPassword').focus(), 30);
+}
+
+async function changePassword(e) {
+  e.preventDefault();
+  const current = $('#currentPassword').value;
+  const next = $('#newPassword').value;
+  const confirm = $('#confirmPassword').value;
+  const error = $('#passwordError');
+  error.textContent = '';
+  if (next.length < 8) { error.textContent = 'Password baru minimal 8 karakter.'; return; }
+  if (next !== confirm) { error.textContent = 'Ulangan password baru tidak sama.'; return; }
+  const btn = $('#passwordSubmit');
+  btn.disabled = true; btn.textContent = 'Menyimpan…';
+  try {
+    await server('change-password', { session: S.bsession.id, currentPassword: current, newPassword: next });
+    $('#dlgPassword').close();
+    toast('Password berhasil diubah. Silakan masuk lagi.');
+    logout();
+  } catch (err) {
+    error.textContent = err.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Simpan password';
   }
 }
 function renderQuota() {
@@ -3010,7 +3042,12 @@ async function renderPdf(data, id) {
 function layoutPdf() {
   const pdf = V.pdf; if (!pdf) return;
   const sc = $('#pdfScroll'), wrap = $('#pdfPages');
-  const fitW = Math.max(240, Math.min((sc.clientWidth || window.innerWidth) - 24, 1000));
+  // Muat seluruh halaman pada tampilan awal: batasi oleh lebar dan tinggi area
+  // scroll. Ini mencegah halaman PDF tinggi terpotong di layar pendek/HP.
+  const availW = Math.max(1, (sc.clientWidth || window.innerWidth) - 24);
+  const availH = Math.max(1, (sc.clientHeight || window.innerHeight) - 24);
+  const pageRatio = V.pageBase.width / V.pageBase.height;
+  const fitW = Math.min(availW, availH * pageRatio, 1000);
   const cssW = Math.round(fitW * V.zoom);
   const cssH = Math.round(cssW * V.pageBase.height / V.pageBase.width);
   $('#pdfZoom').textContent = Math.round(V.zoom * 100) + '%';
@@ -3500,6 +3537,7 @@ function bind() {
   $('#btnResetSetup').onclick = () => { LS.del('vena.clientId'); LS.del('vena.session'); location.reload(); };
   $('#btnLogin').onclick = () => signIn(LS.get('vena.lastEmail') ? '' : 'select_account');
   $('#pwForm').onsubmit = passwordLogin;
+  $('#passwordForm').onsubmit = changePassword;
   $('#pwShow').onclick = () => {
     const i = $('#pwInput'); const on = i.type === 'password';
     i.type = on ? 'text' : 'password';
@@ -3583,6 +3621,8 @@ function bind() {
         case 'open-sidebar': $('#screenApp').classList.add('nav-open'); pushOverlay('nav'); return;
         case 'close-sidebar': if ($('#screenApp').classList.contains('nav-open')) { $('#screenApp').classList.remove('nav-open'); popOverlay('nav'); } return;
         case 'logout': confirmLogout(); return;
+        case 'change-password': openChangePassword(); return;
+        case 'close-password': $('#dlgPassword').close(); return;
         case 'theme': toggleTheme(); return;
         case 'reconnect': reconnect(); return;
         case 'home': location.hash = '#/'; return;
