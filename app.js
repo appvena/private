@@ -7,7 +7,7 @@
 'use strict';
 
 /* ---------------------------------------------------------------- versi */
-const APP_VERSION = '3.0.4';
+const APP_VERSION = '3.0.5';
 const APP_BUILD = '18 Oktober 2026';
 
 /* ---------------------------------------------------------------- konfigurasi */
@@ -115,16 +115,16 @@ function applyTheme() {
   const t = LS.get('vena.theme');
   if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
   const dark = t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  const next = t === 'dark' ? 'candy' : t === 'candy' ? 'light' : 'dark';
+  const nextLabel = next === 'candy' ? 'Tema Candy' : next === 'dark' ? 'Tema gelap' : 'Tema terang';
   $('#btnTheme use').setAttribute('href', dark ? '#i-sun' : '#i-moon');
-  $('#btnTheme').setAttribute('aria-label', dark ? 'Pakai tema terang' : 'Pakai tema gelap');
+  $('#btnTheme').setAttribute('aria-label', `Pakai ${nextLabel.toLowerCase()}`);
   $('#menuTheme use').setAttribute('href', dark ? '#i-sun' : '#i-moon');
-  $('#menuThemeText').textContent = dark ? 'Tema terang' : 'Tema gelap';
+  $('#menuThemeText').textContent = `Pakai ${nextLabel.toLowerCase()}`;
 }
 function toggleTheme() {
-  const dark = document.documentElement.dataset.theme
-    ? document.documentElement.dataset.theme === 'dark'
-    : matchMedia('(prefers-color-scheme: dark)').matches;
-  LS.set('vena.theme', dark ? 'light' : 'dark');
+  const current = LS.get('vena.theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  LS.set('vena.theme', current === 'light' ? 'dark' : current === 'dark' ? 'candy' : 'light');
   applyTheme();
 }
 
@@ -3473,7 +3473,7 @@ function setupLoginScreen() {
   $('#loginLead').textContent = pw
     ? 'Masukkan password untuk membuka penyimpanan Anda.'
     : 'Unggah, atur, dan bagikan file. Semuanya tersimpan aman di Google Drive Anda sendiri.';
-  $('#pwRemember').checked = LS.get('vena.remember') !== '0';
+  $('#pwRemember').checked = LS.get('vena.remember') === '1';
   const last = LS.get('vena.lastEmail');
   const allow = allowedEmail();
   const name = LS.get('vena.lastName');
@@ -3538,11 +3538,14 @@ function bind() {
   $('#btnLogin').onclick = () => signIn(LS.get('vena.lastEmail') ? '' : 'select_account');
   $('#pwForm').onsubmit = passwordLogin;
   $('#passwordForm').onsubmit = changePassword;
-  $('#pwShow').onclick = () => {
-    const i = $('#pwInput'); const on = i.type === 'password';
-    i.type = on ? 'text' : 'password';
-    $('#pwShow').textContent = on ? 'Sembunyikan' : 'Lihat';
-  };
+  $$('[data-toggle-password]').forEach((b) => {
+    b.onclick = () => {
+      const i = document.querySelector(b.dataset.togglePassword); if (!i) return;
+      const on = i.type === 'password'; i.type = on ? 'text' : 'password';
+      b.setAttribute('aria-label', on ? 'Sembunyikan password' : 'Lihat password');
+      b.setAttribute('title', on ? 'Sembunyikan password' : 'Lihat password');
+    };
+  });
   $('#btnTheme').onclick = toggleTheme;
 
   $('#btnAccount').onclick = (e) => {
@@ -3834,6 +3837,19 @@ function bind() {
     }
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) { moveFocus(e); return; }
     if (e.key === '/') { e.preventDefault(); $('#searchInput').focus(); }
+  });
+
+  // Enter selalu menekan tombol aksi utama pada dialog, termasuk dialog
+  // method="dialog" yang tidak selalu men-submit konsisten di semua browser.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.isComposing || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
+    const el = document.activeElement;
+    if (!el || !/INPUT|SELECT/.test(el.tagName)) return;
+    const form = el.closest('form');
+    const dlg = el.closest('dialog[open]');
+    if (!form || !dlg) return;
+    const ok = form.querySelector('button[value="ok"]:not([disabled]), button[type="submit"]:not([disabled])');
+    if (ok) { e.preventDefault(); ok.click(); }
   });
 
   bindDrag();

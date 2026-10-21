@@ -19,11 +19,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.0.4">
+  <link rel="stylesheet" href="style.css?v=3.0.5">
   <script>(function () { var c = document.documentElement.classList, e = new URLSearchParams(location.search).get('embed');
     if (e) { c.add('embed'); c.add('embed-' + e); }
     try { var s = localStorage.getItem('vena.skin'); if (!e && (s === 'desktop' || s === 'commander')) c.add('skin-' + s); } catch (x) {} })();</script>
-  <script src="config.js?v=3.0.4"></script>
+  <script src="config.js?v=3.0.5"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
@@ -80,10 +80,10 @@
         <span>Password</span>
         <span class="pw-wrap">
           <input id="pwInput" type="password" autocomplete="current-password" required>
-          <button type="button" id="pwShow" class="link-btn tiny">Lihat</button>
+          <button type="button" id="pwShow" class="password-toggle" data-toggle-password="#pwInput" aria-label="Lihat password" title="Lihat password"><svg class="i"><use href="#i-eye"/></svg></button>
         </span>
       </label>
-      <label class="check-row"><input type="checkbox" id="pwRemember" checked> Ingat saya di perangkat ini (30 hari)</label>
+      <label class="check-row"><input type="checkbox" id="pwRemember"> Ingat saya di perangkat ini (30 hari)</label>
       <button id="pwSubmit" class="btn btn-primary btn-block">Masuk</button>
       <p class="tiny muted">Di komputer umum, hapus centang “Ingat saya” dan klik Keluar setelah selesai.</p>
     </form>
@@ -527,13 +527,13 @@
       <h3>Ubah password</h3>
       <p class="muted">Password baru akan berlaku untuk semua perangkat. Setelah disimpan, Anda perlu masuk lagi.</p>
       <label class="field"><span>Password lama</span>
-        <input id="currentPassword" type="password" autocomplete="current-password" required>
+        <span class="pw-wrap"><input id="currentPassword" type="password" autocomplete="current-password" required><button type="button" class="password-toggle" data-toggle-password="#currentPassword" aria-label="Lihat password lama" title="Lihat password lama"><svg class="i"><use href="#i-eye"/></svg></button></span>
       </label>
       <label class="field"><span>Password baru</span>
-        <input id="newPassword" type="password" autocomplete="new-password" minlength="8" required>
+        <span class="pw-wrap"><input id="newPassword" type="password" autocomplete="new-password" minlength="8" required><button type="button" class="password-toggle" data-toggle-password="#newPassword" aria-label="Lihat password baru" title="Lihat password baru"><svg class="i"><use href="#i-eye"/></svg></button></span>
       </label>
       <label class="field"><span>Ulangi password baru</span>
-        <input id="confirmPassword" type="password" autocomplete="new-password" minlength="8" required>
+        <span class="pw-wrap"><input id="confirmPassword" type="password" autocomplete="new-password" minlength="8" required><button type="button" class="password-toggle" data-toggle-password="#confirmPassword" aria-label="Lihat ulang password baru" title="Lihat ulang password baru"><svg class="i"><use href="#i-eye"/></svg></button></span>
       </label>
       <p id="passwordError" class="error" role="alert"></p>
       <div class="dlg-actions">
@@ -715,6 +715,6 @@
   </defs>
 </svg>
 
-<script src="app.js?v=3.0.4"></script>
+<script src="app.js?v=3.0.5"></script>
 </body>
 </html>
