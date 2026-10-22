@@ -1506,3 +1506,65 @@ html.skin-candy[data-theme="dark"] .items.grid .it .ic,html.skin-candy[data-them
 html.skin-candy[data-theme="dark"] .items.grid .it .nm{color:#eee9ec}
 html.skin-candy[data-theme="dark"] .details{background:#38363d}
 html.skin-candy[data-theme="dark"] .statusbar{background:#37343a;color:#c7c1c6}
+
+/* Video: selalu mempertahankan rasio asli dan berada tepat di tengah */
+.vs-main video{display:block;width:auto;max-width:100%;height:auto;max-height:100%;object-fit:contain;place-self:center}
+.volume-control{display:inline-flex;align-items:center;gap:7px;color:var(--muted);padding:0 6px}.volume-control .i{width:18px;height:18px}.volume-control input{width:92px;accent-color:var(--accent)}.video-volume{color:#eef3f1}.video-volume input{accent-color:#8fe0d5}
+
+/* Candy diperbarui menjadi iOS Calm: kartu translucent, biru sistem, tipografi SF */
+html.skin-candy{--bg:#f2f2f7;--surface:#ffffff;--surface-2:#f7f7fa;--ink:#1c1c1e;--muted:#6e6e73;--line:#d1d1d6;--accent:#3478f6;--accent-hover:#2563d9;--accent-ink:#fff;--accent-soft:#e2ecff;--folder-back:#9db9ef;--folder-front:#b9d0ff;--folder:#e8f0ff;--folder-hover:#dce8ff;--folder-tab:#c8dcff;--danger:#c93442;--danger-soft:#ffe5e7;--shadow:0 12px 30px rgba(60,60,67,.12);--font-display:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;--font-body:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif}
+html.skin-candy body{background:#f2f2f7;background-image:none;font-family:var(--font-body)}
+html.skin-candy .desk{padding:18px;background:#f2f2f7}
+html.skin-candy .win{max-width:1440px;border:1px solid #fff;border-radius:24px;background:#f2f2f7;box-shadow:0 20px 50px rgba(60,60,67,.14)}
+html.skin-candy .titlebar{min-height:68px;padding:12px 20px;background:rgba(255,255,255,.86);border-bottom:1px solid #d1d1d6;backdrop-filter:blur(18px)}
+html.skin-candy .titlebar:after{display:none}
+html.skin-candy .brand-mark.small{width:38px;height:38px;border-radius:11px;background:linear-gradient(145deg,#62a4ff,#3478f6);box-shadow:0 4px 10px #3478f644;transform:none}
+html.skin-candy .brand-mark.small:before{background:#fff;width:12px;height:6px;top:-5px;border-radius:4px 4px 0 0}
+html.skin-candy .win-title{font-size:22px;color:#1c1c1e;font-weight:750}
+html.skin-candy #btnTheme,html.skin-candy .avatar-btn{width:38px;height:38px;border:1px solid #d1d1d6;border-radius:50%;background:#fff;color:#3478f6;box-shadow:none}
+html.skin-candy .navbar{grid-template-columns:auto minmax(180px,1fr) minmax(220px,340px);gap:10px;margin:0;padding:12px 18px;background:#f2f2f7}
+html.skin-candy .nav-btns{padding:3px;gap:2px;border:1px solid #d1d1d6;border-radius:11px;background:#fff}
+html.skin-candy .nb{width:36px;height:34px;border-radius:9px;color:#3478f6}
+html.skin-candy .address,html.skin-candy .search{height:40px;border:1px solid #d1d1d6;border-radius:10px;background:#fff;color:#1c1c1e;box-shadow:none}
+html.skin-candy .address{padding:0 12px;font-weight:600}
+html.skin-candy .cmdbar{margin:0 18px 12px;padding:8px;border:1px solid #d1d1d6;border-radius:14px;background:#fff;box-shadow:none}
+html.skin-candy .cmd{min-height:34px;padding:7px 11px;border:0;border-radius:9px;background:#f2f2f7;color:#3478f6;font-weight:650;box-shadow:none}
+html.skin-candy .cmd:hover{background:#e2ecff;transform:none}
+html.skin-candy .cmd-primary{background:#3478f6;color:#fff;box-shadow:none}
+html.skin-candy .cmd.danger{background:#ffe5e7;color:#c93442;box-shadow:none}
+html.skin-candy .select{border:1px solid #d1d1d6;border-radius:9px;background:#fff;color:#1c1c1e;box-shadow:none}
+html.skin-candy .win-body{grid-template-columns:218px minmax(0,1fr) 230px;gap:12px;padding:0 18px 14px;background:#f2f2f7}
+html.skin-candy .navpane{border:1px solid #d1d1d6;border-radius:16px;background:#fff;padding:12px 9px;box-shadow:0 3px 10px #3c3c4320}
+html.skin-candy .np-label{padding:5px 10px;color:#6e6e73;font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:700}
+html.skin-candy .nav a{margin:2px 0;padding:9px 11px;border-radius:9px;color:#3a3a3c;font-weight:550}
+html.skin-candy .nav a:hover{background:#f2f2f7}
+html.skin-candy .nav a.active{background:#e2ecff;color:#3478f6;box-shadow:none}
+html.skin-candy .add-drive{border:1px dashed #b7b7bd;border-radius:9px;background:#f7f7fa;color:#3478f6;font-weight:600}
+html.skin-candy .disk{border:1px solid #d1d1d6;border-radius:13px;background:#f7f7fa;box-shadow:none}
+html.skin-candy .pane{border:1px solid #d1d1d6;border-radius:16px;background:#fff;box-shadow:0 3px 10px #3c3c4320}
+html.skin-candy .content{padding:16px 18px 24px}
+html.skin-candy .list-head{color:#6e6e73;font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+html.skin-candy .items.grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+html.skin-candy .items.grid .it,html.skin-candy .items.grid .it:nth-child(3n+1),html.skin-candy .items.grid .it:nth-child(3n+2),html.skin-candy .items.grid .it:nth-child(3n){min-height:150px;padding:10px;border:1px solid #e5e5ea;border-radius:14px;background:#fff;box-shadow:0 3px 10px #3c3c4320}
+html.skin-candy .items.grid .it:hover{transform:translateY(-2px);background:#fbfbfd;box-shadow:0 6px 14px #3c3c4330}
+html.skin-candy .items.grid .it.selected{outline:2px solid #3478f6;outline-offset:1px;background:#eaf1ff;box-shadow:0 3px 10px #3478f633}
+html.skin-candy .items.grid .it .ic,html.skin-candy .items.grid .it:nth-child(3n+1) .ic,html.skin-candy .items.grid .it:nth-child(3n+2) .ic,html.skin-candy .items.grid .it:nth-child(3n) .ic{height:92px;border-radius:12px;background:#f2f2f7}
+html.skin-candy .items.grid .it .ic:before{width:62px;height:62px;border-radius:50%;background:#fff;transform:none}
+html.skin-candy .items.grid .it .ic:after{color:#3478f6;opacity:.55;font-size:16px}
+html.skin-candy .items.grid .it .ic svg.big{width:52px;height:52px;filter:none;opacity:.9}
+html.skin-candy .items.grid .it .nm{padding:5px 3px 0;color:#1c1c1e;font-weight:600}
+html.skin-candy .details{border:1px solid #d1d1d6;border-radius:16px;background:#fff;box-shadow:0 3px 10px #3c3c4320}
+html.skin-candy .statusbar{background:#fff;border-top:1px solid #d1d1d6;color:#6e6e73;padding:9px 18px}
+html.skin-candy .menu,html.skin-candy .dlg{border:1px solid #d1d1d6;border-radius:16px;background:#fff;box-shadow:0 18px 45px #3c3c4338}
+html.skin-candy .menu button{border-radius:9px;color:#1c1c1e}
+html.skin-candy .menu button:hover{background:#f2f2f7}
+html.skin-candy .fab{background:#3478f6;box-shadow:0 5px 12px #3478f655}
+html.skin-candy[data-theme="dark"]{--bg:#1c1c1e;--surface:#2c2c2e;--surface-2:#3a3a3c;--ink:#f2f2f7;--muted:#aeaeb2;--line:#48484a;--accent:#70a7ff;--accent-hover:#8bb8ff;--accent-ink:#102244;--accent-soft:#263b60;--shadow:0 12px 30px rgba(0,0,0,.3)}
+html.skin-candy[data-theme="dark"] body,html.skin-candy[data-theme="dark"] .desk{background:#1c1c1e}
+html.skin-candy[data-theme="dark"] .titlebar,html.skin-candy[data-theme="dark"] .navbar,html.skin-candy[data-theme="dark"] .win,html.skin-candy[data-theme="dark"] .win-body{background:#1c1c1e;color:#f2f2f7}
+html.skin-candy[data-theme="dark"] .navpane,html.skin-candy[data-theme="dark"] .pane,html.skin-candy[data-theme="dark"] .details,html.skin-candy[data-theme="dark"] .cmdbar,html.skin-candy[data-theme="dark"] .menu,html.skin-candy[data-theme="dark"] .dlg{background:#2c2c2e;border-color:#48484a;color:#f2f2f7}
+html.skin-candy[data-theme="dark"] .address,html.skin-candy[data-theme="dark"] .search,html.skin-candy[data-theme="dark"] .cmd,html.skin-candy[data-theme="dark"] .select{background:#3a3a3c;border-color:#48484a;color:#f2f2f7}
+html.skin-candy[data-theme="dark"] .items.grid .it,html.skin-candy[data-theme="dark"] .items.grid .it:nth-child(3n+1),html.skin-candy[data-theme="dark"] .items.grid .it:nth-child(3n+2),html.skin-candy[data-theme="dark"] .items.grid .it:nth-child(3n){background:#2c2c2e;border-color:#48484a;box-shadow:none}
+html.skin-candy[data-theme="dark"] .items.grid .it .ic,html.skin-candy[data-theme="dark"] .items.grid .it:nth-child(3n+1) .ic,html.skin-candy[data-theme="dark"] .items.grid .it:nth-child(3n+2) .ic,html.skin-candy[data-theme="dark"] .items.grid .it:nth-child(3n) .ic{background:#3a3a3c}
+html.skin-candy[data-theme="dark"] .items.grid .it .nm,html.skin-candy[data-theme="dark"] .nav a{color:#f2f2f7}
+@media(max-width:900px){html.skin-candy .desk{padding:0}html.skin-candy .win{border-radius:0}html.skin-candy .win-body{grid-template-columns:minmax(0,1fr);padding:0 10px 10px}html.skin-candy .navpane{border-radius:0 16px 16px 0}html.skin-candy .items.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}}

@@ -19,11 +19,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.1.9">
+  <link rel="stylesheet" href="style.css?v=3.2.0">
   <script>(function () { var c = document.documentElement.classList, e = new URLSearchParams(location.search).get('embed');
     if (e) { c.add('embed'); c.add('embed-' + e); }
     try { var s = localStorage.getItem('vena.skin'); if (!e && (s === 'desktop' || s === 'commander')) c.add('skin-' + s); } catch (x) {} })();</script>
-  <script src="config.js?v=3.1.9"></script>
+  <script src="config.js?v=3.2.0"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
@@ -281,6 +281,7 @@
       </div>
     </div>
     <div class="pl-right">
+      <label class="volume-control" title="Volume musik"><svg class="i"><use href="#i-volume"/></svg><input id="plVolume" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume musik"></label>
       <button class="pb" data-action="player-list" id="plListBtn" aria-pressed="false" title="Daftar putar"><svg class="i"><use href="#i-playlist"/></svg></button>
       <button class="pb" data-action="player-close" title="Tutup pemutar"><svg class="i"><use href="#i-x"/></svg></button>
     </div>
@@ -618,6 +619,7 @@
     <button class="pb pl-play" data-action="player-toggle" id="vsPlay" title="Putar / jeda"><svg class="i"><use href="#i-play"/></svg></button>
     <button class="pb" data-action="player-next" title="Berikutnya"><svg class="i"><use href="#i-skip-fwd"/></svg></button>
     <button class="pb" data-action="player-repeat" id="vsRepeat" aria-pressed="false" title="Ulangi"><svg class="i"><use href="#i-repeat"/></svg></button>
+    <label class="volume-control video-volume" title="Volume video"><svg class="i"><use href="#i-volume"/></svg><input id="vsVolume" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume video"></label>
   </div>
 </div>
 
@@ -704,6 +706,7 @@
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></symbol>
+    <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6l-5 4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
     <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v12m0 0-5-5m5 5 5-5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></symbol>
@@ -742,6 +745,6 @@
   </defs>
 </svg>
 
-<script src="app.js?v=3.1.9"></script>
+<script src="app.js?v=3.2.0"></script>
 </body>
 </html>

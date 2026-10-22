@@ -7,7 +7,7 @@
 'use strict';
 
 /* ---------------------------------------------------------------- versi */
-const APP_VERSION = '3.1.9';
+const APP_VERSION = '3.2.0';
 const APP_BUILD = '18 Oktober 2026';
 
 /* ---------------------------------------------------------------- konfigurasi */
@@ -196,7 +196,7 @@ async function server(action, data = {}) {
   catch { throw new Error('Balasan server Vena tidak valid. Pastikan Apps Script di-deploy sebagai Web app dengan akses "Anyone".'); }
   if (j.error) {
     const stale = action === 'change-password' && j.error === 'BAD_REQUEST' && /tidak dikenal/i.test(j.message || '');
-    const e = new Error(stale ? 'Backend belum diperbarui. Deploy server/Code.gs versi 3.1.9 ke Web App yang sama, lalu coba lagi.' : (j.message || j.error));
+    const e = new Error(stale ? 'Backend belum diperbarui. Deploy server/Code.gs versi 3.2.0 ke Web App yang sama, lalu coba lagi.' : (j.message || j.error));
     e.code = j.error; throw e;
   }
   return j;
@@ -418,22 +418,32 @@ async function ensureRoot() {
   LS.set(key, id);
 }
 
-const SPECIAL_FOLDERS = { whatsapp: 'WhatsApp', device: 'Perangkat' };
+const SPECIAL_FOLDERS = { cabinet: 'Gudang Kabinet' };
 function isProtectedFolder(f) { return !!(f && f.appProperties && f.appProperties.venaProtected); }
 async function ensureSpecialFolder(kind) {
   const name = SPECIAL_FOLDERS[kind];
   if (!name || !S.rootId) return S.rootId;
   S.specialFolders = S.specialFolders || {};
   if (S.specialFolders[kind]) return S.specialFolders[kind];
-  const q = `name='${qstr(name)}' and '${qstr(S.rootId)}' in parents and mimeType='${FOLDER}' and trashed=false`;
+  const names = kind === 'cabinet' ? `(name='${qstr(name)}' or name='WhatsApp')` : `name='${qstr(name)}'`;
+  const q = `${names} and '${qstr(S.rootId)}' in parents and mimeType='${FOLDER}' and trashed=false`;
   const ex = await api('/files', { query: { q, fields: 'files(id,name,parents,appProperties)', pageSize: 1, spaces: 'drive' } });
   let f = ex.files && ex.files[0];
   if (!f) f = await api('/files', { method: 'POST', query: { fields: 'id,name,parents,appProperties' }, body: { name, mimeType: FOLDER, parents: [S.rootId], appProperties: { venaProtected: kind } } });
+  else if (kind === 'cabinet' && f.name !== name) f = await api('/files/' + f.id, { method: 'PATCH', query: { fields: 'id,name,parents,appProperties' }, body: { name } });
   else if (!f.appProperties || !f.appProperties.venaProtected) f = await api('/files/' + f.id, { method: 'PATCH', query: { fields: 'id,name,parents,appProperties' }, body: { appProperties: Object.assign({}, f.appProperties || {}, { venaProtected: kind }) } });
   S.specialFolders[kind] = f.id; S.meta.set(f.id, { name: f.name, parents: f.parents });
   return f.id;
 }
-async function ensureSpecialFolders() { await Promise.all([ensureSpecialFolder('whatsapp'), ensureSpecialFolder('device')]); }
+async function retireLegacyDeviceFolder() {
+  if (!S.rootId) return;
+  const r = await api('/files', { query: { q: `name='Perangkat' and '${qstr(S.rootId)}' in parents and mimeType='${FOLDER}' and trashed=false`, fields: 'files(id,name)', pageSize: 5, spaces: 'drive' } });
+  for (const f of (r.files || [])) {
+    const kids = await api('/files', { query: { q: `'${qstr(f.id)}' in parents and trashed=false`, fields: 'files(id)', pageSize: 1, spaces: 'drive' } });
+    if (!(kids.files || []).length) await api('/files/' + f.id, { method: 'PATCH', query: { fields: 'id,trashed' }, body: { trashed: true } });
+  }
+}
+async function ensureSpecialFolders() { await ensureSpecialFolder('cabinet'); try { await retireLegacyDeviceFolder(); } catch (e) { console.warn('Folder Perangkat lama:', e); } }
 
 async function refreshQuota() {
   try {
@@ -1543,7 +1553,7 @@ async function runAll(list, fn, conc = 4) {
 
 async function trashItems(list) {
   if (!list.length) return;
-  if (list.some(isProtectedFolder)) { toast('Folder WhatsApp dan Perangkat dilindungi dan tidak dapat dihapus.', { error: true }); return; }
+  if (list.some(isProtectedFolder)) { toast('Folder Gudang Kabinet dilindungi dan tidak dapat dihapus.', { error: true }); return; }
   const nF = list.filter(isFolder).length;
   const filled = await filledFolders(list.filter(isFolder));
   if (filled.length && !(await confirmDeleteFolderPassword())) return;
@@ -1620,7 +1630,7 @@ async function restoreItems(list, quiet) {
 
 async function deleteItems(list, skipConfirm) {
   if (!list.length) return;
-  if (list.some(isProtectedFolder)) { toast('Folder WhatsApp dan Perangkat dilindungi dan tidak dapat dihapus.', { error: true }); return; }
+  if (list.some(isProtectedFolder)) { toast('Folder Gudang Kabinet dilindungi dan tidak dapat dihapus.', { error: true }); return; }
   if ((await filledFolders(list.filter(isFolder))).length && !(await confirmDeleteFolderPassword())) return;
   if (!skipConfirm) {
     const ok = await confirmDialog(
@@ -2758,6 +2768,19 @@ async function loadTrack(resumeAt = 0) {
   // Google menolak token di alamat (403), jadi file diambil dengan izin resmi lalu diputar
   el.removeAttribute('src');
   $('#plSub') && P.kind === 'audio' && ($('#plSub').textContent = 'Memuat…');
+  if (P.kind === 'video') {
+    // Video diputar langsung dengan URL media Google Drive agar file besar tidak
+    // perlu diunduh penuh ke memori browser terlebih dahulu.
+    try {
+      const token = await getToken();
+      el.src = streamUrl(f, token);
+      P.streamOk = true;
+      if (resumeAt) el.currentTime = resumeAt;
+      el.play().catch(() => {});
+      renderNowPlaying();
+      return;
+    } catch (e) { mediaError('Video tidak dapat dimuat: ' + e.message); return; }
+  }
   return fallbackToBlob(resumeAt);
 }
 async function fallbackToBlob(resumeAt) {
@@ -2765,7 +2788,6 @@ async function fallbackToBlob(resumeAt) {
   const el = mediaEl();
   const at = resumeAt || el.currentTime || 0;
   const size = Number(f.size) || 0;
-  if (size > (P.kind === 'video' ? 600e6 : 200e6)) { mediaError('File ini terlalu besar untuk diputar di sini. Unduh dulu untuk memutarnya.'); return; }
   P.usingBlob = true;
   $('#plSub').textContent = 'Memuat…';
   try {
@@ -2909,6 +2931,12 @@ function bindPlayer() {
     el.addEventListener('error', onMediaError);
   }
   const a = $('#plAudio'), seek = $('#plSeek');
+  const savedVolume = Number(LS.get('vena.volume') || 1);
+  for (const [el, input] of [[a, $('#plVolume')], [$('#plVideo'), $('#vsVolume')]]) {
+    el.volume = Math.max(0, Math.min(1, savedVolume));
+    input.value = String(el.volume);
+    input.addEventListener('input', () => { el.volume = Number(input.value); LS.set('vena.volume', String(el.volume)); });
+  }
   let dragging = false;
   a.addEventListener('timeupdate', () => {
     $('#plCur').textContent = fmtTime(a.currentTime);
@@ -3519,10 +3547,10 @@ function renderUploads() {
 async function startUpload(fileList) {
   const files = [...fileList];
   if (!files.length) return;
-  // Upload dari tombol/pemilih file HP atau PC selalu masuk Perangkat.
-  // S.uploadTarget hanya dipakai untuk upload khusus dari Commander.
-  const customTarget = S.uploadTarget && S.uploadTarget !== (S.specialFolders && S.specialFolders.whatsapp) ? S.uploadTarget : null;
-  const base = customTarget || await ensureSpecialFolder('device');
+  // Semua upload masuk satu gudang terpusat, termasuk upload biasa dari HP/PC.
+  // S.uploadTarget tetap dipakai hanya untuk upload khusus dari Commander.
+  const customTarget = S.uploadTarget && S.uploadTarget !== (S.specialFolders && S.specialFolders.cabinet) ? S.uploadTarget : null;
+  const base = customTarget || await ensureSpecialFolder('cabinet');
   S.uploadTarget = null;
   addUploads(files.map(f => {
     const rel = f.webkitRelativePath || '';
@@ -3552,17 +3580,17 @@ async function consumeSharedFiles() {
     db.close();
     history.replaceState(null, '', location.pathname + (location.hash || '#/'));
     const files = rows.flatMap(row => (row.files || []).map((blob, i) => {
-      const name = blob.name || `WhatsApp-${Date.now()}-${i + 1}`;
+      const name = blob.name || `Gudang-${Date.now()}-${i + 1}`;
       return new File([blob], name, { type: blob.type || 'application/octet-stream', lastModified: Date.now() });
     }));
     if (files.length) {
       // Saat aplikasi dibuka langsung dari WhatsApp, onRoute belum sempat
       // berjalan sehingga S.route.id masih null. Gunakan root Vena (C:),
       // bukan root Google Drive, sebagai tujuan aman.
-      // Hanya file yang masuk lewat Share Target (mis. WhatsApp) yang masuk WhatsApp.
-      const whatsappFolder = await ensureSpecialFolder('whatsapp');
-      await addUploads(files.map(file => ({ file, dir: [] })), whatsappFolder);
-      toast(files.length === 1 ? 'File dari WhatsApp masuk ke antrean upload.' : `${files.length} file dari WhatsApp masuk ke antrean upload.`);
+      // Share Target juga masuk ke Gudang Kabinet, bukan folder WhatsApp terpisah.
+      const cabinetFolder = await ensureSpecialFolder('cabinet');
+      await addUploads(files.map(file => ({ file, dir: [] })), cabinetFolder);
+      toast(files.length === 1 ? 'File masuk ke Gudang Kabinet.' : `${files.length} file masuk ke Gudang Kabinet.`);
     }
   } catch (e) { console.warn('Share Target:', e); }
 }
