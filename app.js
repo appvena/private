@@ -7,7 +7,7 @@
 'use strict';
 
 /* ---------------------------------------------------------------- versi */
-const APP_VERSION = '3.1.4';
+const APP_VERSION = '3.1.6';
 const APP_BUILD = '18 Oktober 2026';
 
 /* ---------------------------------------------------------------- konfigurasi */
@@ -196,7 +196,7 @@ async function server(action, data = {}) {
   catch { throw new Error('Balasan server Vena tidak valid. Pastikan Apps Script di-deploy sebagai Web app dengan akses "Anyone".'); }
   if (j.error) {
     const stale = action === 'change-password' && j.error === 'BAD_REQUEST' && /tidak dikenal/i.test(j.message || '');
-    const e = new Error(stale ? 'Backend belum diperbarui. Deploy server/Code.gs versi 3.1.4 ke Web App yang sama, lalu coba lagi.' : (j.message || j.error));
+    const e = new Error(stale ? 'Backend belum diperbarui. Deploy server/Code.gs versi 3.1.6 ke Web App yang sama, lalu coba lagi.' : (j.message || j.error));
     e.code = j.error; throw e;
   }
   return j;

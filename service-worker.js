@@ -14,7 +14,7 @@
 //  - Hanya kalau benar-benar tidak ada internet, tampilkan halaman kecil
 //    "Tidak ada koneksi" yang dibuat langsung di sini (bukan dari cache).
 // =====================================================================
-const VERSION = 'vena-3.1.4';
+const VERSION = 'vena-3.1.6';
 const SHARE_DB = 'vena-share-target';
 
 function openShareDb() {
