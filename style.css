@@ -1081,6 +1081,66 @@ html.skin-modern .desk { background: var(--bg) !important; padding: 14px 16px; }
 }
 
 /* =====================================================================
+   MODEL TAMPILAN CANDY
+   Layout kartu pastel dengan aksen permen, ikon lebih bulat, dan
+   navigasi yang terasa ringan. Candy tetap memakai layar aplikasi utama,
+   tetapi seluruh chrome dan isi folder memiliki bahasa visual tersendiri.
+   ===================================================================== */
+.skin-candy {
+  --bg: #FFF8F3; --surface: #FFFEFC; --surface-2: #FFF0F2; --ink: #493342; --muted: #896E7C; --line: #F0D7DF;
+  --accent: #D85B91; --accent-hover: #B94778; --accent-ink: #FFFFFF; --accent-soft: #FADCE9;
+  --folder-back: #E8A0B8; --folder-front: #FFD0DD; --folder: #FFE9EF; --folder-hover: #FBD8E4; --folder-tab: #F7C2D4;
+  --paper: #FFFEFC; --paper-fold: #F7DDE3; --paper-line: #E4C2CF; --marigold: #F0A65A;
+  --danger: #C84A58; --danger-soft: #FCE2E5; --shadow: 0 8px 28px rgba(182,83,126,.13);
+  --k-folder: #F38DAE; --k-image: #F28C72; --k-video: #A68BE4; --k-audio: #69B9D0; --k-pdf: #E96C79;
+  --k-sheet: #78B985; --k-doc: #7194D4; --k-archive: #D0A05C; --k-code: #82909C; --k-slides: #E7A05F; --k-file: #896E7C;
+  --font-display: "Nunito", "Atkinson Hyperlegible", system-ui, sans-serif;
+  --font-body: "Nunito", "Atkinson Hyperlegible", system-ui, sans-serif;
+  background: var(--bg);
+}
+.skin-candy body { background: radial-gradient(circle at 0 0, #FFE1EE 0, transparent 28%), radial-gradient(circle at 100% 0, #DDF8F0 0, transparent 25%), var(--bg); }
+.skin-candy .desk { background: transparent; padding: 18px; }
+.skin-candy .win { border: 3px solid #FFFFFF; border-radius: 30px; box-shadow: 0 18px 50px rgba(184,91,137,.16); overflow: hidden; }
+.skin-candy .titlebar { background: linear-gradient(90deg, #FFF1F6, #F0FFF9); border-bottom: 2px solid var(--line); min-height: 58px; }
+.skin-candy .brand-mark.small { width: 38px; height: 38px; border-radius: 50% 45% 55% 48%; background: linear-gradient(135deg, #F88DB5 15%, #FFD36E 55%, #8EDFCC); box-shadow: 0 5px 12px rgba(216,91,145,.25); transform: rotate(-8deg); }
+.skin-candy .brand-mark.small::before { background: #FFFFFF; width: 9px; height: 9px; left: 9px; top: 9px; box-shadow: 14px 8px 0 #FFFFFF; opacity: .85; }
+.skin-candy .win-title { color: #A83D70; font-weight: 900; }
+.skin-candy .avatar-btn, .skin-candy #btnTheme { border: 2px solid #FFFFFF; box-shadow: 0 5px 14px rgba(184,83,126,.15); }
+.skin-candy .navbar { background: #FFFFFFB8; border-radius: 18px; margin: 10px 12px 0; padding: 7px; border: 1px solid #FFFFFF; }
+.skin-candy .nav-btns, .skin-candy .address, .skin-candy .search { border: 2px solid var(--line); border-radius: 18px; background: var(--surface); }
+.skin-candy .nb, .skin-candy .cmd, .skin-candy .seg button { border-radius: 14px; }
+.skin-candy .cmdbar { margin: 10px 12px; border: 2px solid #FFFFFF; border-radius: 22px; background: #FFFFFFA8; box-shadow: var(--shadow); }
+.skin-candy .cmd-primary { border-radius: 16px; background: linear-gradient(135deg, #D85B91, #F18B9F); box-shadow: 0 7px 15px rgba(216,91,145,.22); }
+.skin-candy .win-body { gap: 14px; padding: 0 12px 12px; }
+.skin-candy .navpane, .skin-candy .pane, .skin-candy .details { border: 2px solid #FFFFFF; border-radius: 24px; box-shadow: var(--shadow); }
+.skin-candy .navpane { background: #FFF5F8; }
+.skin-candy .nav a, .skin-candy .drv-row, .skin-candy .tree .row { border-radius: 15px; }
+.skin-candy .nav a.active { background: linear-gradient(135deg, #D85B91, #F18B9F); color: #FFFFFF; }
+.skin-candy .content { padding: 14px 16px 24px; }
+.skin-candy .items.grid { grid-template-columns: repeat(auto-fill, minmax(142px, 1fr)); gap: 15px; }
+.skin-candy .it { padding: 9px; border: 2px solid transparent; border-radius: 24px; background: #FFFFFFA8; }
+.skin-candy .it:hover { background: #FFF0F5; border-color: #F6C7D8; transform: translateY(-2px); }
+.skin-candy .it.selected { background: #FADCE9; border-color: var(--accent); box-shadow: 0 8px 18px rgba(216,91,145,.17); }
+.skin-candy .items.grid .it .ic { width: 100%; height: 102px; border-radius: 29px 18px 29px 18px; background: linear-gradient(145deg, color-mix(in srgb, var(--kind, var(--accent)) 24%, #FFFFFF), #FFF7FA); border: 2px solid #FFFFFF; }
+.skin-candy .items.grid .it .ic::after { content: "✦"; position: absolute; right: 12px; top: 8px; color: #F2A0BC; font-size: 18px; }
+.skin-candy .items.grid .it .ic svg.big { width: 62px; height: 62px; filter: drop-shadow(0 6px 6px rgba(168,61,112,.14)); }
+.skin-candy .items.grid .it .nm { font-weight: 800; color: #5A3A4B; }
+.skin-candy .drv-card { border: 2px solid #FFFFFF; border-radius: 25px; background: #FFF4F7; box-shadow: var(--shadow); }
+.skin-candy .drv-card:hover { background: #FADCE9; }
+.skin-candy .statusbar { background: #FFF0F5; border-top: 2px solid #FFFFFF; }
+.skin-candy .menu, .skin-candy .dlg { border: 2px solid #FFFFFF; border-radius: 24px; box-shadow: 0 18px 45px rgba(137,70,105,.2); }
+.skin-candy .fab { border-radius: 50%; background: linear-gradient(135deg, #D85B91, #F18B9F); }
+
+/* preview pemilih model */
+.skin-prev.candy { background: linear-gradient(135deg, #FFD3E2, #DDF7EE); }
+.skin-prev.candy i.c1, .skin-prev.candy i.c2, .skin-prev.candy i.c3, .skin-prev.candy i.c4 { width: 38px; height: 30px; border-radius: 13px 8px 13px 8px; box-shadow: 0 3px 5px #B96E8A44; }
+.skin-prev.candy i.c1 { left: 16px; top: 22px; background: #F38EAF; }
+.skin-prev.candy i.c2 { left: 61px; top: 22px; background: #FFD36E; }
+.skin-prev.candy i.c3 { left: 106px; top: 22px; background: #8EDFCC; }
+.skin-prev.candy i.c4 { left: 38px; top: 62px; background: #A995E8; }
+.skin-prev.candy i.cb { left: 150px; top: 64px; width: 28px; height: 28px; border-radius: 50%; background: #D85B91; }
+
+/* =====================================================================
    VENA DI DALAM JENDELA / PANEL (mode tertanam)
    ===================================================================== */
 .pane-drives { display: none; }

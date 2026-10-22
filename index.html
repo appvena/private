@@ -19,11 +19,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.0.5">
+  <link rel="stylesheet" href="style.css?v=3.0.7">
   <script>(function () { var c = document.documentElement.classList, e = new URLSearchParams(location.search).get('embed');
     if (e) { c.add('embed'); c.add('embed-' + e); }
     try { var s = localStorage.getItem('vena.skin'); if (!e && (s === 'desktop' || s === 'commander')) c.add('skin-' + s); } catch (x) {} })();</script>
-  <script src="config.js?v=3.0.5"></script>
+  <script src="config.js?v=3.0.7"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
@@ -517,6 +517,10 @@
         <span class="skin-prev commander"><i class="p1"></i><i class="p2"></i><i class="fb"></i></span>
         <strong>Dua panel</strong><small>Dua folder berdampingan, salin/pindah dengan F5/F6</small>
       </button>
+      <button type="button" class="skin-opt" data-skin="candy">
+        <span class="skin-prev candy"><i class="c1"></i><i class="c2"></i><i class="c3"></i><i class="c4"></i><i class="cb"></i></span>
+        <strong>Candy</strong><small>Kartu warna pastel, ikon permen, sudut lembut, dan navigasi yang ringan</small>
+      </button>
     </div>
     <div class="dlg-actions"><button value="ok" class="btn btn-primary">Selesai</button></div>
   </form>
@@ -567,6 +571,7 @@
       <button type="button" class="app-btn tg" data-action="send-tg"><svg class="i"><use href="#i-send"/></svg>Telegram</button>
       <button type="button" class="app-btn mail" data-action="send-mail"><svg class="i"><use href="#i-mail"/></svg>Email</button>
       <button type="button" class="app-btn more" data-action="send-native" id="shareNative" hidden><svg class="i"><use href="#i-share-ios"/></svg>Lainnya</button>
+      <button type="button" class="app-btn more" data-action="send-file-native" id="shareFileNative" hidden><svg class="i"><use href="#i-share-ios"/></svg>Kirim file</button>
     </div>
     <div class="dlg-actions">
       <button value="ok" class="btn btn-ghost">Selesai</button>
@@ -613,7 +618,7 @@
 
 <div id="toasts" class="toasts" aria-live="polite"></div>
 
-<input type="file" id="pickFiles" multiple hidden>
+  <input type="file" id="pickFiles" multiple hidden>
 <input type="file" id="pickFolder" webkitdirectory multiple hidden>
 
 <!-- ============ IKON ============ -->
@@ -715,6 +720,6 @@
   </defs>
 </svg>
 
-<script src="app.js?v=3.0.5"></script>
+<script src="app.js?v=3.0.7"></script>
 </body>
 </html>

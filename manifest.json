@@ -4,6 +4,18 @@
   "description": "Simpan, atur, putar, dan bagikan file dari Google Drive. © 2026 SRISP",
   "start_url": "./",
   "scope": "./",
+  "share_target": {
+    "action": "./share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "files": [
+        { "name": "files", "accept": ["*/*"] }
+      ]
+    }
+  },
   "display": "standalone",
   "background_color": "#F2F4F1",
   "theme_color": "#0E6B63",
@@ -40,5 +52,5 @@
     "productivity",
     "utilities"
   ],
-  "version": "3.0.5"
+  "version": "3.0.7"
 }

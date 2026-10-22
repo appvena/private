@@ -7,7 +7,7 @@
 'use strict';
 
 /* ---------------------------------------------------------------- versi */
-const APP_VERSION = '3.0.5';
+const APP_VERSION = '3.0.7';
 const APP_BUILD = '18 Oktober 2026';
 
 /* ---------------------------------------------------------------- konfigurasi */
@@ -115,16 +115,14 @@ function applyTheme() {
   const t = LS.get('vena.theme');
   if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
   const dark = t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-  const next = t === 'dark' ? 'candy' : t === 'candy' ? 'light' : 'dark';
-  const nextLabel = next === 'candy' ? 'Tema Candy' : next === 'dark' ? 'Tema gelap' : 'Tema terang';
   $('#btnTheme use').setAttribute('href', dark ? '#i-sun' : '#i-moon');
-  $('#btnTheme').setAttribute('aria-label', `Pakai ${nextLabel.toLowerCase()}`);
+  $('#btnTheme').setAttribute('aria-label', dark ? 'Pakai tema terang' : 'Pakai tema gelap');
   $('#menuTheme use').setAttribute('href', dark ? '#i-sun' : '#i-moon');
-  $('#menuThemeText').textContent = `Pakai ${nextLabel.toLowerCase()}`;
+  $('#menuThemeText').textContent = dark ? 'Pakai tema terang' : 'Pakai tema gelap';
 }
 function toggleTheme() {
   const current = LS.get('vena.theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-  LS.set('vena.theme', current === 'light' ? 'dark' : current === 'dark' ? 'candy' : 'light');
+  LS.set('vena.theme', current === 'dark' ? 'light' : 'dark');
   applyTheme();
 }
 
@@ -196,7 +194,11 @@ async function server(action, data = {}) {
   let j;
   try { j = await res.json(); }
   catch { throw new Error('Balasan server Vena tidak valid. Pastikan Apps Script di-deploy sebagai Web app dengan akses "Anyone".'); }
-  if (j.error) { const e = new Error(j.message || j.error); e.code = j.error; throw e; }
+  if (j.error) {
+    const stale = action === 'change-password' && j.error === 'BAD_REQUEST' && /tidak dikenal/i.test(j.message || '');
+    const e = new Error(stale ? 'Backend belum diperbarui. Deploy server/Code.gs versi 3.0.7 ke Web App yang sama, lalu coba lagi.' : (j.message || j.error));
+    e.code = j.error; throw e;
+  }
   return j;
 }
 
@@ -318,6 +320,7 @@ async function afterLogin() {
   installBackGuard();
   await ensureRoot();
   try { await loadDrives(); } catch (e) { S.drives = [{ id: S.rootId, root: true, letter: 'C', label: 'Data', color: '', limit: 0 }]; }
+  await consumeSharedFiles();
   enterSkin();
   refreshAppUsage();
   onRoute();
@@ -1825,6 +1828,8 @@ function updateShareUI(on) {
   $('#shareLinkRow').hidden = !on;
   $('#shareApps').hidden = !on;
   $('#shareNative').hidden = !navigator.share;
+  const canFileShare = !!navigator.share && !!navigator.canShare;
+  $('#shareFileNative').hidden = !on || !canFileShare || !shareItem || isFolder(shareItem);
   $('#shareExpiryRow').hidden = !on;
 }
 function expiryFromSelect() {
@@ -1905,6 +1910,16 @@ function sendVia(app, f, link, win) {
 async function sendNative(f, link) {
   try { await navigator.share({ title: f.name, text: shareMessage(f, ''), url: link }); }
   catch (e) { if (e.name !== 'AbortError') copyLink(); }
+}
+async function sendFileNative(f) {
+  if (!f || isFolder(f) || !navigator.share) return;
+  try {
+    const res = await api('/files/' + f.id, { query: { alt: 'media', acknowledgeAbuse: 'false' }, raw: true });
+    const blob = await res.blob();
+    const file = new File([blob], f.name, { type: f.mimeType || blob.type || 'application/octet-stream', lastModified: Date.now() });
+    if (!navigator.canShare || !navigator.canShare({ files: [file] })) { toast('Browser ini belum mendukung berbagi file langsung.'); return; }
+    await navigator.share({ files: [file], title: f.name, text: `Dibagikan dari Vena: ${f.name}` });
+  } catch (e) { if (e.name !== 'AbortError') fail(e, 'Gagal membagikan file'); }
 }
 // dari menu: aktifkan link (kalau belum) lalu langsung buka WhatsApp
 async function quickSendWa(f) {
@@ -2280,14 +2295,14 @@ function reportRoute() {
 }
 
 /* ================================================================ MODEL TAMPILAN */
-const SKINS = ['classic', 'desktop', 'commander'];
+const SKINS = ['classic', 'desktop', 'commander', 'candy'];
 const getSkin = () => { const s = LS.get('vena.skin'); return SKINS.includes(s) ? s : 'classic'; };
-const isMultiSkin = () => !EMBED && getSkin() !== 'classic';
+const isMultiSkin = () => !EMBED && ['desktop', 'commander'].includes(getSkin());
 function applySkin(sk) {
   const c = document.documentElement.classList;
-  c.remove('skin-modern', 'skin-desktop', 'skin-commander');
+  c.remove('skin-modern', 'skin-desktop', 'skin-commander', 'skin-candy');
   if (!EMBED && sk !== 'classic') c.add('skin-' + sk);
-  const v = $('#skinVal'); if (v) v.textContent = { classic: 'Klasik', desktop: 'Desktop', commander: 'Dua panel' }[sk];
+  const v = $('#skinVal'); if (v) v.textContent = { classic: 'Klasik', desktop: 'Desktop', commander: 'Dua panel', candy: 'Candy' }[sk];
   for (const b of $$('.skin-opt')) b.setAttribute('aria-pressed', String(b.dataset.skin === sk));
 }
 function setSkin(sk) {
@@ -2301,7 +2316,8 @@ function enterSkin() {
   const sk = getSkin();
   if (EMBED || sk === 'classic') { leaveMulti(); show('screenApp'); return; }
   if (sk === 'desktop') { leaveCommander(); show('screenDesktop'); enterDesktop(); }
-  else { leaveDesktop(); show('screenCmd'); enterCommander(); }
+  else if (sk === 'commander') { leaveDesktop(); show('screenCmd'); enterCommander(); }
+  else { leaveMulti(); show('screenApp'); }
 }
 function leaveMulti() { leaveDesktop(); leaveCommander(); }
 const embedSrc = (mode, hash) => `./?embed=${mode}${hash && hash !== '#/' ? hash : '#/'}`;
@@ -3443,6 +3459,37 @@ function startUpload(fileList) {
   }), base);
 }
 
+function openShareInbox() {
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open('vena-share-target', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('inbox', { keyPath: 'id', autoIncrement: true });
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+async function consumeSharedFiles() {
+  if (!location.search.includes('shared=1')) return;
+  try {
+    const db = await openShareInbox();
+    const rows = await new Promise((resolve, reject) => {
+      const tx = db.transaction('inbox', 'readwrite'), store = tx.objectStore('inbox'), out = [];
+      const req = store.openCursor();
+      req.onsuccess = () => { const c = req.result; if (!c) return; out.push(c.value); store.delete(c.key); c.continue(); };
+      req.onerror = () => reject(req.error); tx.oncomplete = () => resolve(out); tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+    history.replaceState(null, '', location.pathname + (location.hash || '#/'));
+    const files = rows.flatMap(row => (row.files || []).map((blob, i) => {
+      const name = blob.name || `WhatsApp-${Date.now()}-${i + 1}`;
+      return new File([blob], name, { type: blob.type || 'application/octet-stream', lastModified: Date.now() });
+    }));
+    if (files.length) {
+      await addUploads(files.map(file => ({ file, dir: [] })), S.uploadTarget || curFolderId());
+      toast(files.length === 1 ? 'File dari WhatsApp masuk ke antrean upload.' : `${files.length} file dari WhatsApp masuk ke antrean upload.`);
+    }
+  } catch (e) { console.warn('Share Target:', e); }
+}
+
 async function entriesFromDrop(dt) {
   const items = dt.items ? [...dt.items] : [];
   const entries = items.map(i => (i.kind === 'file' && i.webkitGetAsEntry) ? i.webkitGetAsEntry() : null).filter(Boolean);
@@ -3678,6 +3725,7 @@ function bind() {
         case 'send-tg': if (shareItem) sendVia('tg', shareItem, $('#shareLink').value); return;
         case 'send-mail': if (shareItem) sendVia('mail', shareItem, $('#shareLink').value); return;
         case 'send-native': if (shareItem) sendNative(shareItem, $('#shareLink').value); return;
+        case 'send-file-native': if (shareItem) sendFileNative(shareItem); return;
         case 'move-newfolder': {
           const f = await newFolder(MV.at);
           if (f) { MV.at = f.id; loadMoveList(); }
