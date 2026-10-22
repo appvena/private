@@ -1568,3 +1568,15 @@ html.skin-candy[data-theme="dark"] .items.grid .it,html.skin-candy[data-theme="d
 html.skin-candy[data-theme="dark"] .items.grid .it .ic,html.skin-candy[data-theme="dark"] .items.grid .it:nth-child(3n+1) .ic,html.skin-candy[data-theme="dark"] .items.grid .it:nth-child(3n+2) .ic,html.skin-candy[data-theme="dark"] .items.grid .it:nth-child(3n) .ic{background:#3a3a3c}
 html.skin-candy[data-theme="dark"] .items.grid .it .nm,html.skin-candy[data-theme="dark"] .nav a{color:#f2f2f7}
 @media(max-width:900px){html.skin-candy .desk{padding:0}html.skin-candy .win{border-radius:0}html.skin-candy .win-body{grid-template-columns:minmax(0,1fr);padding:0 10px 10px}html.skin-candy .navpane{border-radius:0 16px 16px 0}html.skin-candy .items.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}}
+
+/* Video player fix: area media mengambil ruang di antara header dan footer,
+   rasio asli dipertahankan sehingga video portrait tidak terpotong. */
+.vstage{overflow:hidden}
+.vs-body{flex:1 1 auto;min-height:0;overflow:hidden}
+.vs-main{min-width:0;min-height:0;overflow:hidden;padding:8px 12px}
+.vs-main video{display:block;place-self:center;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;background:#000;border-radius:10px}
+.vstage .vs-ctrls{flex:0 0 auto;min-height:58px;z-index:4;background:rgba(10,15,14,.96);position:relative}
+.video-overlay-controls{position:absolute;right:22px;bottom:22px;z-index:6;display:flex;align-items:center;padding:8px 11px;border-radius:999px;background:rgba(15,20,25,.78);border:1px solid rgba(255,255,255,.25);backdrop-filter:blur(12px);box-shadow:0 5px 18px rgba(0,0,0,.35)}
+.video-overlay-controls .volume-control{color:#fff}.video-overlay-controls .volume-control input{width:100px;accent-color:#8fe0d5}
+.vs-msg{z-index:7;bottom:18px}
+@media(max-width:700px){.vs-body{display:block;position:relative}.vs-main{height:100%;padding:4px}.vs-list{position:absolute;inset:0 0 0 auto;width:min(86vw,320px);z-index:8;background:#111}.video-overlay-controls{right:12px;bottom:12px}.vstage .vs-ctrls{min-height:54px;padding:6px;gap:5px}}

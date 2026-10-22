@@ -7,7 +7,7 @@
 'use strict';
 
 /* ---------------------------------------------------------------- versi */
-const APP_VERSION = '3.2.0';
+const APP_VERSION = '3.2.1';
 const APP_BUILD = '18 Oktober 2026';
 
 /* ---------------------------------------------------------------- konfigurasi */
@@ -196,7 +196,7 @@ async function server(action, data = {}) {
   catch { throw new Error('Balasan server Vena tidak valid. Pastikan Apps Script di-deploy sebagai Web app dengan akses "Anyone".'); }
   if (j.error) {
     const stale = action === 'change-password' && j.error === 'BAD_REQUEST' && /tidak dikenal/i.test(j.message || '');
-    const e = new Error(stale ? 'Backend belum diperbarui. Deploy server/Code.gs versi 3.2.0 ke Web App yang sama, lalu coba lagi.' : (j.message || j.error));
+    const e = new Error(stale ? 'Backend belum diperbarui. Deploy server/Code.gs versi 3.2.1 ke Web App yang sama, lalu coba lagi.' : (j.message || j.error));
     e.code = j.error; throw e;
   }
   return j;
@@ -2756,7 +2756,7 @@ function shuffleOrder(keepIdx) {
   P.order = [keepIdx, ...rest]; P.pos = 0;
 }
 function cleanupBlob() { if (P.blobUrl) { URL.revokeObjectURL(P.blobUrl); P.blobUrl = null; } }
-const streamUrl = (f, token) => `${API}/files/${encodeURIComponent(f.id)}?alt=media&access_token=${encodeURIComponent(token)}`;
+const streamUrl = (f, token) => `${API}/files/${encodeURIComponent(f.id)}?alt=media&acknowledgeAbuse=false&supportsAllDrives=true&access_token=${encodeURIComponent(token)}`;
 
 async function loadTrack(resumeAt = 0) {
   const f = curTrack(); if (!f) return;
@@ -2774,8 +2774,9 @@ async function loadTrack(resumeAt = 0) {
     try {
       const token = await getToken();
       el.src = streamUrl(f, token);
+      el.load();
       P.streamOk = true;
-      if (resumeAt) el.currentTime = resumeAt;
+      if (resumeAt) el.addEventListener('loadedmetadata', () => { el.currentTime = resumeAt; }, { once: true });
       el.play().catch(() => {});
       renderNowPlaying();
       return;
@@ -2821,10 +2822,10 @@ async function onMediaError(e) {
   if (e && e.target !== el) return;          // elemen lain yang baru dihentikan
   if (!el.getAttribute('src')) return;
   if (P.usingBlob) { mediaError('Format file ini tidak didukung browser.'); return; }
-  if (P.streamOk && P.triedRefresh < 2) {          // token habis di tengah lagu → sambung lagi
+  if (P.streamOk && P.triedRefresh < 2) {          // token habis di tengah media → sambung lagi
     P.triedRefresh++;
     const at = el.currentTime;
-    try { const t = await getToken(true); el.src = streamUrl(curTrack(), t); el.currentTime = at; el.play().catch(() => {}); return; } catch {}
+      try { const t = await getToken(true); el.src = streamUrl(curTrack(), t); el.load(); el.addEventListener('loadedmetadata', () => { el.currentTime = at; }, { once: true }); el.play().catch(() => {}); return; } catch {}
   }
   fallbackToBlob();
 }
