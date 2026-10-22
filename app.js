@@ -7,7 +7,7 @@
 'use strict';
 
 /* ---------------------------------------------------------------- versi */
-const APP_VERSION = '3.1.2';
+const APP_VERSION = '3.1.4';
 const APP_BUILD = '18 Oktober 2026';
 
 /* ---------------------------------------------------------------- konfigurasi */
@@ -196,7 +196,7 @@ async function server(action, data = {}) {
   catch { throw new Error('Balasan server Vena tidak valid. Pastikan Apps Script di-deploy sebagai Web app dengan akses "Anyone".'); }
   if (j.error) {
     const stale = action === 'change-password' && j.error === 'BAD_REQUEST' && /tidak dikenal/i.test(j.message || '');
-    const e = new Error(stale ? 'Backend belum diperbarui. Deploy server/Code.gs versi 3.1.2 ke Web App yang sama, lalu coba lagi.' : (j.message || j.error));
+    const e = new Error(stale ? 'Backend belum diperbarui. Deploy server/Code.gs versi 3.1.4 ke Web App yang sama, lalu coba lagi.' : (j.message || j.error));
     e.code = j.error; throw e;
   }
   return j;
@@ -3586,6 +3586,24 @@ async function entriesFromDrop(dt) {
 }
 
 let resetStep = 0;
+let versionClicks = 0, versionClickTimer;
+async function openRecoveryPassword() {
+  try {
+    const r = await server('recovery-question');
+    $('#recoveryQuestion').textContent = r.question;
+    $('#recoveryAnswer').value = ''; $('#recoveryNewPassword').value = ''; $('#recoveryError').textContent = '';
+    $('#dlgRecovery').showModal(); setTimeout(() => $('#recoveryAnswer').focus(), 30);
+  } catch (e) { toast(e.message, { error: true }); }
+}
+async function submitRecoveryPassword(e) {
+  e.preventDefault(); const err = $('#recoveryError'), btn = e.submitter || e.target.querySelector('button[value="ok"]');
+  err.textContent = ''; btn.disabled = true;
+  try { await server('recovery-reset', { answer: $('#recoveryAnswer').value, newPassword: $('#recoveryNewPassword').value }); $('#dlgRecovery').close(); toast('Password berhasil diubah. Silakan masuk dengan password baru.'); }
+  catch (x) { err.textContent = x.message; } finally { btn.disabled = false; }
+}
+function bindVersionRecovery() {
+  for (const el of $$('[data-version]')) el.addEventListener('click', () => { versionClicks++; clearTimeout(versionClickTimer); versionClickTimer = setTimeout(() => { versionClicks = 0; }, 1800); if (versionClicks >= 5) { versionClicks = 0; openRecoveryPassword(); } });
+}
 function openForgotPassword() { resetStep = 0; $('#forgotPasswordForm').reset(); $('#resetCodeWrap').hidden = true; $('#resetError').textContent = ''; $('#resetSubmit').textContent = 'Kirim kode'; $('#dlgForgotPassword').showModal(); setTimeout(() => $('#resetEmail').focus(), 30); }
 async function submitForgotPassword(e) { e.preventDefault(); const err = $('#resetError'), btn = $('#resetSubmit'); err.textContent = ''; btn.disabled = true; try { if (!resetStep) { await server('request-reset', { email: $('#resetEmail').value }); resetStep = 1; $('#resetCodeWrap').hidden = false; $('#resetSubmit').textContent = 'Ganti password'; err.textContent = 'Jika email terdaftar, kode verifikasi sudah dikirim. Kode berlaku 15 menit.'; } else { await server('reset-password', { email: $('#resetEmail').value, code: $('#resetCode').value, newPassword: $('#resetNewPassword').value }); $('#dlgForgotPassword').close(); toast('Password berhasil diubah. Silakan masuk dengan password baru.'); } } catch (x) { err.textContent = x.message; } finally { btn.disabled = false; } }
 async function refreshBackendStatus() { try { const x = await server('backend-status'); $('#backendStatus').textContent = `Backend: aktif • ${x.version}`; } catch (e) { const el = $('#backendStatus'); if (el) el.textContent = 'Backend: tidak terhubung'; } }
@@ -3665,6 +3683,8 @@ function bind() {
   $('#btnResetSetup').onclick = () => { LS.del('vena.clientId'); LS.del('vena.session'); location.reload(); };
   $('#btnLogin').onclick = () => signIn(LS.get('vena.lastEmail') ? '' : 'select_account');
   $('#pwForm').onsubmit = passwordLogin;
+  $('#recoveryForm').onsubmit = submitRecoveryPassword;
+  bindVersionRecovery();
   $('#forgotPasswordForm').onsubmit = submitForgotPassword;
   $('#passwordForm').onsubmit = changePassword;
   $('#deletePasswordForm').onsubmit = verifyDeletePassword;
@@ -3757,6 +3777,7 @@ function bind() {
         case 'change-password': openChangePassword(); return;
         case 'forgot-password': openForgotPassword(); return;
         case 'close-forgot-password': $('#dlgForgotPassword').close(); return;
+        case 'close-recovery': $('#dlgRecovery').close(); return;
         case 'show-devices': showDevices(); return;
         case 'show-activity': showActivity(); return;
         case 'update-pwa': if (window.venaWaitingWorker) { window.venaWaitingWorker.postMessage({ type: 'SKIP_WAITING' }); window.location.reload(); } return;
