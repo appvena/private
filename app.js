@@ -7,7 +7,7 @@
 'use strict';
 
 /* ---------------------------------------------------------------- versi */
-const APP_VERSION = '3.1.7';
+const APP_VERSION = '3.1.9';
 const APP_BUILD = '18 Oktober 2026';
 
 /* ---------------------------------------------------------------- konfigurasi */
@@ -196,7 +196,7 @@ async function server(action, data = {}) {
   catch { throw new Error('Balasan server Vena tidak valid. Pastikan Apps Script di-deploy sebagai Web app dengan akses "Anyone".'); }
   if (j.error) {
     const stale = action === 'change-password' && j.error === 'BAD_REQUEST' && /tidak dikenal/i.test(j.message || '');
-    const e = new Error(stale ? 'Backend belum diperbarui. Deploy server/Code.gs versi 3.1.7 ke Web App yang sama, lalu coba lagi.' : (j.message || j.error));
+    const e = new Error(stale ? 'Backend belum diperbarui. Deploy server/Code.gs versi 3.1.9 ke Web App yang sama, lalu coba lagi.' : (j.message || j.error));
     e.code = j.error; throw e;
   }
   return j;
@@ -3519,7 +3519,10 @@ function renderUploads() {
 async function startUpload(fileList) {
   const files = [...fileList];
   if (!files.length) return;
-  const base = S.uploadTarget || await ensureSpecialFolder('device');
+  // Upload dari tombol/pemilih file HP atau PC selalu masuk Perangkat.
+  // S.uploadTarget hanya dipakai untuk upload khusus dari Commander.
+  const customTarget = S.uploadTarget && S.uploadTarget !== (S.specialFolders && S.specialFolders.whatsapp) ? S.uploadTarget : null;
+  const base = customTarget || await ensureSpecialFolder('device');
   S.uploadTarget = null;
   addUploads(files.map(f => {
     const rel = f.webkitRelativePath || '';
@@ -3556,8 +3559,9 @@ async function consumeSharedFiles() {
       // Saat aplikasi dibuka langsung dari WhatsApp, onRoute belum sempat
       // berjalan sehingga S.route.id masih null. Gunakan root Vena (C:),
       // bukan root Google Drive, sebagai tujuan aman.
-      const activeFolder = S.route.type === 'folder' && S.route.id ? S.route.id : await ensureSpecialFolder('whatsapp');
-      await addUploads(files.map(file => ({ file, dir: [] })), S.uploadTarget || activeFolder || S.rootId);
+      // Hanya file yang masuk lewat Share Target (mis. WhatsApp) yang masuk WhatsApp.
+      const whatsappFolder = await ensureSpecialFolder('whatsapp');
+      await addUploads(files.map(file => ({ file, dir: [] })), whatsappFolder);
       toast(files.length === 1 ? 'File dari WhatsApp masuk ke antrean upload.' : `${files.length} file dari WhatsApp masuk ke antrean upload.`);
     }
   } catch (e) { console.warn('Share Target:', e); }
