@@ -14,7 +14,7 @@
 //  - Hanya kalau benar-benar tidak ada internet, tampilkan halaman kecil
 //    "Tidak ada koneksi" yang dibuat langsung di sini (bukan dari cache).
 // =====================================================================
-const VERSION = 'vena-3.0.7';
+const VERSION = 'vena-3.1.1';
 const SHARE_DB = 'vena-share-target';
 
 function openShareDb() {
@@ -39,7 +39,8 @@ async function saveShareRequest(request) {
   db.close();
 }
 
-self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('install', () => {});
+self.addEventListener('message', e => { if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting(); });
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
 const OFFLINE_HTML = `<!doctype html><html lang="id"><head><meta charset="utf-8">

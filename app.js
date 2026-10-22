@@ -7,7 +7,7 @@
 'use strict';
 
 /* ---------------------------------------------------------------- versi */
-const APP_VERSION = '3.0.8';
+const APP_VERSION = '3.1.1';
 const APP_BUILD = '18 Oktober 2026';
 
 /* ---------------------------------------------------------------- konfigurasi */
@@ -196,7 +196,7 @@ async function server(action, data = {}) {
   catch { throw new Error('Balasan server Vena tidak valid. Pastikan Apps Script di-deploy sebagai Web app dengan akses "Anyone".'); }
   if (j.error) {
     const stale = action === 'change-password' && j.error === 'BAD_REQUEST' && /tidak dikenal/i.test(j.message || '');
-    const e = new Error(stale ? 'Backend belum diperbarui. Deploy server/Code.gs versi 3.0.8 ke Web App yang sama, lalu coba lagi.' : (j.message || j.error));
+    const e = new Error(stale ? 'Backend belum diperbarui. Deploy server/Code.gs versi 3.1.1 ke Web App yang sama, lalu coba lagi.' : (j.message || j.error));
     e.code = j.error; throw e;
   }
   return j;
@@ -319,6 +319,8 @@ async function afterLogin() {
   show('screenApp');
   installBackGuard();
   await ensureRoot();
+  registerCurrentDevice(); refreshBackendStatus();
+  try { await ensureSpecialFolders(); } catch (e) { console.warn('Folder sistem:', e); }
   try { await loadDrives(); } catch (e) { S.drives = [{ id: S.rootId, root: true, letter: 'C', label: 'Data', color: '', limit: 0 }]; }
   await consumeSharedFiles();
   enterSkin();
@@ -373,12 +375,14 @@ async function api(path, { method = 'GET', query, body, raw = false, signal, _re
     if (res.status === 403 && /storage quota/i.test(msg)) msg = 'Ruang Google Drive sudah penuh.';
     const err = new Error(msg); err.status = res.status; throw err;
   }
-  if (method !== 'GET') notifySync();
+  if (method !== 'GET') { notifySync(); recordLocalActivity(method + ' ' + path); }
   if (raw) return res;
   if (res.status === 204) return null;
   const txt = await res.text();
   return txt ? JSON.parse(txt) : null;
 }
+
+function recordLocalActivity(detail) { try { const a = JSON.parse(LS.get('vena.activity') || '[]'); a.unshift({ type: 'file', detail, at: Date.now() }); LS.set('vena.activity', JSON.stringify(a.slice(0, 100))); } catch {} }
 
 async function listAll(q, { orderBy, max = 2000 } = {}) {
   const out = [];
@@ -413,6 +417,23 @@ async function ensureRoot() {
   S.rootId = id;
   LS.set(key, id);
 }
+
+const SPECIAL_FOLDERS = { whatsapp: 'WhatsApp', device: 'Perangkat' };
+function isProtectedFolder(f) { return !!(f && f.appProperties && f.appProperties.venaProtected); }
+async function ensureSpecialFolder(kind) {
+  const name = SPECIAL_FOLDERS[kind];
+  if (!name || !S.rootId) return S.rootId;
+  S.specialFolders = S.specialFolders || {};
+  if (S.specialFolders[kind]) return S.specialFolders[kind];
+  const q = `name='${qstr(name)}' and '${qstr(S.rootId)}' in parents and mimeType='${FOLDER}' and trashed=false`;
+  const ex = await api('/files', { query: { q, fields: 'files(id,name,parents,appProperties)', pageSize: 1, spaces: 'drive' } });
+  let f = ex.files && ex.files[0];
+  if (!f) f = await api('/files', { method: 'POST', query: { fields: 'id,name,parents,appProperties' }, body: { name, mimeType: FOLDER, parents: [S.rootId], appProperties: { venaProtected: kind } } });
+  else if (!f.appProperties || !f.appProperties.venaProtected) f = await api('/files/' + f.id, { method: 'PATCH', query: { fields: 'id,name,parents,appProperties' }, body: { appProperties: Object.assign({}, f.appProperties || {}, { venaProtected: kind }) } });
+  S.specialFolders[kind] = f.id; S.meta.set(f.id, { name: f.name, parents: f.parents });
+  return f.id;
+}
+async function ensureSpecialFolders() { await Promise.all([ensureSpecialFolder('whatsapp'), ensureSpecialFolder('device')]); }
 
 async function refreshQuota() {
   try {
@@ -794,6 +815,7 @@ async function saveDrive() {
 async function deleteDrive(d) {
   if (d.root) { toast('Drive C: adalah drive utama dan tidak bisa dihapus.', { error: true }); return; }
   const fs = folderSize(d.id);
+  if ((await filledFolders([d])).length && !(await confirmDeleteFolderPassword())) return;
   const ok = await confirmDialog(`Hapus drive ${driveName(d)}?`,
     (fs.files ? `Berisi ${fs.files.toLocaleString('id-ID')} file (${fmtSize(fs.bytes)}). ` : 'Drive ini kosong. ') +
     'Drive beserta isinya dipindahkan ke Sampah dan masih bisa dipulihkan selama 30 hari.', 'Hapus drive');
@@ -1468,6 +1490,7 @@ function confirmDialog(title, text, okLabel) {
     d.returnValue = '';
     d.onclose = () => resolve(d.returnValue === 'ok');
     d.showModal();
+    setTimeout(() => $('#confirmOk').focus(), 0);
   });
 }
 
@@ -1520,10 +1543,13 @@ async function runAll(list, fn, conc = 4) {
 
 async function trashItems(list) {
   if (!list.length) return;
+  if (list.some(isProtectedFolder)) { toast('Folder WhatsApp dan Perangkat dilindungi dan tidak dapat dihapus.', { error: true }); return; }
   const nF = list.filter(isFolder).length;
+  const filled = await filledFolders(list.filter(isFolder));
+  if (filled.length && !(await confirmDeleteFolderPassword())) return;
   const ok = await confirmDialog(
     list.length === 1 ? `Hapus “${list[0].name}”?` : `Hapus ${list.length} item?`,
-    (nF ? 'Folder ikut dihapus beserta isinya. ' : '') + 'Item dipindahkan ke Sampah dan masih bisa dipulihkan selama 30 hari.', 'Hapus');
+    (nF ? 'Folder ikut dihapus beserta isinya. ' : '') + (filled.length ? 'Password sudah dikonfirmasi. ' : '') + 'Item dipindahkan ke Sampah dan masih bisa dipulihkan selama 30 hari.', 'Hapus');
   if (!ok) return;
   try {
     const res = await runAll(list, f => api('/files/' + f.id, { method: 'PATCH', query: { fields: 'id' }, body: { trashed: true } }));
@@ -1540,6 +1566,46 @@ async function trashItems(list) {
   } catch (e) { fail(e, 'Gagal menghapus'); }
 }
 
+async function filledFolders(folders) {
+  const out = [];
+  for (const f of folders) {
+    if (folderSize(f.id).files > 0) { out.push(f); continue; }
+    try {
+      const kids = await listAll(`'${qstr(f.id)}' in parents and trashed=false`, { max: 1 });
+      if (kids.length) out.push(f);
+    } catch (e) { if (e.auth) throw e; }
+  }
+  return out;
+}
+
+function confirmDeleteFolderPassword() {
+  if (!brokerMode()) {
+    toast('Konfirmasi password folder hanya tersedia pada mode password Vena.', { error: true });
+    return Promise.resolve(false);
+  }
+  return new Promise((resolve) => {
+    const d = $('#dlgDeletePassword'), form = $('#deletePasswordForm'), input = $('#deletePasswordInput');
+    $('#deletePasswordError').textContent = '';
+    form.reset(); d.returnValue = '';
+    d.onclose = () => resolve(d.returnValue === 'ok');
+    d.showModal(); setTimeout(() => input.focus(), 30);
+  });
+}
+
+async function verifyDeletePassword(e) {
+  e.preventDefault();
+  const input = $('#deletePasswordInput'), error = $('#deletePasswordError'), btn = $('#deletePasswordSubmit');
+  const password = input.value;
+  if (!password) { error.textContent = 'Masukkan password Vena.'; return; }
+  btn.disabled = true; btn.textContent = 'Memeriksa…'; error.textContent = '';
+  try {
+    await server('login', { password, remember: false });
+    $('#dlgDeletePassword').returnValue = 'ok';
+    $('#dlgDeletePassword').close();
+  } catch (err) { error.textContent = err.message || 'Password salah.'; input.select(); }
+  finally { btn.disabled = false; btn.textContent = 'Konfirmasi hapus'; }
+}
+
 async function restoreItems(list, quiet) {
   try {
     await runAll(list, f => api('/files/' + f.id, { method: 'PATCH', query: { fields: 'id' }, body: { trashed: false } }));
@@ -1554,6 +1620,8 @@ async function restoreItems(list, quiet) {
 
 async function deleteItems(list, skipConfirm) {
   if (!list.length) return;
+  if (list.some(isProtectedFolder)) { toast('Folder WhatsApp dan Perangkat dilindungi dan tidak dapat dihapus.', { error: true }); return; }
+  if ((await filledFolders(list.filter(isFolder))).length && !(await confirmDeleteFolderPassword())) return;
   if (!skipConfirm) {
     const ok = await confirmDialog(
       list.length === 1 ? `Hapus “${list[0].name}” selamanya?` : `Hapus ${list.length} item selamanya?`,
@@ -3209,6 +3277,7 @@ async function runUpload(t) {
   try {
     const parent = await ensureFolderPath(t.base, t.dir);
     await sendFile(t, parent);
+    recordLocalActivity('UPLOAD ' + t.file.name);
     t.status = 'done';
     landedIn(parent);
   } catch (e) {
@@ -3447,10 +3516,10 @@ function renderUploads() {
   renderUploadTitle();
 }
 
-function startUpload(fileList) {
+async function startUpload(fileList) {
   const files = [...fileList];
   if (!files.length) return;
-  const base = S.uploadTarget || curFolderId();
+  const base = S.uploadTarget || await ensureSpecialFolder('device');
   S.uploadTarget = null;
   addUploads(files.map(f => {
     const rel = f.webkitRelativePath || '';
@@ -3487,7 +3556,7 @@ async function consumeSharedFiles() {
       // Saat aplikasi dibuka langsung dari WhatsApp, onRoute belum sempat
       // berjalan sehingga S.route.id masih null. Gunakan root Vena (C:),
       // bukan root Google Drive, sebagai tujuan aman.
-      const activeFolder = S.route.type === 'folder' && S.route.id ? S.route.id : S.rootId;
+      const activeFolder = S.route.type === 'folder' && S.route.id ? S.route.id : await ensureSpecialFolder('whatsapp');
       await addUploads(files.map(file => ({ file, dir: [] })), S.uploadTarget || activeFolder || S.rootId);
       toast(files.length === 1 ? 'File dari WhatsApp masuk ke antrean upload.' : `${files.length} file dari WhatsApp masuk ke antrean upload.`);
     }
@@ -3515,6 +3584,14 @@ async function entriesFromDrop(dt) {
   for (const e of entries) await walk(e, []);
   return out;
 }
+
+let resetStep = 0;
+function openForgotPassword() { resetStep = 0; $('#forgotPasswordForm').reset(); $('#resetCodeWrap').hidden = true; $('#resetError').textContent = ''; $('#resetSubmit').textContent = 'Kirim kode'; $('#dlgForgotPassword').showModal(); setTimeout(() => $('#resetEmail').focus(), 30); }
+async function submitForgotPassword(e) { e.preventDefault(); const err = $('#resetError'), btn = $('#resetSubmit'); err.textContent = ''; btn.disabled = true; try { if (!resetStep) { await server('request-reset', { email: $('#resetEmail').value }); resetStep = 1; $('#resetCodeWrap').hidden = false; $('#resetSubmit').textContent = 'Ganti password'; err.textContent = 'Jika email terdaftar, kode verifikasi sudah dikirim. Kode berlaku 15 menit.'; } else { await server('reset-password', { email: $('#resetEmail').value, code: $('#resetCode').value, newPassword: $('#resetNewPassword').value }); $('#dlgForgotPassword').close(); toast('Password berhasil diubah. Silakan masuk dengan password baru.'); } } catch (x) { err.textContent = x.message; } finally { btn.disabled = false; } }
+async function refreshBackendStatus() { try { const x = await server('backend-status'); $('#backendStatus').textContent = `Backend: aktif • ${x.version}`; } catch (e) { const el = $('#backendStatus'); if (el) el.textContent = 'Backend: tidak terhubung'; } }
+async function registerCurrentDevice() { if (!brokerMode() || !S.bsession) return; try { await server('register-device', { session: S.bsession.id, deviceLabel: /Android/i.test(navigator.userAgent) ? 'Android' : /iPhone|iPad/i.test(navigator.userAgent) ? 'iPhone/iPad' : 'Komputer', userAgent: navigator.userAgent }); } catch {} }
+async function showDevices() { $('#devicesList').innerHTML = '<p class="muted">Memuat…</p>'; $('#dlgDevices').showModal(); try { const r = await server('list-devices', { session: S.bsession.id }); $('#devicesList').innerHTML = (r.devices || []).map(d => `<p><strong>${esc(d.label)}</strong> ${d.current ? '<span class="tiny muted">(perangkat ini)</span>' : ''}<br><span class="tiny muted">${new Date(d.last).toLocaleString('id-ID')}</span></p>`).join('') || '<p class="muted">Belum ada perangkat.</p>'; } catch (e) { $('#devicesList').innerHTML = `<p class="error">${esc(e.message)}</p>`; } }
+async function showActivity() { $('#activityList').innerHTML = '<p class="muted">Memuat…</p>'; $('#dlgActivity').showModal(); try { const r = await server('activity-log', { session: S.bsession.id }); const local = JSON.parse(LS.get('vena.activity') || '[]'); const entries = [...(r.entries || []), ...local].sort((a, b) => b.at - a.at).slice(0, 100); $('#activityList').innerHTML = entries.map(x => `<p><strong>${esc(x.type)}</strong> — ${esc(x.detail)}<br><span class="tiny muted">${new Date(x.at).toLocaleString('id-ID')}</span></p>`).join('') || '<p class="muted">Belum ada aktivitas.</p>'; } catch (e) { $('#activityList').innerHTML = `<p class="error">${esc(e.message)}</p>`; } }
 
 /* ================================================================ SETUP & LOGIN */
 function setupLoginScreen() {
@@ -3588,7 +3665,9 @@ function bind() {
   $('#btnResetSetup').onclick = () => { LS.del('vena.clientId'); LS.del('vena.session'); location.reload(); };
   $('#btnLogin').onclick = () => signIn(LS.get('vena.lastEmail') ? '' : 'select_account');
   $('#pwForm').onsubmit = passwordLogin;
+  $('#forgotPasswordForm').onsubmit = submitForgotPassword;
   $('#passwordForm').onsubmit = changePassword;
+  $('#deletePasswordForm').onsubmit = verifyDeletePassword;
   $$('[data-toggle-password]').forEach((b) => {
     b.onclick = () => {
       const i = document.querySelector(b.dataset.togglePassword); if (!i) return;
@@ -3676,7 +3755,13 @@ function bind() {
         case 'close-sidebar': if ($('#screenApp').classList.contains('nav-open')) { $('#screenApp').classList.remove('nav-open'); popOverlay('nav'); } return;
         case 'logout': confirmLogout(); return;
         case 'change-password': openChangePassword(); return;
+        case 'forgot-password': openForgotPassword(); return;
+        case 'close-forgot-password': $('#dlgForgotPassword').close(); return;
+        case 'show-devices': showDevices(); return;
+        case 'show-activity': showActivity(); return;
+        case 'update-pwa': if (window.venaWaitingWorker) { window.venaWaitingWorker.postMessage({ type: 'SKIP_WAITING' }); window.location.reload(); } return;
         case 'close-password': $('#dlgPassword').close(); return;
+        case 'close-delete-password': $('#dlgDeletePassword').close(); return;
         case 'theme': toggleTheme(); return;
         case 'reconnect': reconnect(); return;
         case 'home': location.hash = '#/'; return;
@@ -3891,6 +3976,26 @@ function bind() {
     if (e.key === '/') { e.preventDefault(); $('#searchInput').focus(); }
   });
 
+  // Dialog konfirmasi memakai tombol kiri/kanan seperti dialog native:
+  // panah berpindah fokus, Enter menekan tombol yang sedang dipilih.
+  document.addEventListener('keydown', (e) => {
+    const dlg = document.querySelector('dialog[open]');
+    if (!dlg || e.isComposing || e.ctrlKey || e.altKey || e.metaKey) return;
+    const active = document.activeElement;
+    const buttons = [...dlg.querySelectorAll('button:not([disabled])')];
+    if (!buttons.length) return;
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && (active === dlg || active.tagName === 'BUTTON')) {
+      e.preventDefault();
+      let i = buttons.indexOf(active); if (i < 0) i = e.key === 'ArrowLeft' ? 0 : buttons.length - 1;
+      i = (i + (e.key === 'ArrowLeft' ? -1 : 1) + buttons.length) % buttons.length;
+      buttons[i].focus();
+      return;
+    }
+    if (e.key === 'Enter' && (active === dlg || active.tagName === 'BUTTON')) {
+      e.preventDefault(); (active === dlg ? buttons[buttons.length - 1] : active).click();
+    }
+  });
+
   // Enter selalu menekan tombol aksi utama pada dialog, termasuk dialog
   // method="dialog" yang tidak selalu men-submit konsisten di semua browser.
   document.addEventListener('keydown', (e) => {
@@ -3945,7 +4050,7 @@ function bind() {
 
 /* ---------------------------------------------------------------- service worker (PWA) */
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
-  window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' }).catch(() => {}));
+  window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' }).then(reg => { reg.addEventListener('updatefound', () => { const w = reg.installing; if (!w) return; w.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) { window.venaWaitingWorker = w; const bar = document.querySelector('#updateBar'); if (bar) bar.hidden = false; } }); }); }).catch(() => {}));
 }
 
 bind();
