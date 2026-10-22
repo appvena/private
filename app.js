@@ -7,7 +7,7 @@
 'use strict';
 
 /* ---------------------------------------------------------------- versi */
-const APP_VERSION = '3.0.7';
+const APP_VERSION = '3.0.8';
 const APP_BUILD = '18 Oktober 2026';
 
 /* ---------------------------------------------------------------- konfigurasi */
@@ -196,7 +196,7 @@ async function server(action, data = {}) {
   catch { throw new Error('Balasan server Vena tidak valid. Pastikan Apps Script di-deploy sebagai Web app dengan akses "Anyone".'); }
   if (j.error) {
     const stale = action === 'change-password' && j.error === 'BAD_REQUEST' && /tidak dikenal/i.test(j.message || '');
-    const e = new Error(stale ? 'Backend belum diperbarui. Deploy server/Code.gs versi 3.0.7 ke Web App yang sama, lalu coba lagi.' : (j.message || j.error));
+    const e = new Error(stale ? 'Backend belum diperbarui. Deploy server/Code.gs versi 3.0.8 ke Web App yang sama, lalu coba lagi.' : (j.message || j.error));
     e.code = j.error; throw e;
   }
   return j;
@@ -3484,7 +3484,11 @@ async function consumeSharedFiles() {
       return new File([blob], name, { type: blob.type || 'application/octet-stream', lastModified: Date.now() });
     }));
     if (files.length) {
-      await addUploads(files.map(file => ({ file, dir: [] })), S.uploadTarget || curFolderId());
+      // Saat aplikasi dibuka langsung dari WhatsApp, onRoute belum sempat
+      // berjalan sehingga S.route.id masih null. Gunakan root Vena (C:),
+      // bukan root Google Drive, sebagai tujuan aman.
+      const activeFolder = S.route.type === 'folder' && S.route.id ? S.route.id : S.rootId;
+      await addUploads(files.map(file => ({ file, dir: [] })), S.uploadTarget || activeFolder || S.rootId);
       toast(files.length === 1 ? 'File dari WhatsApp masuk ke antrean upload.' : `${files.length} file dari WhatsApp masuk ke antrean upload.`);
     }
   } catch (e) { console.warn('Share Target:', e); }
