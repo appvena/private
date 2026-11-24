@@ -7,8 +7,8 @@
 'use strict';
 
 /* ---------------------------------------------------------------- versi */
-const APP_VERSION = '3.2.1';
-const APP_BUILD = '18 Oktober 2026';
+const APP_VERSION = '3.3.2';
+const APP_BUILD = '25 November 2026';
 
 /* ---------------------------------------------------------------- konfigurasi */
 const CFG = Object.assign({
@@ -319,7 +319,7 @@ async function afterLogin() {
   show('screenApp');
   installBackGuard();
   await ensureRoot();
-  registerCurrentDevice(); refreshBackendStatus();
+  registerCurrentDevice(); refreshBackendStatus(); sweepTempFiles();
   try { await ensureSpecialFolders(); } catch (e) { console.warn('Folder sistem:', e); }
   try { await loadDrives(); } catch (e) { S.drives = [{ id: S.rootId, root: true, letter: 'C', label: 'Data', color: '', limit: 0 }]; }
   await consumeSharedFiles();
@@ -502,7 +502,8 @@ const refreshQuotaSoon = () => { clearTimeout(quotaTimer); quotaTimer = setTimeo
 
 /* ================================================================ RUTE */
 function parseHash() {
-  const h = decodeURIComponent(location.hash.replace(/^#\/?/, ''));
+  let h = location.hash.replace(/^#\/?/, '');
+  try { h = decodeURIComponent(h); } catch {}
   if (!h) return { type: 'drives' };
   if (h.startsWith('f/')) return { type: 'folder', id: h.slice(2) || S.rootId };
   if (h.startsWith('search/')) return { type: 'search', q: h.slice(7) };
@@ -589,7 +590,7 @@ async function loadView(silent = false) {
       return;
     }
     if (r.type === 'folder') {
-      items = await listAll(`'${qstr(r.id)}' in parents and trashed=false`, { orderBy: 'folder,name' });
+      items = await listAll(`'${qstr(r.id)}' in parents and trashed=false`, { orderBy: 'folder,name', max: 50000 });
     } else if (r.type === 'recent') {
       const res = await api('/files', { query: { q: `trashed=false and mimeType!='${FOLDER}'`, orderBy: 'modifiedTime desc', pageSize: 60, fields: `files(${FIELDS})`, spaces: 'drive' } });
       items = res.files || [];
@@ -598,7 +599,7 @@ async function loadView(silent = false) {
     } else if (r.type === 'shared') {
       items = await listAll("visibility='anyoneWithLink' and trashed=false");
     } else if (r.type === 'trash') {
-      items = (await listAll('trashed=true')).filter(f => f.explicitlyTrashed !== false);
+      items = (await listAll('trashed=true', { max: 50000 })).filter(f => f.explicitlyTrashed !== false);
     } else if (r.type === 'search') {
       items = r.q ? await listAll(`(name contains '${qstr(r.q)}' or fullText contains '${qstr(r.q)}') and trashed=false`, { max: 500 }) : [];
     }
@@ -1199,7 +1200,7 @@ function renderSelection() {
   const n = sel.length, files = sel.filter(f => !isFolder(f)).length;
   for (const b of $$('#cmdbar [data-need]')) {
     const need = b.dataset.need;
-    b.disabled = need === 'one' ? n !== 1 : need === 'files' ? files === 0 : n === 0;
+    b.disabled = need === 'one' ? n !== 1 : need === 'files' ? files === 0 : need === 'print' ? !(n === 1 && canPrint(sel[0])) : n === 0;
   }
   $('#content').classList.toggle('selecting', n > 0);
   $('#screenApp').classList.toggle('has-sel', n > 0);
@@ -1239,6 +1240,7 @@ function renderDetails() {
     let acts = '';
     if (trash) acts = btn('sel-restore', 'i-restore', 'Pulihkan', 'btn-primary') + btn('sel-delete', 'i-trash', 'Hapus permanen', 'danger');
     else acts = btn('sel-open', folder ? 'i-folder' : 'i-eye', folder ? 'Buka folder' : 'Buka', 'btn-primary')
+      + (!folder && canPrint(f) ? btn('sel-print', 'i-printer', 'Cetak') : '')
       + btn('sel-download', 'i-download', folder ? 'Unduh ZIP' : 'Unduh')
       + btn('sel-share', 'i-link', f.shared ? 'Link aktif' : 'Bagikan')
       + btn('sel-rename', 'i-edit', 'Ganti nama')
@@ -1423,6 +1425,7 @@ function openItemMenu(id, x, y, alignRight) {
     h += folder ? b('open', 'i-folder', 'Buka') : b('open', mediaKind(f) ? 'i-play' : 'i-eye', mediaKind(f) ? 'Putar' : 'Pratinjau');
     if (folder) h += b('playfolder', 'i-play', 'Putar musik / video di folder ini');
     if (folder && EMBED === 'window') h += b('newwin', 'i-external', 'Buka di jendela baru');
+    if (!folder && canPrint(f)) h += b('print', 'i-printer', 'Cetak');
     h += b('download', 'i-download', folder ? 'Unduh sebagai ZIP' : 'Unduh');
     h += b('share', 'i-link', f.shared ? 'Kelola link berbagi' : 'Bagikan link');
     h += b('sendwa', 'i-chat', 'Kirim lewat WhatsApp');
@@ -1456,6 +1459,7 @@ async function itemAction(act, id) {
     case 'icon': return openIconPicker(S.selected.has(f.id) && S.selected.size > 1 ? selectedItems() : [f]);
     case 'open': return openItem(f);
     case 'download': return downloadFiles([f]);
+    case 'print': return printFile(f);
     case 'share': return openShare(f);
     case 'rename': return renameItem(f);
     case 'move': return openMove([f]);
@@ -1551,6 +1555,9 @@ async function runAll(list, fn, conc = 4) {
   return results;
 }
 
+const splitResults = (list, res) => ({ ok: list.filter((f, i) => !(res[i] instanceof Error)), bad: list.filter((f, i) => res[i] instanceof Error), err: res.find(r => r instanceof Error) });
+const failNote = (n, err) => n ? ` ${n} gagal${err && err.message ? ' (' + err.message + ')' : ''}.` : '';
+
 async function trashItems(list) {
   if (!list.length) return;
   if (list.some(isProtectedFolder)) { toast('Folder Gudang Kabinet dilindungi dan tidak dapat dihapus.', { error: true }); return; }
@@ -1563,14 +1570,14 @@ async function trashItems(list) {
   if (!ok) return;
   try {
     const res = await runAll(list, f => api('/files/' + f.id, { method: 'PATCH', query: { fields: 'id' }, body: { trashed: true } }));
-    const ok = list.filter((f, i) => !(res[i] instanceof Error));
+    const { ok, bad, err } = splitResults(list, res);
     const ids = new Set(ok.map(f => f.id));
     S.items = S.items.filter(f => !ids.has(f.id));
     for (const id of ids) S.selected.delete(id);
     render();
-    const failed = list.length - ok.length;
-    toast(ok.length === 1 ? `“${ok[0].name}” dipindahkan ke Sampah.` : `${ok.length} item dipindahkan ke Sampah.` + (failed ? ` ${failed} gagal.` : ''), {
-      action: 'Urungkan', onAction: async () => { await restoreItems(ok, true); onRoute(true); }, ms: 7000
+    if (!ok.length) { fail(err || new Error('Tidak ada item yang terhapus'), 'Gagal menghapus'); return; }
+    toast((ok.length === 1 ? `“${ok[0].name}” dipindahkan ke Sampah.` : `${ok.length} item dipindahkan ke Sampah.`) + failNote(bad.length, err), {
+      error: !!bad.length, action: 'Urungkan', onAction: async () => { await restoreItems(ok, true); onRoute(true); }, ms: 7000
     });
     refreshQuotaSoon(); refreshTreeSoon();
   } catch (e) { fail(e, 'Gagal menghapus'); }
@@ -1590,8 +1597,8 @@ async function filledFolders(folders) {
 
 function confirmDeleteFolderPassword() {
   if (!brokerMode()) {
-    toast('Konfirmasi password folder hanya tersedia pada mode password Vena.', { error: true });
-    return Promise.resolve(false);
+    // Mode login Google tidak punya password Vena: cukup konfirmasi biasa.
+    return confirmDialog('Folder masih berisi', 'Folder ini masih berisi file atau subfolder. Semua isinya ikut dipindahkan ke Sampah.', 'Lanjutkan');
   }
   return new Promise((resolve) => {
     const d = $('#dlgDeletePassword'), form = $('#deletePasswordForm'), input = $('#deletePasswordInput');
@@ -1618,13 +1625,17 @@ async function verifyDeletePassword(e) {
 
 async function restoreItems(list, quiet) {
   try {
-    await runAll(list, f => api('/files/' + f.id, { method: 'PATCH', query: { fields: 'id' }, body: { trashed: false } }));
+    const res = await runAll(list, f => api('/files/' + f.id, { method: 'PATCH', query: { fields: 'id' }, body: { trashed: false } }));
+    const { ok, bad, err } = splitResults(list, res);
     if (S.route.type === 'trash') {
-      const ids = new Set(list.map(f => f.id));
+      const ids = new Set(ok.map(f => f.id));
       S.items = S.items.filter(f => !ids.has(f.id)); S.selected.clear(); render();
     }
-    if (!quiet) toast(list.length === 1 ? `“${list[0].name}” dipulihkan.` : `${list.length} item dipulihkan.`);
-    refreshTreeSoon();
+    if (bad.length) toast((ok.length ? `${ok.length} item dipulihkan.` : 'Gagal memulihkan.') + failNote(bad.length, err), { error: true, ms: 7000 });
+    else if (!quiet) toast(ok.length === 1 ? `“${ok[0].name}” dipulihkan.` : `${ok.length} item dipulihkan.`);
+    // drive yang dipulihkan dari Sampah muncul lagi di daftar drive
+    if (ok.some(f => f.appProperties && f.appProperties.venaDrive)) { try { await loadDrives(); } catch {} }
+    refreshTreeSoon(); refreshQuotaSoon();
   } catch (e) { fail(e, 'Gagal memulihkan'); }
 }
 
@@ -1639,10 +1650,12 @@ async function deleteItems(list, skipConfirm) {
     if (!ok) return;
   }
   try {
-    await runAll(list, f => api('/files/' + f.id, { method: 'DELETE' }));
-    const ids = new Set(list.map(f => f.id));
+    const res = await runAll(list, f => api('/files/' + f.id, { method: 'DELETE' }));
+    const { ok, bad, err } = splitResults(list, res);
+    const ids = new Set(ok.map(f => f.id));
     S.items = S.items.filter(f => !ids.has(f.id)); S.selected.clear(); render();
-    toast(list.length === 1 ? 'Dihapus permanen.' : `${list.length} item dihapus permanen.`);
+    if (bad.length) toast((ok.length ? `${ok.length} item dihapus permanen.` : 'Gagal menghapus.') + failNote(bad.length, err), { error: true, ms: 7000 });
+    else toast(ok.length === 1 ? 'Dihapus permanen.' : `${ok.length} item dihapus permanen.`);
     refreshTreeSoon();
     refreshQuotaSoon();
   } catch (e) { fail(e, 'Gagal menghapus'); }
@@ -2043,7 +2056,10 @@ async function copyItems(list, target) {
   };
   const copyFolder = async (f, parent, name) => {
     if (p.signal.aborted) throw new DOMException('Dibatalkan', 'AbortError');
-    const nf = await api('/files', { method: 'POST', query: { fields: FIELDS }, body: { name, mimeType: FOLDER, parents: [parent], appProperties: f.appProperties || undefined } });
+    const ap = f.appProperties || {}, keep = {};
+    if (ap.venaColor) keep.venaColor = ap.venaColor;     // hanya warna & ikon yang ikut disalin
+    if (ap.venaIcon) keep.venaIcon = ap.venaIcon;
+    const nf = await api('/files', { method: 'POST', query: { fields: FIELDS }, body: { name, mimeType: FOLDER, parents: [parent], appProperties: Object.keys(keep).length ? keep : undefined } });
     const kids = await listAll(`'${qstr(f.id)}' in parents and trashed=false`, { max: 100000 });
     for (const k of kids) {
       if (isFolder(k)) await copyFolder(k, nf.id, k.name);
@@ -2166,7 +2182,10 @@ function paintIconPicker() {
 async function saveIcons(list, color, sym) {
   const props = { venaColor: color || null, venaIcon: sym || null };
   try {
-    await runAll(list, f => api('/files/' + f.id, { method: 'PATCH', query: { fields: 'id,appProperties' }, body: { appProperties: props } }));
+    const res = await runAll(list, f => api('/files/' + f.id, { method: 'PATCH', query: { fields: 'id,appProperties' }, body: { appProperties: props } }));
+    const { ok, bad, err } = splitResults(list, res);
+    if (bad.length) toast(`Ikon ${bad.length} item gagal diubah${err && err.message ? ': ' + err.message : ''}.`, { error: true });
+    list = ok; if (!list.length) return;
     for (const f of list) {
       const ap = Object.assign({}, f.appProperties);
       if (color) ap.venaColor = color; else delete ap.venaColor;
@@ -2193,13 +2212,16 @@ async function moveItemsTo(list, target) {
     if (chain.some(c => ids.has(c.id))) { toast('Folder tidak bisa dipindahkan ke dalam dirinya sendiri.', { error: true }); return; }
   }
   try {
-    await runAll(list, f => api('/files/' + f.id, { method: 'PATCH', query: {
+    const res = await runAll(list, f => api('/files/' + f.id, { method: 'PATCH', query: {
       addParents: target, removeParents: (f.parents || []).join(','), fields: 'id,parents' } }));
-    for (const f of list) { f.parents = [target]; if (isFolder(f)) S.meta.set(f.id, { name: f.name, parents: [target] }); }
+    const { ok, bad, err } = splitResults(list, res);
+    if (!ok.length) { fail(err || new Error('Tidak ada item yang dipindahkan'), 'Gagal memindahkan'); return; }
+    for (const f of ok) { f.parents = [target]; if (isFolder(f)) S.meta.set(f.id, { name: f.name, parents: [target] }); }
+    const okIds = new Set(ok.map(f => f.id));
     const name = (S.meta.get(target) || {}).name || 'folder';
-    toast(list.length === 1 ? `“${list[0].name}” dipindahkan ke “${name}”.` : `${list.length} item dipindahkan ke “${name}”.`, {
-      action: 'Buka', onAction: () => location.hash = folderHash(target) });
-    if (S.route.type === 'folder' && S.route.id !== target) S.items = S.items.filter(f => !ids.has(f.id));
+    toast((ok.length === 1 ? `“${ok[0].name}” dipindahkan ke “${name}”.` : `${ok.length} item dipindahkan ke “${name}”.`) + failNote(bad.length, err), {
+      error: !!bad.length, action: 'Buka', onAction: () => location.hash = folderHash(target) });
+    if (S.route.type === 'folder' && S.route.id !== target) S.items = S.items.filter(f => !okIds.has(f.id));
     S.selected.clear(); render(); refreshTreeSoon(); refreshQuotaSoon();
   } catch (e) { fail(e, 'Gagal memindahkan'); }
 }
@@ -2996,8 +3018,27 @@ function updatePlayAllButton() {
 }
 
 /* ================================================================ PRATINJAU */
-const V = { id: null, url: null, ctl: null, pdf: null, wb: null, zoom: 1 };
+const V = { id: null, url: null, ctl: null, pdf: null, wb: null, sheet: 0, zoom: 1 };
 function viewerFiles() { return visibleFiles(); }
+
+// Cara sebuah file ditampilkan (dan dicetak) di dalam aplikasi.
+// null = belum bisa dibuka di sini.
+const PREVIEW_LIMIT = { image: 40e6, pdf: 120e6, sheet: 25e6, text: 3e6, convert: 50e6, gexport: Infinity };
+function previewKind(f) {
+  if (!f || isFolder(f)) return null;
+  const k = kindOf(f), e = extOf(f), mime = f.mimeType || '';
+  if (mime.startsWith('application/vnd.google-apps.'))
+    return ['document', 'presentation', 'spreadsheet', 'drawing'].some(t => mime.endsWith(t)) ? 'gexport' : null;
+  if (k === 'image') return 'image';
+  if (k === 'pdf') return 'pdf';
+  if (k === 'sheet') return 'sheet';
+  const textual = (k === 'code' || mime.startsWith('text/') || ['txt', 'md', 'log', 'json', 'xml'].includes(e)) && e !== 'csv';
+  if (textual) return 'text';
+  if (['doc', 'docx', 'odt', 'rtf', 'ppt', 'pptx', 'odp'].includes(e) || (k === 'doc' && e !== 'pages') || (k === 'slides' && e !== 'key')) return 'convert';
+  return null;
+}
+const tooBigToPreview = (f, mode) => (Number(f.size) || 0) > PREVIEW_LIMIT[mode];
+const canPrint = (f) => { const m = previewKind(f); return !!m && !tooBigToPreview(f, m) && S.route.type !== 'trash'; };
 async function openViewer(id) {
   const f = itemById(id); if (!f) return;
   V.id = id;
@@ -3016,7 +3057,8 @@ async function openViewer(id) {
   document.body.style.overflow = 'hidden';
   const body = $('#viewerBody');
   body.className = 'viewer-body';
-  const k = kindOf(f), size = Number(f.size) || 0, e = extOf(f), mime = f.mimeType || '';
+  const e = extOf(f);
+  $('#viewerPrint').hidden = !canPrint(f);
   const msg = (text) => {
     body.className = 'viewer-body';
     body.innerHTML = `<div class="viewer-msg">${itemSvg(f, 'big')}<p>${esc(text)}</p>
@@ -3026,19 +3068,9 @@ async function openViewer(id) {
   const loading = (t) => { body.className = 'viewer-body'; body.innerHTML = `<div class="viewer-loading"><div class="spinner"></div><p>${esc(t || 'Memuat…')}</p></div>`; };
 
   // jenis tampilan
-  const textual = (k === 'code' || mime.startsWith('text/') || ['txt', 'md', 'log', 'json', 'xml'].includes(e)) && e !== 'csv';
-  const gdoc = mime.startsWith('application/vnd.google-apps.');
-  const convertible = ['doc', 'docx', 'odt', 'rtf', 'ppt', 'pptx', 'odp'].includes(e) || (k === 'doc' && !textual && e !== 'pages') || (k === 'slides' && e !== 'key');
-  let mode = null;
-  if (gdoc) mode = ['document', 'presentation', 'spreadsheet', 'drawing'].some(t => mime.endsWith(t)) ? 'gexport' : null;
-  else if (k === 'image') mode = 'image';
-  else if (k === 'pdf') mode = 'pdf';
-  else if (k === 'sheet') mode = 'sheet';
-  else if (textual) mode = 'text';
-  else if (convertible) mode = 'convert';
-  const limits = { image: 40e6, pdf: 120e6, sheet: 25e6, text: 3e6, convert: 50e6, gexport: Infinity };
+  const mode = previewKind(f);
   if (!mode) return msg('Pratinjau belum tersedia untuk jenis file ini. Unduh untuk membukanya.');
-  if (size > limits[mode]) return msg('File ini terlalu besar untuk dipratinjau di sini. Unduh untuk membukanya.');
+  if (tooBigToPreview(f, mode)) return msg('File ini terlalu besar untuk dipratinjau di sini. Unduh untuk membukanya.');
 
   loading(mode === 'convert' || mode === 'gexport' ? 'Menyiapkan pratinjau dokumen…' : 'Memuat…');
   V.ctl = new AbortController();
@@ -3063,6 +3095,11 @@ async function openViewer(id) {
       V.url = URL.createObjectURL(blob);
       body.className = 'viewer-body img-mode';
       body.innerHTML = `<img alt="${esc(f.name)}" src="${V.url}" title="Klik untuk memperbesar">`;
+      body.firstChild.onerror = function () {      // mis. HEIC dari iPhone di Chrome/Windows
+        this.onerror = null;
+        if (f.thumbnailLink) { this.referrerPolicy = 'no-referrer'; this.src = f.thumbnailLink.replace(/=s\d+$/, '=s1600'); }
+        else msg('Browser ini tidak bisa menampilkan gambar ini. Unduh untuk membukanya.');
+      };
       body.firstChild.onclick = (ev) => {          // klik: ukuran asli ⇄ pas layar
         const z = body.classList.toggle('zoomed');
         if (z) {
@@ -3121,6 +3158,16 @@ async function officeToPdf(f, signal) {
   } finally {
     api(`/files/${tmp.id}`, { method: 'DELETE' }).catch(() => {});
   }
+}
+
+// File sementara "~pratinjau …" bisa tertinggal kalau tab ditutup saat konversi.
+// Disembunyikan dari daftar, tapi tetap memakan kuota — hapus yang lebih dari 15 menit.
+async function sweepTempFiles() {
+  try {
+    const before = new Date(Date.now() - 15 * 60e3).toISOString();
+    const r = await api('/files', { query: { q: `appProperties has { key='venaTemp' and value='1' } and createdTime < '${before}'`, fields: 'files(id)', pageSize: 100, spaces: 'drive' } });
+    for (const x of (r && r.files) || []) await api(`/files/${x.id}`, { method: 'DELETE' }).catch(() => {});
+  } catch (e) { console.warn('Bersihkan file sementara:', e); }
 }
 
 /* ---- penampil PDF (jalan di semua perangkat, termasuk HP) ---- */
@@ -3212,6 +3259,7 @@ async function renderSheet(data, ext, id) {
 function showSheet(i) {
   const wb = V.wb; if (!wb) return;
   const ws = wb.Sheets[wb.SheetNames[i]];
+  V.sheet = i;
   const MAX = 3000;
   let note = '';
   if (ws['!ref']) {
@@ -3254,6 +3302,190 @@ function stepViewer(d) {
   const i = list.findIndex(x => x.id === V.id);
   const n = list[i + d];
   if (n) openViewer(n.id);
+}
+
+/* ================================================================ CETAK
+   File dicetak langsung dari aplikasi, tanpa diunduh dulu.
+   - PDF, Word, PowerPoint, Google Docs/Slides/Sheets: diubah ke PDF.
+     Chrome/Edge di komputer memakai penampil PDF bawaan (hasil tajam/vektor).
+     HP, iPhone, Safari, Firefox: halaman digambar jadi gambar resolusi
+     tinggi lalu dicetak — cara ini jalan di semua perangkat.
+   - Gambar, teks/kode, Excel/CSV: disusun jadi halaman cetak sederhana.
+   Isi cetak ditaruh di #printArea yang hanya terlihat saat mencetak. */
+const PR = { busy: false, urls: [], frame: null, title: '' };
+const nativePdfPrint = () => {
+  const ua = navigator.userAgent;
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua) || isIOS()) return false;
+  if (navigator.pdfViewerEnabled === false) return false;      // Chrome diset "unduh PDF"
+  return /Chrome\/|Edg\//.test(ua) && !/Firefox\//.test(ua);
+};
+
+function cleanupPrint() {
+  const a = $('#printArea'); if (a) a.remove();
+  const st = $('#printStyle'); if (st) st.remove();
+  document.documentElement.classList.remove('printing');
+  for (const u of PR.urls) URL.revokeObjectURL(u);
+  PR.urls = [];
+  if (PR.title) { document.title = PR.title; PR.title = ''; }
+}
+function cleanupPrintFrame() {
+  if (!PR.frame) return;
+  URL.revokeObjectURL(PR.frame.src);
+  PR.frame.remove(); PR.frame = null;
+}
+
+// Susun halaman cetak lalu buka dialog cetak browser.
+async function printHtml(html, pageCss, title, urls = []) {
+  cleanupPrint();
+  const area = document.createElement('div');
+  area.id = 'printArea';
+  area.innerHTML = html;
+  document.body.appendChild(area);
+  const st = document.createElement('style');
+  st.id = 'printStyle';
+  st.textContent = `@media print { ${pageCss} }`;
+  document.head.appendChild(st);
+  PR.urls = urls;
+  PR.title = document.title;
+  document.title = title.replace(/\.[^.]+$/, '');            // jadi nama file saat "Simpan sebagai PDF"
+  document.documentElement.classList.add('printing');
+  await Promise.all([...area.querySelectorAll('img')].map(img =>
+    img.complete ? Promise.resolve() : new Promise(r => { img.onload = img.onerror = r; })));
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  // Di Android/iPhone dialog cetak tidak memblokir dan pratinjau bisa digambar
+  // ulang saat ukuran kertas diganti, jadi isi cetak baru dibersihkan setelah
+  // pengguna kembali menyentuh aplikasi.
+  window.addEventListener('afterprint', () => {
+    const done = () => { cleanupPrint(); document.removeEventListener('pointerdown', done, true); document.removeEventListener('keydown', done, true); };
+    setTimeout(() => { document.addEventListener('pointerdown', done, true); document.addEventListener('keydown', done, true); }, 300);
+  }, { once: true });
+  window.print();
+}
+
+async function pdfBytesOf(f, mode, signal) {
+  if (mode === 'gexport') {
+    const res = await api(`/files/${f.id}/export`, { query: { mimeType: 'application/pdf' }, raw: true, signal });
+    return res.arrayBuffer();
+  }
+  if (mode === 'convert') return officeToPdf(f, signal);
+  return (await fetchBlob(f, signal)).arrayBuffer();
+}
+
+async function printPdf(data, name, p) {
+  if (nativePdfPrint()) {
+    try {
+      cleanupPrintFrame();
+      const fr = document.createElement('iframe');
+      fr.className = 'print-frame';
+      fr.setAttribute('aria-hidden', 'true');
+      fr.src = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
+      PR.frame = fr;
+      await new Promise((resolve, reject) => {
+        fr.onload = resolve;
+        setTimeout(() => reject(new Error('timeout')), 20000);
+        document.body.appendChild(fr);
+      });
+      await sleep(400);                                 // beri waktu penampil PDF siap
+      p.close();
+      fr.contentWindow.focus();
+      fr.contentWindow.print();
+      return;
+    } catch (e) {
+      console.warn('Cetak PDF bawaan gagal, pakai cara gambar:', e);
+      cleanupPrintFrame();
+    }
+  }
+  // cara gambar: render tiap halaman ±200 dpi
+  const pdfjsLib = await loadPdfJs();
+  const doc = await pdfjsLib.getDocument({ data: new Uint8Array(data) }).promise;
+  const urls = [];
+  let pageCss = '@page { margin: 0; }';
+  try {
+    for (let n = 1; n <= doc.numPages; n++) {
+      if (p.signal.aborted) throw Object.assign(new Error('Dibatalkan'), { name: 'AbortError' });
+      p.set(`Menyiapkan halaman ${n} dari ${doc.numPages}`, (n - 1) / doc.numPages);
+      const page = await doc.getPage(n);
+      const base = page.getViewport({ scale: 1 });
+      if (n === 1) pageCss = `@page { size: ${Math.round(base.width)}pt ${Math.round(base.height)}pt; margin: 0; }`;
+      const scale = Math.min(200 / 72, Math.sqrt(14e6 / (base.width * base.height)));   // batas kanvas iPhone
+      const vp = page.getViewport({ scale });
+      const c = document.createElement('canvas');
+      c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+      c.width = c.height = 0;
+      page.cleanup();
+      urls.push(URL.createObjectURL(blob));
+    }
+  } catch (e) {
+    for (const u of urls) URL.revokeObjectURL(u);
+    throw e;
+  } finally {
+    doc.destroy();
+  }
+  p.close();
+  await printHtml(urls.map((u, i) => `<img class="pr-page" alt="Halaman ${i + 1}" src="${u}">`).join(''), pageCss, name, urls);
+}
+
+function sheetPrintHtml(wb, which) {
+  const X = window.XLSX;
+  return which.map((i) => {
+    const ws = wb.Sheets[wb.SheetNames[i]];
+    const table = ws && ws['!ref'] ? X.utils.sheet_to_html(ws, { header: '', footer: '' }) : '<p>(sheet kosong)</p>';
+    const head = wb.SheetNames.length > 1 ? `<h2>${esc(wb.SheetNames[i])}</h2>` : '';
+    return `<section class="pr-sheet">${head}${table}</section>`;
+  }).join('');
+}
+
+async function printFile(f) {
+  if (!f || isFolder(f)) return;
+  if (PR.busy) { toast('Masih menyiapkan cetak sebelumnya…'); return; }
+  const mode = previewKind(f);
+  if (!mode) { toast('Jenis file ini belum bisa dicetak langsung. Unduh lalu cetak dari aplikasinya.', { error: true }); return; }
+  if (tooBigToPreview(f, mode)) { toast('File ini terlalu besar untuk dicetak dari sini. Unduh lalu cetak dari aplikasinya.', { error: true }); return; }
+  PR.busy = true;
+  const viewing = V.id === f.id && !$('#viewer').hidden;
+  const p = progressToast('Menyiapkan cetak ' + f.name);
+  p.set(mode === 'convert' || mode === 'gexport' ? 'Mengubah dokumen ke PDF…' : 'Memuat file…', null);
+  try {
+    if (mode === 'pdf' || mode === 'convert' || mode === 'gexport') {
+      const data = viewing && V.pdf ? await V.pdf.getData() : await pdfBytesOf(f, mode, p.signal);
+      await printPdf(data, f.name, p);
+    } else if (mode === 'image') {
+      let url = viewing && V.url, urls = [];
+      if (!url) { url = URL.createObjectURL(await fetchBlob(f, p.signal)); urls = [url]; }
+      const dim = await new Promise((r) => { const im = new Image(); im.onload = () => r([im.naturalWidth, im.naturalHeight]); im.onerror = () => r([0, 0]); im.src = url; });
+      if (!dim[0]) { urls.forEach(u => URL.revokeObjectURL(u)); throw new Error('browser ini tidak bisa membaca gambar tersebut'); }
+      p.close();
+      const landscape = dim[0] > dim[1] * 1.1;
+      await printHtml(`<img class="pr-img" alt="${esc(f.name)}" src="${url}">`,
+        `@page { ${landscape ? 'size: landscape; ' : ''}margin: 10mm; }`, f.name, urls);
+    } else if (mode === 'text') {
+      const txt = await (await fetchBlob(f, p.signal)).text();
+      p.close();
+      await printHtml(`<h1 class="pr-title">${esc(f.name)}</h1><pre class="pr-text">${esc(txt)}</pre>`, '@page { margin: 15mm; }', f.name);
+    } else if (mode === 'sheet') {
+      let wb = viewing && V.wb, which;
+      if (wb) which = [V.sheet || 0];                    // dari pratinjau: sheet yang sedang dilihat
+      else {
+        const buf = await (await fetchBlob(f, p.signal)).arrayBuffer();
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+        wb = window.XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true, codepage: 65001 });
+        which = wb.SheetNames.map((_, i) => i);
+      }
+      p.close();
+      await printHtml(sheetPrintHtml(wb, which), '@page { margin: 10mm; }', f.name);
+    }
+  } catch (e) {
+    p.close();
+    if (e.name === 'AbortError') toast('Cetak dibatalkan.');
+    else if (e.auth) { /* banner sesi sudah tampil */ }
+    else fail(e, 'Gagal menyiapkan cetak');
+  } finally {
+    PR.busy = false;
+  }
 }
 
 /* ================================================================ UNGGAH */
@@ -3320,6 +3552,10 @@ async function runUpload(t) {
     const done = U.tasks.filter(x => x.status === 'done').length;
     const failed = U.tasks.filter(x => x.status === 'failed').length;
     if (done && !failed) toast(done === 1 ? 'Unggahan selesai.' : `${done} file selesai diunggah.`);
+    else if (failed) {
+      const first = U.tasks.find(x => x.status === 'failed');
+      toast(`${failed} file gagal diunggah${first && first.error ? ': ' + first.error : ''}.`, { error: true, ms: 9000, action: 'Coba lagi', onAction: () => { for (const x of U.tasks) if (x.status === 'failed') x.status = 'queued'; pumpUploads(); } });
+    }
   }
 }
 
@@ -3332,22 +3568,28 @@ const abortErr = () => Object.assign(new Error('Dibatalkan'), { aborted: true })
 async function startUploadSession(file, type, parentId, retried) {
   const meta = { name: file.name, parents: [parentId] };
   if (file.lastModified) meta.modifiedTime = new Date(file.lastModified).toISOString();
-  const token = await getToken();
-  let r;
-  try {
-    r = await fetch(`${UPLOAD}?uploadType=resumable&fields=${encodeURIComponent(FIELDS)}`, {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': type, 'X-Upload-Content-Length': String(file.size) },
-      body: JSON.stringify(meta),
-    });
-  } catch { throw new Error('Koneksi terputus'); }
-  if (r.status === 401 && !retried) { S.token = null; return startUploadSession(file, type, parentId, true); }
-  if (!r.ok) {
-    let m = 'Ditolak Google Drive (' + r.status + ')'; try { m = (await r.json()).error.message; } catch {}
-    if (/quota/i.test(m)) m = 'Ruang Google Drive sudah penuh';
-    throw Object.assign(new Error(m), { fatal: true });
+  // Banyak file sekaligus bisa kena batas kecepatan Google (403/429) atau
+  // server sibuk (5xx). Itu bukan kegagalan permanen: tunggu lalu coba lagi.
+  for (let attempt = 0; ; attempt++) {
+    const token = await getToken();
+    let r = null;
+    try {
+      r = await fetch(`${UPLOAD}?uploadType=resumable&fields=${encodeURIComponent(FIELDS)}`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': type, 'X-Upload-Content-Length': String(file.size) },
+        body: JSON.stringify(meta),
+      });
+    } catch { if (attempt >= 5) throw new Error('Koneksi terputus'); }
+    if (r && r.status === 401 && !retried) { S.token = null; retried = true; continue; }
+    if (r && r.ok) return r.headers.get('Location');   // null kalau browser tidak diizinkan membacanya
+    let m = r ? 'Ditolak Google Drive (' + r.status + ')' : 'Koneksi terputus', reason = '';
+    if (r) { try { const j = await r.json(); m = j.error.message || m; reason = ((j.error.errors || [])[0] || {}).reason || ''; } catch {} }
+    const transient = !r || r.status === 429 || r.status >= 500 || (r.status === 403 && /rateLimit|userRateLimitExceeded|backendError/i.test(reason + ' ' + m));
+    if (transient && attempt < 5) { await sleep(Math.min(20000, 800 * 2 ** attempt + Math.random() * 500)); continue; }
+    if (/storageQuota|quota exceeded|storage quota/i.test(reason + ' ' + m)) m = 'Ruang Google Drive sudah penuh';
+    else if (r && r.status === 401) { expireSession(); throw new AuthError(); }
+    throw Object.assign(new Error(m), { fatal: !transient });
   }
-  return r.headers.get('Location');   // null kalau browser tidak diizinkan membacanya
 }
 
 // kirim satu potongan [start, end) — hasil: {done, data} atau {next}
@@ -3513,7 +3755,7 @@ function uploadStateText(t) {
 }
 function renderUploadRow(t) {
   const li = $(`#uploadsList li[data-u="${t.id}"]`);
-  if (!li) return renderUploads();
+  if (!li) { renderUploadTitle(); return; }
   li.className = t.status === 'done' ? 'done' : t.status === 'failed' ? 'fail' : '';
   li.querySelector('.u-state').textContent = uploadStateText(t);
   const pct = t.status === 'done' ? 100 : t.file.size ? (t.loaded / t.file.size * 100) : (t.status === 'uploading' ? 50 : 0);
@@ -3536,28 +3778,34 @@ function renderUploadTitle() {
 }
 function renderUploads() {
   const ul = $('#uploadsList');
-  ul.innerHTML = U.tasks.slice(-200).reverse().map(t => `<li data-u="${t.id}">
+  const order = { uploading: 0, failed: 1, queued: 2, done: 3, cancelled: 4 };
+  const shown = U.tasks.slice().sort((a, b) => (order[a.status] - order[b.status]) || (a.id - b.id)).slice(0, 200);
+  ul.innerHTML = shown.map(t => `<li data-u="${t.id}">
       <span class="u-name" title="${esc(t.file.name)}">${esc(t.file.name)}</span>
       <span class="u-act"></span>
       <span class="u-state"></span>
       <span class="u-bar"><span></span></span></li>`).join('');
-  for (const t of U.tasks.slice(-200)) renderUploadRow(t);
+  for (const t of shown) renderUploadRow(t);
   renderUploadTitle();
 }
 
 async function startUpload(fileList) {
   const files = [...fileList];
   if (!files.length) return;
-  // Semua upload masuk satu gudang terpusat, termasuk upload biasa dari HP/PC.
-  // S.uploadTarget tetap dipakai hanya untuk upload khusus dari Commander.
-  const customTarget = S.uploadTarget && S.uploadTarget !== (S.specialFolders && S.specialFolders.cabinet) ? S.uploadTarget : null;
-  const base = customTarget || await ensureSpecialFolder('cabinet');
+  // Tujuan: folder yang sedang dibuka (sama seperti seret & lepas).
+  // Kalau tidak sedang di dalam folder (Komputer ini, Terbaru, Cari, dll.),
+  // file masuk ke Gudang Kabinet. Panel kanan Dua panel memakai S.uploadTarget.
+  const target = S.uploadTarget || (S.route.type === 'folder' && S.route.id ? S.route.id : null);
   S.uploadTarget = null;
-  addUploads(files.map(f => {
-    const rel = f.webkitRelativePath || '';
-    const dir = rel ? rel.split('/').slice(0, -1) : [];
-    return { file: f, dir };
-  }), base);
+  try {
+    const base = target || await ensureSpecialFolder('cabinet');
+    await addUploads(files.map(f => {
+      const rel = f.webkitRelativePath || '';
+      const dir = rel ? rel.split('/').slice(0, -1) : [];
+      return { file: f, dir };
+    }), base);
+    if (!target) toast(`Mengunggah ${files.length} file ke Gudang Kabinet.`, { action: 'Buka', onAction: () => { location.hash = folderHash(base); } });
+  } catch (e) { fail(e, 'Unggahan tidak bisa dimulai'); }
 }
 
 function openShareInbox() {
@@ -3821,6 +4069,7 @@ function bind() {
         case 'home': location.hash = '#/'; return;
         case 'retry': loadView(); return;
         case 'sel-download': downloadFiles(selectedItems()); return;
+        case 'sel-print': { const f = selectedItems()[0]; if (f) printFile(f); return; }
         case 'sel-open': { const f = selectedItems()[0]; if (f) openItem(f); return; }
         case 'sel-share': { const f = selectedItems()[0]; if (f) openShare(f); return; }
         case 'sel-rename': { const f = selectedItems()[0]; if (f) renameItem(f); return; }
@@ -3879,6 +4128,7 @@ function bind() {
         case 'viewer-next': stepViewer(1); return;
         case 'viewer-download': { const f = itemById(V.id); if (f) downloadFiles([f]); return; }
         case 'viewer-share': { const f = itemById(V.id); if (f) openShare(f); return; }
+        case 'viewer-print': { const f = itemById(V.id); if (f) printFile(f); return; }
         case 'toggle-uploads': $('#uploads').classList.toggle('min'); return;
         case 'close-uploads': {
           if (U.tasks.some(x => x.status === 'uploading' || x.status === 'queued')) {
@@ -3984,6 +4234,11 @@ function bind() {
   });
 
   document.addEventListener('keydown', (e) => {
+    // Ctrl+P: cetak file yang sedang dibuka / dipilih, bukan tampilan aplikasinya
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'p' && !document.querySelector('dialog[open]')) {
+      const f = !$('#viewer').hidden ? itemById(V.id) : (!$('#screenApp').hidden && selectedItems().length === 1 ? selectedItems()[0] : null);
+      if (f && canPrint(f)) { e.preventDefault(); printFile(f); return; }
+    }
     const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
     if (!$('#videoStage').hidden) {
       if (e.key === 'Escape') stopPlayer();
@@ -4090,8 +4345,7 @@ function bind() {
     const tile = e.target.closest && e.target.closest('#items .it');
     const tf = tile && itemById(tile.dataset.id);
     const base = tf && isFolder(tf) ? tf.id : curFolderId();
-    const entries = await entriesFromDrop(e.dataTransfer);
-    addUploads(entries, base);
+    try { addUploads(await entriesFromDrop(e.dataTransfer), base); } catch (x) { fail(x, 'Unggahan tidak bisa dimulai'); }
   });
 
   // tempel file dari clipboard (mis. tangkapan layar)

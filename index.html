@@ -19,11 +19,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.2.1">
+  <link rel="stylesheet" href="style.css?v=3.3.2">
   <script>(function () { var c = document.documentElement.classList, e = new URLSearchParams(location.search).get('embed');
     if (e) { c.add('embed'); c.add('embed-' + e); }
     try { var s = localStorage.getItem('vena.skin'); if (!e && (s === 'desktop' || s === 'commander')) c.add('skin-' + s); } catch (x) {} })();</script>
-  <script src="config.js?v=3.2.1"></script>
+  <script src="config.js?v=3.3.2"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
@@ -164,6 +164,7 @@
     <span class="cmd-sep" data-hide-in="trash"></span>
     <button class="cmd" data-action="sel-open" data-need="one" data-hide-in="trash"><svg class="i"><use href="#i-eye"/></svg><span>Buka</span></button>
     <button class="cmd" data-action="sel-download" data-need="any" data-hide-in="trash"><svg class="i"><use href="#i-download"/></svg><span>Unduh</span></button>
+    <button class="cmd" data-action="sel-print" data-need="print" data-hide-in="trash" title="Cetak (Ctrl+P)"><svg class="i"><use href="#i-printer"/></svg><span>Cetak</span></button>
     <button class="cmd" data-action="sel-share" data-need="one" data-hide-in="trash"><svg class="i"><use href="#i-link"/></svg><span>Bagikan</span></button>
     <button class="cmd" data-action="sel-rename" data-need="one" data-hide-in="trash"><svg class="i"><use href="#i-edit"/></svg><span>Ganti nama</span></button>
     <button class="cmd cmd-play" data-action="play-all" id="cmdPlay" hidden><svg class="i"><use href="#i-play"/></svg><span>Putar semua</span></button>
@@ -631,7 +632,8 @@
       <span id="viewerMeta" class="tiny"></span>
     </div>
     <button class="icon-btn" data-action="viewer-share" aria-label="Bagikan"><svg class="i"><use href="#i-link"/></svg></button>
-    <button class="icon-btn" data-action="viewer-download" aria-label="Unduh"><svg class="i"><use href="#i-download"/></svg></button>
+    <button class="icon-btn" data-action="viewer-print" id="viewerPrint" aria-label="Cetak" title="Cetak (Ctrl+P)"><svg class="i"><use href="#i-printer"/></svg></button>
+    <button class="icon-btn" data-action="viewer-download" aria-label="Unduh" title="Unduh"><svg class="i"><use href="#i-download"/></svg></button>
     <a class="icon-btn" id="viewerOpenDrive" target="_blank" rel="noopener" aria-label="Buka di Google Drive"><svg class="i"><use href="#i-external"/></svg></a>
   </header>
   <div class="viewer-body" id="viewerBody"></div>
@@ -724,6 +726,7 @@
     <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM13 7l4 4"/></symbol>
     <symbol id="i-move" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM9 13h6m0 0-2-2m2 2-2 2"/></symbol>
     <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-printer" viewBox="0 0 24 24"><path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="7" rx="1"/><path d="M17.5 12h.01"/></symbol>
     <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
     <symbol id="i-logout" viewBox="0 0 24 24"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 16l-4-4 4-4M6 12h10"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
@@ -744,6 +747,6 @@
   </defs>
 </svg>
 
-<script src="app.js?v=3.2.1"></script>
+<script src="app.js?v=3.3.2"></script>
 </body>
 </html>
